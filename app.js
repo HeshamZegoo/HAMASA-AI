@@ -138,7 +138,8 @@
     recognitionSpeaksReply=voiceMode;
     // Native speech recognition is preferred when available; MediaRecorder + Gemini is the iPhone/Safari fallback.
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-    if(SR){
+    const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent);
+    if(SR&&!isIOS){
       try{
         recognition=new SR();recognition.lang=$("languageSelect").value;recognition.interimResults=true;recognition.continuous=false;
         recognition.onstart=()=>{listening=true;$("micButton").classList.add("listening");$("voiceMic").classList.add("listening");$("voiceStatus").textContent="سامعك... اتكلم";};
