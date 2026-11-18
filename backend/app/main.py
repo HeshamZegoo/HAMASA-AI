@@ -120,7 +120,7 @@ async def transcribe_audio(body: TranscriptionRequest):
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(75.0, connect=15.0)) as client:
             response = await client.post(
-                "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+                "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
                 params={"key": key},
                 headers={"Content-Type": "application/json"},
                 json=payload,
