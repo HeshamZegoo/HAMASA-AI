@@ -197,6 +197,7 @@ dialog h2{font-size:20px;margin-bottom:16px;display:flex;justify-content:space-b
 </dialog>
 <div class="toast" id="toast" role="status"></div>
 
+<script src="./config.js"></script>
 <script>
 'use strict';
 /* =====================================================================
@@ -205,7 +206,7 @@ dialog h2{font-size:20px;margin-bottom:16px;display:flex;justify-content:space-b
    NVIDIA provider and voice by the Gemini provider, both behind your server.
    Never put API keys in this file; keep them server-side.
    ===================================================================== */
-const API_BASE = "https://hamasa-api-production.up.railway.app";
+const API_BASE = (window.HAMASA_CONFIG?.API_URL || "https://hamasa-api-production.up.railway.app").replace(/\/+$/, "");
 const HAMASA_CONFIG = {
   chatUrl: API_BASE + "/api/chat",
   voiceUrl: API_BASE + "/api/live"
@@ -589,9 +590,9 @@ async function startLiveSession() {
     const audioResume = liveContext.resume();
     // Attach a handler immediately; we still await the original promise below.
     audioResume.catch(() => {});
-    const microphoneRequest = navigator.mediaDevices.getUserMedia({
-      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true }
-    });
+    // Use the least restrictive audio request first: iOS Safari can reject
+    // optional processing constraints on some devices and OS builds.
+    const microphoneRequest = navigator.mediaDevices.getUserMedia({ audio: true });
     let micTimedOut = false;
     let micTimerId;
     const micTimeout = new Promise((resolve, reject) => {
@@ -604,8 +605,11 @@ async function startLiveSession() {
     microphoneRequest.then(stream => {
       if (micTimedOut || attemptId !== liveAttemptId) stream.getTracks().forEach(track => track.stop());
     }).catch(() => {});
-    liveStream = await Promise.race([microphoneRequest, micTimeout]);
-    clearTimeout(micTimerId);
+    try {
+      liveStream = await Promise.race([microphoneRequest, micTimeout]);
+    } finally {
+      clearTimeout(micTimerId);
+    }
     if (attemptId !== liveAttemptId) { liveStream.getTracks().forEach(track => track.stop()); liveStream = null; return; }
     $('#vst').textContent = 'Connecting to Gemini';
     $('#vhint').textContent = 'Microphone ready. Opening live voice connection…';
@@ -665,9 +669,14 @@ async function startLiveSession() {
         if (playbackSources.size === 0) setVoice('listening');
       }
     };
-    liveSocket.onerror = () => { vErr = t('errB'); };
+    liveSocket.onerror = () => {
+      const error = new Error('تعذر فتح اتصال الصوت مع خادم حماصة.');
+      vErr = error.message;
+      if (!liveSetupDone && liveSetupReject) liveSetupReject(error);
+    };
     liveSocket.onclose = event => {
       liveReady = false;
+      if (attemptId !== liveAttemptId) return;
       // A user-requested stop is a normal close, not a connection failure.
       if (event.code === 1000 && event.reason === 'Voice session ended') return;
       const reason = event.reason ? ' — ' + event.reason : '';
