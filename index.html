@@ -567,6 +567,9 @@ function saveLiveTurn() {
   scrollEnd();
 }
 async function startLiveSession(microphoneRequest) {
+  // Visible entry marker: distinguishes a click-handler stall from mic/network waits.
+  $('#vst').textContent = 'Preparing voice session…';
+  $('#vhint').textContent = 'وصلنا لبدء جلسة الصوت؛ جاري تجهيز الميكروفون…';
   let attemptId = liveAttemptId;
   try {
     // Keep every startup guard inside this try block so Safari always shows the
@@ -771,9 +774,18 @@ async function activateLiveMic(event) {
   $('#vst').textContent = 'Starting…';
   $('#vhint').textContent = 'تم طلب تشغيل الميكروفون من Safari…';
   micButton.disabled = true;
+  const startupWatchdog = setTimeout(() => {
+    const status = $('#vst').textContent || '';
+    if (/Starting|Preparing/i.test(status)) {
+      $('#vst').textContent = 'Voice startup stalled';
+      $('#vhint').textContent = 'الضغط على الزر وصل، لكن جلسة الصوت لم تبدأ بشكل سليم. أعد تحميل الصفحة مرة واحدة؛ وإذا تكرر التعليق سنحدد السبب من سجل المتصفح.';
+      console.error('HAMASA: voice startup watchdog fired', { status, secure: window.isSecureContext, mediaDevices: !!navigator.mediaDevices, getUserMedia: !!navigator.mediaDevices?.getUserMedia });
+    }
+  }, 12000);
   try {
     await startLiveSession(microphoneRequest);
   } finally {
+    clearTimeout(startupWatchdog);
     micButton.disabled = false;
   }
 }
