@@ -368,9 +368,9 @@ function errorRow() {
 function setBusy(v) { busy = v; sendBtn.disabled = v || !inp.value.trim(); }
 function requestedFileFormat(text) {
   const s = String(text || '').toLowerCase();
-  if (/\b(pdf)\\b|\\.pdf|بي دي اف|pdf/.test(s)) return 'pdf';
-  if (/\b(xlsx|excel)\\b|اكسل|إكسل|اكسيل|جدول حساب/.test(s)) return 'xlsx';
-  if (/\b(docx|word)\\b|وورد/.test(s)) return 'docx';
+  if (/\bpdf\b|\.pdf|بي دي اف/.test(s)) return 'pdf';
+  if (/\b(xlsx|excel)\b|اكسل|إكسل|اكسيل|جدول حساب/.test(s)) return 'xlsx';
+  if (/\b(docx|word)\b|وورد/.test(s)) return 'docx';
   if (/(اعمل|اعملي|أنشئ|انشئ|جهز|جهزي|حضّر|حضر|حوّل|حول|صدّر|صدر).{0,35}(ملف|مستند|تقرير|جدول)/i.test(s) ||
       /(ملف|مستند|تقرير|جدول).{0,35}(للتنزيل|تحميل|جاهز)/i.test(s)) return 'docx';
   return null;
