@@ -424,6 +424,7 @@ let liveSocket = null, liveStream = null, liveContext = null;
 let liveProcessor = null, liveSource = null, silentGain = null;
 let liveReady = false, liveUserText = '', liveAssistantText = '';
 let liveSetupResolve = null, liveSetupReject = null, liveSetupTimer = null, liveSetupDone = false;
+let liveAttemptId = 0;
 let fallbackRecorder = null, fallbackChunks = [], fallbackRecording = false, fallbackMime = '';
 let playbackCursor = 0;
 const playbackSources = new Set();
@@ -431,8 +432,8 @@ let voiceGender = store.get('hamasa.voiceGender', 'male') === 'female' ? 'female
 
 function setVoice(s) {
   vstate = s;
-  const orb = $('#vOrb').querySelector('.orb');
-  if (orb) orb.classList.add(s);
+  const orb = $('#vOrb')?.querySelector('.orb');
+  if (orb) orb.className = 'orb ' + s;
   $('#vst').textContent = t(s);
   $('#mic').classList.toggle('rec', s === 'listening');
   $('#vhint').textContent = s === 'listening' ? t('stopTap') : (vErr || t('idle'));
@@ -455,7 +456,12 @@ function stopPlayback() {
   playbackCursor = 0;
 }
 function stopLiveSession(closeSocket = true) {
+  liveAttemptId++;
   liveReady = false;
+  if (liveSetupTimer) { clearTimeout(liveSetupTimer); liveSetupTimer = null; }
+  liveSetupDone = false;
+  liveSetupResolve = null;
+  liveSetupReject = null;
   if (fallbackRecorder && fallbackRecorder.state === 'recording') {
     fallbackRecorder.onstop = null;
     try { fallbackRecorder.stop(); } catch {}
@@ -564,6 +570,7 @@ function saveLiveTurn() {
 }
 async function startLiveSession() {
   if (liveSocket || vstate !== 'idle') return;
+  const attemptId = ++liveAttemptId;
   if (!navigator.mediaDevices?.getUserMedia) { vmsg('noSR'); return; }
   if (!window.isSecureContext) { vmsg('micDenied'); return; }
   try {
@@ -579,7 +586,9 @@ async function startLiveSession() {
       audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true }
     });
     liveStream = await microphoneRequest;
+    if (attemptId !== liveAttemptId) { liveStream.getTracks().forEach(track => track.stop()); liveStream = null; return; }
     await audioResume;
+    if (attemptId !== liveAttemptId) return;
     const wsUrl = new URL(HAMASA_CONFIG.voiceUrl);
     wsUrl.protocol = wsUrl.protocol === 'https:' ? 'wss:' : 'ws:';
     wsUrl.searchParams.set('gender', voiceGender);
@@ -589,6 +598,7 @@ async function startLiveSession() {
       liveSetupReject = error => { clearTimeout(liveSetupTimer); reject(error); };
       liveSetupTimer = setTimeout(() => liveSetupReject(new Error('Gemini did not confirm the voice session. Check the Gemini Live API key and model access.')), 25000);
     });
+    setupComplete.catch(() => {});
     liveSocket = new WebSocket(wsUrl.toString());
     liveSocket.onmessage = event => {
       let packet;
@@ -651,6 +661,7 @@ async function startLiveSession() {
     // Setup acknowledgement is captured by onmessage from the moment the socket is created,
     // so a fast Gemini setupComplete frame can never be missed.
     await setupComplete;
+    if (attemptId !== liveAttemptId || !liveContext || !liveStream) return;
     const source = liveContext.createMediaStreamSource(liveStream);
     liveProcessor = liveContext.createScriptProcessor(4096, 1, 1);
     silentGain = liveContext.createGain();
@@ -826,7 +837,15 @@ async function startPushToTalk() {
     stopLiveSession();
   }
 }
-$('#mic').onclick = startLiveSession;
+$('#mic').onclick = () => {
+  if (liveSocket || liveStream || vstate !== 'idle') {
+    stopLiveSession();
+    vErr = '';
+    setVoice('idle');
+    return;
+  }
+  startLiveSession();
+};
 /* INIT */
 mountOrbs(); applyTheme(); applyLang(); renderChat(); checkBackend();
 </script>
