@@ -423,6 +423,7 @@ let vstate = 'idle', vErr = '';
 let liveSocket = null, liveStream = null, liveContext = null;
 let liveProcessor = null, liveSource = null, silentGain = null;
 let liveReady = false, liveUserText = '', liveAssistantText = '';
+let liveSetupResolve = null, liveSetupReject = null, liveSetupTimer = null, liveSetupDone = false;
 let playbackCursor = 0;
 const playbackSources = new Set();
 let voiceGender = store.get('hamasa.voiceGender', 'male') === 'female' ? 'female' : 'male';
@@ -574,18 +575,27 @@ async function startLiveSession() {
     const wsUrl = new URL(HAMASA_CONFIG.voiceUrl);
     wsUrl.protocol = wsUrl.protocol === 'https:' ? 'wss:' : 'ws:';
     wsUrl.searchParams.set('gender', voiceGender);
+    liveSetupDone = false;
+    const setupComplete = new Promise((resolve, reject) => {
+      liveSetupResolve = () => { liveSetupDone = true; clearTimeout(liveSetupTimer); resolve(); };
+      liveSetupReject = error => { clearTimeout(liveSetupTimer); reject(error); };
+      liveSetupTimer = setTimeout(() => liveSetupReject(new Error('Gemini did not confirm the voice session. Check the Gemini Live API key and model access.')), 25000);
+    });
     liveSocket = new WebSocket(wsUrl.toString());
     liveSocket.onmessage = event => {
       let packet;
       try { packet = JSON.parse(event.data); } catch { return; }
       if (packet.error) {
-        vErr = packet.error;
-        stopLiveSession();
+        const message = String(packet.error);
+        vErr = message;
+        if (!liveSetupDone && liveSetupReject) liveSetupReject(new Error(message));
         setVoice('idle');
+        stopLiveSession();
         return;
       }
       if (packet.setupComplete) {
         liveReady = true;
+        if (!liveSetupDone && liveSetupResolve) liveSetupResolve();
         setVoice('listening');
         return;
       }
@@ -612,10 +622,12 @@ async function startLiveSession() {
       }
     };
     liveSocket.onerror = () => { vErr = t('errB'); };
-    liveSocket.onclose = () => {
+    liveSocket.onclose = event => {
       liveReady = false;
+      const reason = event.reason ? ' — ' + event.reason : '';
+      if (!liveSetupDone && liveSetupReject) liveSetupReject(new Error('Gemini Live connection closed (' + event.code + ')' + reason));
       if (voice.classList.contains('on')) {
-        if (!vErr) vErr = t('errB');
+        if (!vErr) vErr = 'Voice connection closed (' + event.code + ')' + reason;
         setVoice('idle');
       }
     };
@@ -624,18 +636,8 @@ async function startLiveSession() {
       liveSocket.addEventListener('open', () => { clearTimeout(timeout); resolve(); }, { once: true });
       liveSocket.addEventListener('error', () => { clearTimeout(timeout); reject(new Error('Could not open Gemini Live connection.')); }, { once: true });
     });
-    const setupComplete = new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('Gemini Live setup timed out.')), 18000);
-      const check = event => {
-        try {
-          const packet = JSON.parse(event.data);
-          if (packet.setupComplete) { clearTimeout(timeout); liveSocket.removeEventListener('message', check); resolve(); }
-          if (packet.error) { clearTimeout(timeout); liveSocket.removeEventListener('message', check); reject(new Error(packet.error)); }
-        } catch {}
-      };
-      liveSocket.addEventListener('message', check);
-    });
-    // Backend owns the single Gemini setup message; do not send a duplicate from the browser.
+    // Setup acknowledgement is captured by onmessage from the moment the socket is created,
+    // so a fast Gemini setupComplete frame can never be missed.
     await setupComplete;
     const source = liveContext.createMediaStreamSource(liveStream);
     liveProcessor = liveContext.createScriptProcessor(4096, 1, 1);
