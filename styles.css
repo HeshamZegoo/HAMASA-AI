@@ -28,3 +28,58 @@
 @keyframes face-blink{0%,46%,50%,100%{transform:scaleY(1)}48%{transform:scaleY(.08)}}
 @keyframes face-talk{0%,100%{height:5px}50%{height:15px}}
 @media(max-width:760px){.hamasa-face{transform:scale(.92);margin-bottom:22px}.voice-face{transform:scale(1)}}
+
+/* HAMASA palette + responsive iOS viewport */
+:root{--bg:#031326;--panel:#071b31;--panel2:#102943;--line:rgba(255,255,255,.13);--text:#fff;--muted:#a9b7ca;--cyan:#D100D1;--violet:#D100D1;--accent:#D100D1;--font:'DM Sans','IBM Plex Sans Arabic',sans-serif}
+body{background:var(--bg);min-height:0}
+.ambient-a{background:#123b63}.ambient-b{background:#D100D1;opacity:.10}
+.app-shell{height:var(--app-height,100dvh);min-height:0}
+.main{min-width:0;min-height:0;display:flex;flex:1;flex-direction:column}
+.topbar{flex-shrink:0}
+.top-actions{align-items:center}
+.language-btn{width:auto;min-width:48px;padding:0 10px;font-size:12px;font-weight:700;color:#fff;border-color:#D100D1;background:#D100D122}
+.chat-view{min-height:0;overscroll-behavior:contain}
+.composer-wrap{flex-shrink:0;padding-bottom:calc(12px + env(safe-area-inset-bottom))}
+.composer{background:#0b2038;border-color:#D100D155}
+.send-button{background:#D100D1;color:#fff}
+.mic-inline{background:#ffffff12;color:#fff}
+.suggestion{background:#0b2038;border-color:#ffffff1b;color:#fff}
+.suggestion span{color:#D100D1}
+.brand-mark{background:linear-gradient(145deg,#12365a,#071326);box-shadow:0 0 25px #D100D133}
+.brand-mark span{background:#D100D1}
+.live-dot,.status-dot{background:#D100D1}
+.face-aura{background:radial-gradient(circle,#D100D155 0%,#123d6b66 48%,transparent 72%)}
+.face-head{background:linear-gradient(145deg,#ffffff 0%,#4c7298 25%,#123b63 65%,#031326 100%);border-color:#D100D1aa}
+.mic-button{border-color:#D100D1aa;background:linear-gradient(145deg,#123b63,#031326);color:#fff;box-shadow:0 0 35px #D100D133}
+.settings-card{background:#071b31}
+.settings-row select,.setting-row select{background:#102943;color:#fff;border-color:#ffffff30}
+.memory-card{background:#0b2038;border-color:#ffffff22}
+.memory-actions button{background:#D100D122;border-color:#D100D166}
+body.light{--bg:#f4f7fb;--panel:#fff;--panel2:#eaf0f8;--text:#10233a;--muted:#52647a;--line:rgba(3,19,38,.14)}
+body.light .sidebar,body.light .settings-card{background:#fff}
+body.light .composer,body.light .memory-card{background:#fff}
+body.light .suggestion{background:#fff;color:#10233a;border-color:#d8dfeb}
+body.light .topbar,body.light .setting-row select{color:#10233a}
+html[dir="ltr"] .sidebar{border-left:0;border-right:1px solid var(--line)}
+html[dir="ltr"] .brand,html[dir="ltr"] .new-chat,html[dir="ltr"] .nav-item{text-align:left}
+html[dir="ltr"] .top-title{direction:ltr}
+html[dir="ltr"] .composer textarea{text-align:left}
+html[dir="ltr"] .message{direction:ltr}
+@media(max-width:760px){
+  body{overflow:hidden}
+  .app-shell{height:var(--app-height,100dvh);width:100%;overflow:hidden}
+  .main{height:100%;min-height:0}
+  .chat-view{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:12px}
+  .welcome{margin:auto 0;padding:16px 0 26px}
+  .composer-wrap{width:100%;padding:8px 12px calc(8px + env(safe-area-inset-bottom))}
+  .composer{min-height:58px}
+  .composer textarea{font-size:16px;max-height:110px}
+  .composer-foot{font-size:9px}
+  .voice-view,.settings-view{min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;align-items:start;padding:22px 16px calc(24px + env(safe-area-inset-bottom))}
+  .voice-stage{margin:auto;width:100%}
+  .settings-card{padding:20px 16px;margin:auto 0}
+  .sidebar{right:auto;left:0;transform:translateX(-105%)}
+  .sidebar.open{transform:translateX(0)}
+  html[dir="rtl"] .sidebar{left:auto;right:0;transform:translateX(105%)}
+  html[dir="rtl"] .sidebar.open{transform:translateX(0)}
+}
