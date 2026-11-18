@@ -134,7 +134,7 @@ app.add_middleware(
     allow_origins=ORIGINS,
     allow_credentials=False,
     allow_methods=["GET", "POST", "DELETE"],
-    allow_headers=["Content-Type", "X-Hamasa-Client"],
+    allow_headers=["Content-Type", "X-Hamasa-Client", "Authorization"],
 )
 
 class Message(BaseModel):
