@@ -71,6 +71,16 @@ def main() -> None:
     except subprocess.CalledProcessError:
         fail("frontend JavaScript syntax check failed")
 
+    try:
+        subprocess.run(
+            ["node", "--check", str(ROOT / "attachments.js")],
+            text=True,
+            check=True,
+            cwd=ROOT,
+        )
+    except subprocess.CalledProcessError:
+        fail("attachment JavaScript syntax check failed")
+
     if not compileall.compile_dir(str(BACKEND), quiet=1, force=True):
         fail("Python backend compilation failed")
 
