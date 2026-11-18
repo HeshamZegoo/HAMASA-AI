@@ -197,13 +197,13 @@ async def live_voice(websocket: WebSocket):
 
     gender = websocket.query_params.get("gender", "male")
     voice = "Puck" if gender == "male" else "Kore"
-    model = "models/gemini-3.8-live"
+    model = "models/gemini-3.1-flash-live-preview"
     live_prompt = HAMASA_SYSTEM_PROMPT + """
 أنت الآن في محادثة صوتية مباشرة. تحدث باللهجة المصرية القاهرية الطبيعية، بجمل قصيرة وتلقائية، واستجب فوراً لما تسمعه. لا تقل إنك تحول الصوت إلى نص، ولا تصف آلية عملك. أنت حماصة. لا تبدأ كل رد بمقدمة، ولا تطل بلا داعٍ. استمع للمستخدم وقاطعه فقط إذا قاطعك هو؛ وإذا بدأ المستخدم الكلام أثناء ردك فتوقف واستمع له.
 """
     uri = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=" + key
     try:
-        logger.info("Gemini Live: opening upstream session model=%s voice=%s", model, voice)
+        logger.info("Gemini Live: opening Gemini Developer API session model=%s voice=%s", model, voice)
         async with websockets.connect(
             uri, max_size=16 * 1024 * 1024, ping_interval=20,
             ping_timeout=20, close_timeout=5, open_timeout=15,
@@ -233,10 +233,10 @@ async def live_voice(websocket: WebSocket):
                 packet = __import__("json").loads(first)
                 await websocket.send_text(first)
                 if packet.get("error"):
-                    logger.error("Gemini Live setup rejected: %s", str(packet["error"])[:500])
+                    logger.error("Gemini Live setup rejected for model=%s: %s", model, str(packet["error"])[:500])
                     return
                 if "setupComplete" in packet:
-                    logger.info("Gemini Live: setup confirmed")
+                    logger.info("Gemini Live: setup confirmed for model=%s", model)
                     break
 
             async def browser_to_google():
