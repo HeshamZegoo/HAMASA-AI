@@ -629,6 +629,16 @@ async function startLiveSession() {
     liveSocket.onmessage = event => {
       let packet;
       try { packet = JSON.parse(event.data); } catch { return; }
+      if (packet.stage === 'server_connected') {
+        $('#vst').textContent = 'Server connected';
+        $('#vhint').textContent = 'خادم حماصة استقبل اتصال الصوت. جاري الاتصال بـ Gemini…';
+        return;
+      }
+      if (packet.stage === 'gemini_connecting') {
+        $('#vst').textContent = 'Connecting to Gemini';
+        $('#vhint').textContent = 'اتصال المايك وصل للسيرفر. جاري انتظار Gemini Live…';
+        return;
+      }
       if (packet.error) {
         const message = String(packet.error);
         vErr = message;
