@@ -631,21 +631,7 @@ async function startLiveSession() {
       };
       liveSocket.addEventListener('message', check);
     });
-    liveSocket.send(JSON.stringify({
-      setup: {
-        model: 'models/gemini-3.8-live',
-        generationConfig: {
-          responseModalities: ['AUDIO'],
-          speechConfig: {
-            languageCode: 'ar-EG',
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceGender === 'male' ? 'Puck' : 'Kore' } }
-          }
-        },
-        systemInstruction: { parts: [{ text: 'أنت حماصة. تحدث باللهجة المصرية القاهرية الطبيعية. رد بجمل تلقائية وواضحة، وتجنب قراءة الرموز أو التنسيق. افهم المستخدم من سياق الحوار. إذا قاطعك المستخدم فتوقف واستمع له. تحدث باللغة التي يستخدمها المستخدم، مع تفضيل اللهجة المصرية عند التحدث بالعربية.' }] },
-        inputAudioTranscription: {},
-        outputAudioTranscription: {}
-      }
-    }));
+    // Backend owns the single Gemini setup message; do not send a duplicate from the browser.
     await setupComplete;
     const source = liveContext.createMediaStreamSource(liveStream);
     liveProcessor = liveContext.createScriptProcessor(4096, 1, 1);
