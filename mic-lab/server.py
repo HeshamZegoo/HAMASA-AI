@@ -70,7 +70,7 @@ async def live_token(body: TokenRequest, request: Request):
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(20, connect=10)) as client:
             response = await client.post(
-                "https://generativelanguage.googleapis.com/v1alpha/auth_tokens",
+                "https://generativelanguage.googleapis.com/v1beta/auth_tokens",
                 headers={"x-goog-api-key": API_KEY, "Content-Type": "application/json"},
                 json=payload,
             )
