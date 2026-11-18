@@ -565,6 +565,10 @@ async function startLiveSession() {
   try {
     vErr = '';
     setVoice('thinking');
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) throw new Error('Audio is not supported in this browser.');
+    liveContext = new AudioContextClass();
+    await liveContext.resume();
     liveStream = await navigator.mediaDevices.getUserMedia({
       audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true }
     });
@@ -621,8 +625,6 @@ async function startLiveSession() {
       liveSocket.addEventListener('open', () => { clearTimeout(timeout); resolve(); }, { once: true });
       liveSocket.addEventListener('error', () => { clearTimeout(timeout); reject(new Error('Could not open Gemini Live connection.')); }, { once: true });
     });
-    liveContext = new (window.AudioContext || window.webkitAudioContext)();
-    await liveContext.resume();
     const setupComplete = new Promise((resolve, reject) => {
       const timeout = setTimeout(() => reject(new Error('Gemini Live setup timed out.')), 18000);
       const check = event => {
