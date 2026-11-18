@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 logger = logging.getLogger("hamasa.attachments")
 
-MAX_FILE_BYTES = 8 * 1024 * 1024
+MAX_FILE_BYTES = 64 * 1024 * 1024
 TEXT_TYPES = {
     "text/plain", "text/markdown", "text/csv", "application/json",
     "application/xml", "text/xml"
@@ -17,7 +17,7 @@ IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 class AttachmentInput(BaseModel):
     name: str = Field(min_length=1, max_length=180)
     mime_type: str = Field(min_length=1, max_length=120)
-    data: str = Field(min_length=1, max_length=12_000_000)
+    data: str = Field(min_length=1, max_length=90_000_000)
 
 def _decode(item: AttachmentInput) -> bytes:
     try:
@@ -32,7 +32,7 @@ def _extract_text(item: AttachmentInput, raw: bytes) -> str:
     mime = item.mime_type.lower()
     suffix = item.name.rsplit(".", 1)[-1].lower() if "." in item.name else ""
     if mime in TEXT_TYPES or suffix in {"txt", "md", "csv", "json", "xml", "log", "py", "js", "html", "css"}:
-        return raw.decode("utf-8-sig", errors="replace")[:50000]
+        return raw.decode("utf-8-sig", errors="replace")
     if mime == "application/pdf" or suffix == "pdf":
         try:
             from pypdf import PdfReader
