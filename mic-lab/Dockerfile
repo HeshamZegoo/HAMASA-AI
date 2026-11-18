@@ -1,5 +1,7 @@
-FROM python:3.12-alpine
+FROM python:3.12-slim
 WORKDIR /app
-COPY index.html /app/index.html
+COPY requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
+COPY server.py index.html /app/
 ENV PYTHONDONTWRITEBYTECODE=1
-CMD sh -c 'python -m http.server ${PORT:-8080} --bind 0.0.0.0 --directory /app'
+CMD sh -c 'uvicorn server:app --host 0.0.0.0 --port ${PORT:-8080}'
