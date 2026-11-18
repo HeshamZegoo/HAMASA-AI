@@ -101,6 +101,18 @@ to{transform:scaleY(1.9)}}
 dialog{margin:auto;width:min(440px,calc(100vw - 28px));max-height:calc(var(--vh) - 28px);overflow-y:auto;border:1px solid var(--line);border-radius:24px;padding:22px;color:var(--fg);background:var(--bg2);box-shadow:var(--sh)}
 dialog::backdrop{background:rgba(1,8,18,.6);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 dialog h2{font-size:20px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center}
+.memory-box{border-top:1px solid var(--line);margin-top:18px;padding-top:16px}
+.memory-box h3{font-size:15px;margin-bottom:6px}
+.memory-help{font-size:12px;line-height:1.5;color:var(--mut);margin-bottom:12px}
+.memory-box select,.memory-box textarea{width:100%;border:1px solid var(--line);border-radius:12px;padding:11px;background:var(--glass2);color:var(--fg);font:inherit;margin-bottom:8px}
+.memory-box textarea{min-height:76px;resize:vertical}
+.memory-add{width:100%;padding:11px;border-radius:12px;background:linear-gradient(135deg,var(--acc),#6a1bd6);color:white;font-weight:700}
+.memory-list{display:grid;gap:8px;margin-top:12px;max-height:190px;overflow:auto}
+.memory-item{display:flex;align-items:flex-start;gap:8px;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--glass2)}
+.memory-item>div{min-width:0;flex:1}
+.memory-item small{display:block;color:var(--mut);font-size:11px;margin-bottom:3px}
+.memory-item p{font-size:13px;line-height:1.45;overflow-wrap:anywhere}
+.memory-item button{color:#ff7a90;padding:2px 6px;font-size:18px;line-height:1}
 .row{display:flex;flex-direction:column;gap:8px;margin-bottom:18px}
 .row>span{font-size:13px;color:var(--mut)}
 .seg{display:flex;padding:4px;border-radius:14px;background:var(--glass2);gap:4px}
@@ -171,6 +183,19 @@ dialog h2{font-size:20px;margin-bottom:16px;display:flex;justify-content:space-b
  <h2><span id="dT" data-i="settings"></span><button class="ib" id="dX" data-a="close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></h2>
  <div class="row"><span data-i="language"></span><div class="seg"><button data-lang="en" type="button">English</button><button data-lang="ar" type="button">عربي</button></div></div>
  <div class="row"><span data-i="theme"></span><div class="seg"><button data-theme="dark" type="button" data-i="dark"></button><button data-theme="light" type="button" data-i="light"></button></div></div>
+ <section class="memory-box" aria-labelledby="memoryTitle">
+  <h3 id="memoryTitle" data-i="memoryTitle"></h3>
+  <p class="memory-help" data-i="memoryHelp"></p>
+  <select id="memoryCategory" aria-label="Memory category">
+   <option value="preference" data-i="memoryPreference"></option>
+   <option value="project" data-i="memoryProject"></option>
+   <option value="decision" data-i="memoryDecision"></option>
+   <option value="temporary" data-i="memoryTemporary"></option>
+  </select>
+  <textarea id="memoryText" maxlength="500" data-p="memoryPlaceholder"></textarea>
+  <button class="memory-add" id="memoryAdd" type="button" data-i="memoryAdd"></button>
+  <div class="memory-list" id="memoryList" aria-live="polite"></div>
+ </section>
  <button class="danger" id="clearBtn" type="button" data-i="clearAll"></button>
 </dialog>
 <div class="toast" id="toast" role="status"></div>
@@ -208,8 +233,12 @@ function buildChatRequest(messages) {
         .join("\\n");
       return "موضوع سابق: " + String(c.title || "محادثة") + "\\n" + excerpt;
     });
-  const crossChatMemory = previousChats.join("\\n\\n").slice(-2500);
+  const crossChatMemory = previousChats.join("\\n\\n").slice(-1800);
+  const structuredMemory = memories.map(item =>
+    "[" + (memoryLabels[item.category]?.() || item.category) + "] " + item.text
+  ).join("\\n").slice(0, 3500);
   const memory = [
+    structuredMemory ? "ذاكرة منظمة اختار المستخدم حفظها، مرتبة حسب النوع. أعطِ الأولوية للمعلومات الدائمة، وتعامل مع المؤقتة باعتبارها قديمة بعد مرور الوقت، ولا تفترض أن أي معلومة ما زالت صحيحة إذا ظهر ما يخالفها:\\n" + structuredMemory : "",
     olderContext ? "سياق أقدم من المحادثة الحالية:\\n" + olderContext : "",
     crossChatMemory ? "مقتطفات من محادثات سابقة على هذا الجهاز؛ استخدمها فقط لو مرتبطة بالسؤال الحالي، ولا تفترض أن كل تفاصيلها ما زالت محدثة:\\n" + crossChatMemory : ""
   ].filter(Boolean).join("\\n\\n").slice(-6000);
@@ -261,6 +290,7 @@ en:{newChat:'New chat',history:'Recent',noHist:'No conversations yet.',settings:
  s:['Explain something tricky in simple words','Help me plan my week','Write a short message to a friend','Tell me a joke, Egyptian style'],
  demoTag:'Demo reply · not from the AI',errT:'Couldn’t reach Hamasa',errB:'Check your connection, then try again.',retry:'Try again',
 attachSoon:'Attachments are coming soon.',cleared:'History cleared.',clearAll:'Clear all conversations',del:'Delete conversation',
+memoryTitle:'Long-term memory',memoryHelp:'Saved only in this browser. Add useful facts you want Hamasa to remember. Avoid passwords or sensitive information.',memoryPreference:'Preferences',memoryProject:'Projects',memoryDecision:'Decisions',memoryTemporary:'Temporary context',memoryPlaceholder:'Write one clear fact to remember…',memoryAdd:'Save memory',memoryEmpty:'No saved memories yet.',memoryRemove:'Delete memory',memorySaved:'Memory saved.',memoryLimit:'Memory list is full. Delete an old item first.',
  backend:'Connection',beNone:'Backend is offline or the NVIDIA provider is not configured.',beLive:'Connected to the HAMASA NVIDIA chat service.',
  demo:['This is a demo reply. Connect the chat endpoint in HAMASA_CONFIG and I’ll answer for real.','Demo mode is on, so I’m not the real model yet. Once the backend is wired in, ask me again.','Placeholder answer: the interface works, the AI isn’t connected yet.']},
 ar:{newChat:'محادثة جديدة',history:'الأخيرة',noHist:'لا توجد محادثات بعد.',settings:'الإعدادات',menu:'القائمة',close:'إغلاق',theme:'المظهر',language:'اللغة',dark:'داكن',light:'فاتح',
@@ -269,6 +299,7 @@ ar:{newChat:'محادثة جديدة',history:'الأخيرة',noHist:'لا تو
  s:['اشرحلي حاجة معقدة ببساطة','ساعدني أنظّم أسبوعي','اكتبلي رسالة قصيرة لصاحبي','قولّي نكتة مصرية'],
  demoTag:'رد تجريبي · ليس من الذكاء الاصطناعي',errT:'مقدرتش أوصل لحماصة',errB:'اتأكد من الاتصال وجرّب تاني.',retry:'جرّب تاني',
 attachSoon:'المرفقات هتتوفر قريباً.',cleared:'تم مسح السجل.',clearAll:'مسح كل المحادثات',del:'حذف المحادثة',
+memoryTitle:'الذاكرة طويلة المدى',memoryHelp:'الذاكرة محفوظة على المتصفح ده فقط. أضف المعلومات المهمة اللي عايز حماصة يفتكرها. متحفظش كلمات مرور أو معلومات حساسة.',memoryPreference:'تفضيلات',memoryProject:'مشاريع',memoryDecision:'قرارات',memoryTemporary:'معلومات مؤقتة',memoryPlaceholder:'اكتب معلومة واضحة عايز حماصة يفتكرها…',memoryAdd:'حفظ في الذاكرة',memoryEmpty:'لسه مفيش معلومات محفوظة.',memoryRemove:'حذف المعلومة',memorySaved:'اتحفظت في الذاكرة.',memoryLimit:'الذاكرة وصلت للحد الأقصى. احذف معلومة قديمة الأول.',
  backend:'الاتصال',beNone:'الخادم غير متصل أو مزود NVIDIA غير مُعدّ.',beLive:'متصل بخادم حماصة وNVIDIA.',
  demo:['ده رد تجريبي. اربط خادم المحادثة في HAMASA_CONFIG وهرد عليك بجد.','الوضع التجريبي شغال، فأنا لسه مش النموذج الحقيقي. اسألني تاني بعد ربط الخادم.','رد مؤقت: الواجهة شغالة والذكاء الاصطناعي لسه مش متصل.']}
 };
@@ -282,6 +313,9 @@ const store = { get(k, d) { try { const v = localStorage.getItem(k); return v ==
 let lang = store.get('hamasa.lang', 'en') === 'ar' ? 'ar' : 'en';
 let theme = store.get('hamasa.theme', 'dark') === 'light' ? 'light' : 'dark';
 let convs = store.get('hamasa.convs', []); if (!Array.isArray(convs)) convs = [];
+let memories = store.get('hamasa.memory', []);
+if (!Array.isArray(memories)) memories = [];
+memories = memories.filter(x => x && typeof x.text === 'string' && typeof x.category === 'string').slice(0, 40);
 let cur = null, busy = false;
 const t = k => I18N[lang][k];
 
@@ -341,12 +375,55 @@ $('#scrim').onclick = () => nav(false);
 if (innerWidth >= 1024) nav(true);
 addEventListener('keydown', e => { if (e.key === 'Escape' && innerWidth < 1024 && app.classList.contains('open')) nav(false); });
 const dlg = $('#dlg');
-const openSet = () => { if (innerWidth < 1024) nav(false); dlg.showModal ? dlg.showModal() : dlg.setAttribute('open', ''); };
+const openSet = () => { if (innerWidth < 1024) nav(false); renderMemories(); dlg.showModal ? dlg.showModal() : dlg.setAttribute('open', ''); };
 $('#setBtn').onclick = openSet; $('#setSide').onclick = openSet; $('#dX').onclick = () => dlg.close();
 dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
 $('#clearBtn').onclick = () => { convs = []; store.set('hamasa.convs', convs); newChat(); dlg.close(); toast(t('cleared')); };
 
 function save() { store.set('hamasa.convs', convs.slice(0, 40)); }
+const memoryLabels = {
+  preference: () => t('memoryPreference'),
+  project: () => t('memoryProject'),
+  decision: () => t('memoryDecision'),
+  temporary: () => t('memoryTemporary')
+};
+function saveMemories() { store.set('hamasa.memory', memories); }
+function renderMemories() {
+  const list = $('#memoryList');
+  if (!list) return;
+  list.innerHTML = '';
+  if (!memories.length) {
+    const empty = document.createElement('p');
+    empty.className = 'memory-help';
+    empty.textContent = t('memoryEmpty');
+    list.append(empty);
+    return;
+  }
+  memories.forEach((item, index) => {
+    const row = document.createElement('div'); row.className = 'memory-item';
+    const content = document.createElement('div');
+    const category = document.createElement('small');
+    category.textContent = memoryLabels[item.category]?.() || item.category;
+    const value = document.createElement('p'); value.textContent = item.text;
+    content.append(category, value);
+    const remove = document.createElement('button');
+    remove.type = 'button'; remove.textContent = '×'; remove.setAttribute('aria-label', t('memoryRemove'));
+    remove.onclick = () => { memories.splice(index, 1); saveMemories(); renderMemories(); };
+    row.append(content, remove); list.append(row);
+  });
+}
+$('#memoryAdd').onclick = () => {
+  const text = $('#memoryText').value.trim();
+  const category = $('#memoryCategory').value;
+  if (!text) { $('#memoryText').focus(); return; }
+  if (memories.length >= 40) { toast(t('memoryLimit')); return; }
+  if (memories.some(x => x.text.toLocaleLowerCase() === text.toLocaleLowerCase() && x.category === category)) {
+    $('#memoryText').value = ''; toast(t('memorySaved')); return;
+  }
+  memories.unshift({ category, text, updatedAt: new Date().toISOString() });
+  memories = memories.slice(0, 40);
+  saveMemories(); $('#memoryText').value = ''; renderMemories(); toast(t('memorySaved'));
+};
 function renderHist() {
   const h = $('#hist'); h.innerHTML = '';
   if (!convs.length) { h.innerHTML = `<div class="none">${t('noHist')}</div>`; return; }
