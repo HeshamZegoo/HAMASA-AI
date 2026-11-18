@@ -2,11 +2,13 @@ import logging
 import base64
 import os
 import sqlite3
+import hashlib
+import uuid
 from pathlib import Path
 from typing import Literal
 
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from .attachments import prepare_messages, AttachmentInput
@@ -138,6 +140,10 @@ class ChatRequest(BaseModel):
     memory: str = Field(default="", max_length=6000)
     attachments: list[AttachmentInput] = Field(default_factory=list)
 
+class MemoryCreateRequest(BaseModel):
+    category: Literal["preference", "project", "decision", "temporary"]
+    text: str = Field(min_length=1, max_length=500)
+
 class FileCreateRequest(BaseModel):
     prompt: str = Field(min_length=2, max_length=12000)
     format: Literal["docx", "pdf", "xlsx"]
@@ -261,22 +267,106 @@ async def text_to_speech(body: TTSRequest):
     except httpx.RequestError:
         raise HTTPException(status_code=502, detail="Could not connect to TTS provider.")
 
+def _client_hash(client_id: str) -> str:
+    try:
+        parsed = uuid.UUID(client_id)
+    except (ValueError, TypeError, AttributeError):
+        raise HTTPException(status_code=400, detail="Invalid memory client identifier.")
+    return hashlib.sha256(parsed.bytes).hexdigest()
+
+def _memory_db():
+    if DATABASE_URL.startswith(("postgres://", "postgresql://")):
+        try:
+            import psycopg
+            return psycopg.connect(DATABASE_URL, connect_timeout=8)
+        except Exception as exc:
+            logger.error("Memory database connection failed: %s", type(exc).__name__)
+            raise HTTPException(status_code=503, detail="Memory database is temporarily unavailable.")
+    if DATABASE_URL.startswith("sqlite:///") or not DATABASE_URL:
+        path = DATABASE_URL.removeprefix("sqlite:///") if DATABASE_URL else str(Path(__file__).resolve().parent.parent / "hamasa.db")
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        return sqlite3.connect(path)
+    raise HTTPException(status_code=503, detail="Unsupported memory database configuration.")
+
 def init_db():
-    if DATABASE_URL.startswith("sqlite:///"):
-        path = DATABASE_URL.removeprefix("sqlite:///")
-    elif not DATABASE_URL:
-        path = str(Path(__file__).resolve().parent.parent / "hamasa.db")
-    else:
-        # PostgreSQL persistence is provisioned separately; do not silently pretend SQLite is PostgreSQL.
+    if DATABASE_URL.startswith(("postgres://", "postgresql://")):
+        import psycopg
+        with psycopg.connect(DATABASE_URL, connect_timeout=8) as db:
+            db.execute("""
+                CREATE TABLE IF NOT EXISTS hamasa_memories (
+                    id TEXT PRIMARY KEY,
+                    owner_hash CHAR(64) NOT NULL,
+                    category VARCHAR(20) NOT NULL CHECK (category IN ('preference','project','decision','temporary')),
+                    content VARCHAR(500) NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+            """)
+            db.execute("CREATE INDEX IF NOT EXISTS idx_hamasa_memories_owner ON hamasa_memories(owner_hash, updated_at DESC)")
         return
-    Path(path).parent.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(path) as db:
-        db.execute("CREATE TABLE IF NOT EXISTS conversations (id INTEGER PRIMARY KEY, created_at TEXT DEFAULT CURRENT_TIMESTAMP, title TEXT NOT NULL)")
-        db.commit()
+    if DATABASE_URL.startswith("sqlite:///") or not DATABASE_URL:
+        with _memory_db() as db:
+            db.execute("CREATE TABLE IF NOT EXISTS conversations (id INTEGER PRIMARY KEY, created_at TEXT DEFAULT CURRENT_TIMESTAMP, title TEXT NOT NULL)")
+            db.execute("""CREATE TABLE IF NOT EXISTS hamasa_memories (
+                id TEXT PRIMARY KEY, owner_hash TEXT NOT NULL, category TEXT NOT NULL,
+                content TEXT NOT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP)""")
 
 @app.on_event("startup")
 def startup():
     init_db()
+
+@app.get("/api/memory")
+def list_memories(x_hamasa_client: str = Header(default="")):
+    owner = _client_hash(x_hamasa_client)
+    with _memory_db() as db:
+        rows = db.execute(
+            "SELECT id, category, content, updated_at FROM hamasa_memories WHERE owner_hash = %s ORDER BY updated_at DESC LIMIT 40"
+            if DATABASE_URL.startswith(("postgres://", "postgresql://"))
+            else "SELECT id, category, content, updated_at FROM hamasa_memories WHERE owner_hash = ? ORDER BY updated_at DESC LIMIT 40",
+            (owner,)
+        ).fetchall()
+    return {"memories": [
+        {"id": row[0], "category": row[1], "text": row[2],
+         "updatedAt": row[3].isoformat() if hasattr(row[3], "isoformat") else str(row[3])}
+        for row in rows
+    ]}
+
+@app.post("/api/memory")
+def create_memory(body: MemoryCreateRequest, x_hamasa_client: str = Header(default="")):
+    owner = _client_hash(x_hamasa_client)
+    memory_id = str(uuid.uuid4())
+    with _memory_db() as db:
+        count = db.execute(
+            "SELECT COUNT(*) FROM hamasa_memories WHERE owner_hash = %s" if DATABASE_URL.startswith(("postgres://", "postgresql://"))
+            else "SELECT COUNT(*) FROM hamasa_memories WHERE owner_hash = ?", (owner,)
+        ).fetchone()[0]
+        if count >= 40:
+            raise HTTPException(status_code=409, detail="Memory limit reached.")
+        if DATABASE_URL.startswith(("postgres://", "postgresql://")):
+            db.execute("INSERT INTO hamasa_memories (id, owner_hash, category, content) VALUES (%s, %s, %s, %s)",
+                       (memory_id, owner, body.category, body.text))
+        else:
+            db.execute("INSERT INTO hamasa_memories (id, owner_hash, category, content) VALUES (?, ?, ?, ?)",
+                       (memory_id, owner, body.category, body.text))
+    return {"id": memory_id, "category": body.category, "text": body.text}
+
+@app.delete("/api/memory/{memory_id}")
+def delete_memory(memory_id: str, x_hamasa_client: str = Header(default="")):
+    owner = _client_hash(x_hamasa_client)
+    try:
+        uuid.UUID(memory_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid memory identifier.")
+    with _memory_db() as db:
+        cur = db.execute(
+            "DELETE FROM hamasa_memories WHERE id = %s AND owner_hash = %s" if DATABASE_URL.startswith(("postgres://", "postgresql://"))
+            else "DELETE FROM hamasa_memories WHERE id = ? AND owner_hash = ?", (memory_id, owner)
+        )
+        deleted = cur.rowcount
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Memory not found.")
+    return {"deleted": True}
 
 @app.get("/")
 def root():
