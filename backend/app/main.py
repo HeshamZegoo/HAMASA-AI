@@ -324,7 +324,7 @@ def _verified_user(authorization: str = Header(default="")):
     except (ValueError, KeyError, TypeError, json.JSONDecodeError):
         raise HTTPException(status_code=401, detail="Session expired. Please sign in again.")
     with _auth_db() as db:
-        row = db.execute("SELECT id, email FROM hamasa_users WHERE id = " + ("%s" if DATABASE_URL.startswith(("postgres://", "postgresql://")) else "?"), (user_id,)).fetchone()
+        row = db.execute("SELECT id, email FROM hamasa_users WHERE id = " + ("%s" if DATABASE_URL.startswith(("postgres://", "postgresql://")) else "?"), (uuid.UUID(user_id) if DATABASE_URL.startswith(("postgres://", "postgresql://")) else user_id,)).fetchone()
     if not row:
         raise HTTPException(status_code=401, detail="Account not found. Please sign in again.")
     return {"id": str(row[0]), "email": row[1]}
@@ -341,7 +341,7 @@ def signup(body: AuthRequest):
     placeholder = "%s" if DATABASE_URL.startswith(("postgres://", "postgresql://")) else "?"
     try:
         with _auth_db() as db:
-            db.execute(f"INSERT INTO hamasa_users (id, email, password_hash) VALUES ({placeholder}, {placeholder}, {placeholder})", (user_id, email, ph))
+            db.execute(f"INSERT INTO hamasa_users (id, email, password_hash) VALUES ({placeholder}, {placeholder}, {placeholder})", (uuid.UUID(user_id) if DATABASE_URL.startswith(("postgres://", "postgresql://")) else user_id, email, ph))
     except Exception as exc:
         if "unique" in str(exc).lower() or "duplicate" in str(exc).lower():
             raise HTTPException(status_code=409, detail="An account with this email already exists.")
