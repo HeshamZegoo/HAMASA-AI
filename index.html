@@ -698,7 +698,9 @@ async function activateLiveMic(event) {
   }
   // Give immediate, visible feedback on iOS before any permission/network await.
   vErr = '';
-  setVoice('thinking');
+  // Do not change vstate here: startLiveSession() requires the idle state
+  // to pass its own re-entry guard, then sets the thinking state itself.
+  $('#vst').textContent = 'Starting…';
   $('#vhint').textContent = 'Starting live microphone…';
   micButton.disabled = true;
   try {
