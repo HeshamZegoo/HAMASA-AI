@@ -73,20 +73,49 @@
       ||arabic[0]
       ||null;
   }
-  function speak(text){
-    if(!("speechSynthesis" in window))return;
+  async function speak(text){
     const clean=cleanSpeechText(text);
     if(!clean)return;
+    const provider=$("ttsProvider")?.value||"azure";
+    const gender=$("ttsGender")?.value||"male";
+    try{
+      const response=await fetch(API+"/api/tts",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text:clean,provider,gender})});
+      const data=await response.json();
+      if(!response.ok)throw new Error(data.detail||"تعذر تشغيل الصوت");
+      const raw=atob(data.audio),bytes=new Uint8Array(raw.length);
+      for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
+      const blob=new Blob([bytes],{type:data.mime_type||"audio/wav"});
+      const url=URL.createObjectURL(blob),audio=new Audio(url);
+      audio.onended=()=>URL.revokeObjectURL(url);
+      await audio.play();
+      return;
+    }catch(e){
+      console.warn("Cloud TTS unavailable; using device voice:",e.message);
+      if($("ttsStatus"))$("ttsStatus").textContent="خدمة الصوت السحابي غير جاهزة: "+e.message+" — بنستخدم صوت الجهاز مؤقتاً.";
+    }
+    if(!("speechSynthesis" in window))return;
     speechSynthesis.cancel();
     const u=new SpeechSynthesisUtterance(clean);
-    u.lang=$("languageSelect").value||"ar-EG";
-    const voice=chooseArabicVoice(u.lang);
+    u.lang="ar-EG";
+    const voice=chooseArabicVoice("ar-EG");
     if(voice)u.voice=voice;
-    u.rate=.88;
-    u.pitch=1;
-    u.volume=1;
+    u.rate=.9;u.pitch=1;u.volume=1;
     speechSynthesis.speak(u);
   }
+  async function checkTTSStatus(){
+    if(!API)return;
+    try{
+      const r=await fetch(API+"/api/tts/status"),s=await r.json();
+      if($("ttsStatus")){
+        $("ttsStatus").textContent="حالة الصوت: Azure "+(s.azure_configured?"جاهز":"يحتاج مفتاح")+
+          " — Gemini "+(s.gemini_configured?"جاهز":"يحتاج مفتاح");
+      }
+    }catch(e){if($("ttsStatus"))$("ttsStatus").textContent="تعذر فحص خدمات الصوت حالياً.";}
+  }
+  ["ttsProvider","ttsGender"].forEach(id=>{
+    const el=$(id);if(el){const saved=localStorage.getItem("hamasa_"+id);if(saved)el.value=saved;el.onchange=()=>localStorage.setItem("hamasa_"+id,el.value);}
+  });
+  checkTTSStatus();
   if("speechSynthesis" in window){
     speechSynthesis.getVoices();
     speechSynthesis.addEventListener?.("voiceschanged",()=>speechSynthesis.getVoices());
