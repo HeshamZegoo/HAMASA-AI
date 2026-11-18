@@ -25,7 +25,7 @@ def _decode(item: AttachmentInput) -> bytes:
     except Exception as exc:
         raise ValueError(f"الملف {item.name} تالف أو مش بصيغة Base64 صحيحة.") from exc
     if not raw or len(raw) > MAX_FILE_BYTES:
-        raise ValueError(f"حجم الملف {item.name} غير مسموح. الحد الأقصى 8 ميجابايت.")
+        raise ValueError(f"حجم الملف {item.name} غير مسموح. الحد الأقصى 64 ميجابايت.")
     return raw
 
 def _extract_text(item: AttachmentInput, raw: bytes) -> str:
@@ -37,7 +37,7 @@ def _extract_text(item: AttachmentInput, raw: bytes) -> str:
         try:
             from pypdf import PdfReader
             reader = PdfReader(io.BytesIO(raw))
-            return "\n".join(page.extract_text() or "" for page in reader.pages[:40])[:50000]
+            return "\n".join(page.extract_text() or "" for page in reader.pages)
         except Exception as exc:
             logger.info("PDF extraction failed for %s: %s", item.name, type(exc).__name__)
             raise ValueError(f"مقدرتش أقرأ محتوى PDF: {item.name}.") from exc
@@ -45,7 +45,7 @@ def _extract_text(item: AttachmentInput, raw: bytes) -> str:
         try:
             from docx import Document
             doc = Document(io.BytesIO(raw))
-            return "\n".join(p.text for p in doc.paragraphs)[:50000]
+            return "\n".join(p.text for p in doc.paragraphs)
         except Exception as exc:
             logger.info("DOCX extraction failed for %s: %s", item.name, type(exc).__name__)
             raise ValueError(f"مقدرتش أقرأ ملف Word: {item.name}.") from exc
