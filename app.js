@@ -6,13 +6,41 @@
   let recognition = null, listening = false, recognitionSpeaksReply = false;
   let recorder = null, recordedChunks = [];
   let visualMode = localStorage.getItem("hamasa_visual") || "face";
+
+  const translations={
+    en:{newChat:"New chat",workspace:"Workspace",chat:"Chat",voiceMode:"Voice mode",settings:"Settings",recent:"Recent",clear:"Clear",historyEmpty:"Your chats will appear here",online:"Online",welcome:"Hi, I’m",welcomeText:"Here to listen, understand, and help you with anything.",voiceEyebrow:"VOICE COMPANION",voiceIdle:"I’m listening",voicePrompt:"Tap the mic and speak naturally",voiceStopHint:"Tap again to stop recording",speakReplies:"Speak replies",speakRepliesHint:"Read Hamasa’s replies aloud",voiceEngine:"Voice engine",voiceGender:"Voice",voiceGenderHint:"Change it anytime",memoryTitle:"Hamasa memory",memoryHint:"Save useful details, projects and preferences. This memory is stored only in this browser.",saveMemory:"Save memory",clearMemory:"Clear memory",speechLanguage:"Speech recognition language",speechLanguageHint:"Language used to recognize speech",assistantLook:"Assistant appearance",assistantLookHint:"Animated visual style",chatPlaceholder:"Message Hamasa...",footer:"Hamasa can make mistakes. Check important information.",thinking:"Hamasa is thinking…",micEmpty:"I couldn’t hear anything clearly. Try again.",transcribing:"Transcribing your voice…",heard:"Got it. Thinking…",recording:"Listening… tap again when you finish.",recordingEmpty:"No audio was captured. Check microphone permission and try again.",micPermission:"Microphone access was denied. Allow it in Safari settings.",micError:"Could not start microphone: ",memorySaved:"Memory saved on this browser.",memoryCleared:"Saved memory cleared from this browser.",ttsChecking:"Checking voice services…",ttsReady:"Gemini TTS: Ready",ttsMissing:"Add your Gemini API key in Railway.",ttsFailed:"Could not check voice services.",transcriptionFailed:"Voice transcription failed: "},
+    ar:{newChat:"محادثة جديدة",workspace:"مساحتك",chat:"المحادثة",voiceMode:"وضع الصوت",settings:"الإعدادات",recent:"الأخيرة",clear:"مسح",historyEmpty:"محادثاتك هتظهر هنا",online:"متصل",welcome:"أهلاً بيك، أنا",welcomeText:"موجود علشان أسمعك، أفهمك، وأساعدك في أي حاجة.",voiceEyebrow:"مرافقك الصوتي",voiceIdle:"أنا سامعك",voicePrompt:"اضغط على المايك واتكلم براحتك",voiceStopHint:"اضغط تاني لإيقاف التسجيل",speakReplies:"تشغيل الردود صوتياً",speakRepliesHint:"حماصة يقرأ الردود بصوت مسموع",voiceEngine:"محرك الصوت",voiceGender:"نوع الصوت",voiceGenderHint:"تقدر تغيّره في أي وقت",memoryTitle:"ذاكرة حماصة",memoryHint:"احفظ معلومات ومشاريع وتفضيلات مهمة. الذاكرة دي بتتحفظ على المتصفح ده فقط.",saveMemory:"حفظ الذاكرة",clearMemory:"مسح الذاكرة",speechLanguage:"لغة التعرف على الكلام",speechLanguageHint:"اللغة المستخدمة لفهم كلامك",assistantLook:"شكل المساعد",assistantLookHint:"المظهر المتحرك",chatPlaceholder:"اكتب لحماصة...",footer:"حماصة ممكن يغلط أحياناً — راجع المعلومات المهمة.",thinking:"حماصة بيفكر…",micEmpty:"ملحقتش أسمع كلام واضح. جرّب تاني.",transcribing:"بحوّل كلامك لنص…",heard:"وصلت، بفكر…",recording:"سامعك… اضغط تاني لما تخلص.",recordingEmpty:"ملقتش تسجيل صوت. راجع إذن المايك وجرب تاني.",micPermission:"إذن المايك مرفوض. اسمح بيه من إعدادات Safari.",micError:"مش قادر أشغل المايك: ",memorySaved:"اتحفظت الذاكرة على المتصفح ده.",memoryCleared:"اتمسحت الذاكرة المحفوظة من المتصفح ده.",ttsChecking:"جاري فحص خدمات الصوت…",ttsReady:"Gemini TTS: جاهز",ttsMissing:"أضف مفتاح Gemini في Railway.",ttsFailed:"تعذر فحص خدمات الصوت.",transcriptionFailed:"فشل تحويل الصوت لنص: "}
+  };
+  let locale=localStorage.getItem("hamasa_locale")||"en";
+  const tr=k=>translations[locale]?.[k]||translations.en[k]||k;
+  function applyLocale(){
+    document.documentElement.lang=locale;document.documentElement.dir=locale==="ar"?"rtl":"ltr";
+    $("langBtn").textContent=locale==="en"?"عربي":"English";
+    $("langBtn").title=locale==="en"?"Switch to Arabic":"Switch to English";
+    document.querySelectorAll("[data-i18n]").forEach(el=>{const key=el.dataset.i18n;if(translations[locale][key])el.textContent=translations[locale][key];});
+    input.placeholder=tr("chatPlaceholder");input.setAttribute("aria-label",tr("chatPlaceholder"));
+    $("clearHistory").textContent=tr("clear");
+    $("voiceStatus").textContent=tr("voiceIdle");
+    document.querySelector(".composer-foot span").textContent=tr("footer");
+    document.querySelectorAll(".suggestion").forEach((b,i)=>{const en=b.dataset.promptEn;const ar=["ساعدني أنظم يومي","اشرحلي موضوع صعب","خلينا نتكلم شوية"][i];b.firstChild.textContent=(locale==="en"?en:ar)+" ";});
+    $("newChat").lastChild.textContent=" "+tr("newChat");
+    document.querySelector(".top-title").childNodes[1].textContent=" HAMASA ";
+    $("ttsGender").options[0].text=locale==="en"?"Male":"رجالي";$("ttsGender").options[1].text=locale==="en"?"Female":"نسائي";
+    $("languageSelect").options[0].text=locale==="en"?"Egyptian Arabic":"العربية المصرية";
+    $("languageSelect").options[1].text=locale==="en"?"Arabic":"العربية";
+    $("languageSelect").options[2].text="English";
+    $("visualSelect").options[0].text=locale==="en"?"Hamasa Face":"Face حماصة";
+    $("visualSelect").options[1].text="AI Orb";
+  }
+  $("langBtn").onclick=()=>{locale=locale==="en"?"ar":"en";localStorage.setItem("hamasa_locale",locale);applyLocale();};
+
   const MEMORY_KEY = "hamasa_personal_memory";
   const getMemory = () => localStorage.getItem(MEMORY_KEY) || "";
   const welcome=$("welcome"), messages=$("messages"), input=$("messageInput");
   const persist=()=>localStorage.setItem("hamasa_conversations",JSON.stringify(conversations));
   function renderHistory(){
     const host=$("historyList"); host.innerHTML="";
-    if(!conversations.length){host.innerHTML='<div class="empty-history">محادثاتك هتظهر هنا</div>';return;}
+    if(!conversations.length){host.innerHTML='<div class="empty-history">'+tr("historyEmpty")+'</div>';return;}
     conversations.slice().reverse().forEach(c=>{const b=document.createElement("button");b.className="history-entry";b.textContent=c.title;b.onclick=()=>{current=c;renderMessages();};host.append(b);});
   }
   function saveCurrent(){
@@ -39,7 +67,7 @@
     const content=(text||input.value).trim();if(!content)return;
     input.value="";input.style.height="auto";addMessage("user",content);
     const placeholder={role:"assistant",content:""};
-    const row=document.createElement("div");row.className="message assistant";row.innerHTML='<div class="message-avatar">ح</div><div class="bubble">حماصة بيفكر...</div>';messages.append(row);
+    const row=document.createElement("div");row.className="message assistant";row.innerHTML='<div class="message-avatar">ح</div><div class="bubble">'+tr("thinking")+'</div>';messages.append(row);
     try{
       if(!API||API.includes("YOUR-RAILWAY"))throw new Error("لسه السيرفر مش متوصل. اربط Backend حماصة واضبط API_URL في config.js.");
       const response=await fetch(API+"/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages:current.messages.slice(-30).map(m=>({role:m.role,content:m.content})),memory:getMemory()})});
@@ -107,26 +135,26 @@
     memoryInput.value = getMemory();
     $("saveMemoryButton").onclick = () => {
       localStorage.setItem(MEMORY_KEY, memoryInput.value.trim().slice(0, 6000));
-      memoryStatus.textContent = "اتحفظت ذاكرة حماصة على الجهاز ده.";
+      memoryStatus.textContent = tr("memorySaved");
     };
     $("clearMemoryButton").onclick = () => {
       memoryInput.value = "";
       localStorage.removeItem(MEMORY_KEY);
-      memoryStatus.textContent = "اتمسحت الذاكرة المحفوظة على الجهاز ده.";
+      memoryStatus.textContent = tr("memoryCleared");
     };
   }
   async function transcribeRecordedAudio(blob){
     try{
-      $("voiceStatus").textContent="بحوّل كلامك لنص...";
+      $("voiceStatus").textContent=tr("transcribing");
       const dataUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(",")[1]);reader.onerror=reject;reader.readAsDataURL(blob);});
-      const response=await fetch(API+"/api/transcribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({audio:dataUrl,mime_type:blob.type||"audio/mp4"})});
+      const safeMime=(blob.type||"audio/mp4").split(";")[0];const response=await fetch(API+"/api/transcribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({audio:dataUrl,mime_type:safeMime})});
       const data=await response.json();
       if(!response.ok)throw new Error(data.detail||"تعذر فهم التسجيل");
       input.value=(data.transcript||"").trim();
-      if(!input.value){$("voiceStatus").textContent="ملحقتش أسمع كلام واضح، جرّب تاني";return;}
-      $("voiceStatus").textContent="وصلت، بفكر...";
+      if(!input.value){$("voiceStatus").textContent=tr("micEmpty");return;}
+      $("voiceStatus").textContent=tr("heard");
       await send(undefined,{speakResponse:true});
-    }catch(e){$("voiceStatus").textContent="حصلت مشكلة في تحويل الصوت: "+e.message;}
+    }catch(e){$("voiceStatus").textContent=tr("transcriptionFailed")+e.message;}
   }
   async function toggleMic(){
     if(listening){
@@ -157,9 +185,9 @@
       recorder=new MediaRecorder(stream,mime?{mimeType:mime}:undefined);recordedChunks=[];
       recorder.ondataavailable=e=>{if(e.data&&e.data.size)recordedChunks.push(e.data);};
       recorder.onerror=()=>{$("voiceStatus").textContent="تعذر تسجيل الصوت. جرّب تاني.";stream.getTracks().forEach(t=>t.stop());listening=false;};
-      recorder.onstop=()=>{listening=false;$("micButton").classList.remove("listening");$("voiceMic").classList.remove("listening");stream.getTracks().forEach(t=>t.stop());const blob=new Blob(recordedChunks,{type:recorder.mimeType||"audio/mp4"});if(blob.size)transcribeRecordedAudio(blob);else $("voiceStatus").textContent="التسجيل فاضي، جرّب تاني";};
-      recorder.start();listening=true;$("micButton").classList.add("listening");$("voiceMic").classList.add("listening");$("voiceStatus").textContent="سامعك... اضغط تاني لما تخلص";
-    }catch(e){$("voiceStatus").textContent=e.message||"مش قادر أفتح المايك";listening=false;}
+      recorder.onstop=()=>{listening=false;$("micButton").classList.remove("listening");$("voiceMic").classList.remove("listening");stream.getTracks().forEach(t=>t.stop());const blob=new Blob(recordedChunks,{type:recorder.mimeType||"audio/mp4"});console.info("Hamasa audio capture",{mime:blob.type,size:blob.size,chunks:recordedChunks.length});if(blob.size>1200)transcribeRecordedAudio(blob);else $("voiceStatus").textContent=tr("recordingEmpty");};
+      recorder.start(250);listening=true;$("micButton").classList.add("listening");$("voiceMic").classList.add("listening");$("voiceStatus").textContent=tr("recording");
+    }catch(e){$("voiceStatus").textContent=e.name==="NotAllowedError"?tr("micPermission"):tr("micError")+e.message;listening=false;}
   }
   function view(name){
     $("chatView").classList.toggle("hidden",name!=="chat");$("composerWrap").classList.toggle("hidden",name!=="chat");
@@ -173,7 +201,7 @@
   $("newChat").onclick=()=>{saveCurrent();current={id:crypto.randomUUID(),title:"محادثة جديدة",messages:[]};renderMessages();view("chat");};
   $("clearHistory").onclick=()=>{if(confirm("تمسح سجل المحادثات المحفوظ؟")){conversations=[];persist();renderHistory();}};
   $("menuBtn").onclick=()=>$("sidebar").classList.toggle("open");
-  $("themeBtn").onclick=()=>document.body.classList.toggle("light");
+  const savedTheme=localStorage.getItem("hamasa_theme")||"dark";document.body.classList.toggle("light",savedTheme==="light");$("themeBtn").onclick=()=>{const light=document.body.classList.toggle("light");localStorage.setItem("hamasa_theme",light?"light":"dark");};
   $("settingsBtn").onclick=()=>view("settings");
   document.querySelectorAll(".nav-item").forEach(b=>b.onclick=()=>view(b.dataset.view));
   document.querySelectorAll(".suggestion").forEach(b=>b.onclick=()=>{input.value=b.textContent.replace("↗","").trim();send();});
@@ -182,5 +210,9 @@
   const visualSelect=$("visualSelect");
   if(visualSelect){visualSelect.value=visualMode;visualSelect.onchange=()=>{visualMode=visualSelect.value;localStorage.setItem("hamasa_visual",visualMode);document.querySelectorAll(".hamasa-face").forEach(el=>el.classList.toggle("face-hidden",visualMode!=="face"));document.querySelectorAll(".orb").forEach(el=>el.classList.toggle("orb-hidden",visualMode==="face"));};}
   document.querySelectorAll(".orb").forEach(el=>el.classList.toggle("orb-hidden",visualMode==="face"));
+  applyLocale();
+  const updateViewport=()=>{const vv=window.visualViewport;const h=vv?vv.height:window.innerHeight;document.documentElement.style.setProperty("--app-height",Math.round(h)+"px");if(document.activeElement===input){requestAnimationFrame(()=>{$("chatView").scrollTop=$("chatView").scrollHeight;});}};
+  updateViewport();window.addEventListener("resize",updateViewport);if(window.visualViewport){window.visualViewport.addEventListener("resize",updateViewport);window.visualViewport.addEventListener("scroll",updateViewport);}
+  input.addEventListener("focus",()=>setTimeout(updateViewport,250));input.addEventListener("blur",()=>setTimeout(updateViewport,250));
   renderHistory();renderMessages();
 })();
