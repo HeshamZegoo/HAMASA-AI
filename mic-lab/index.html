@@ -1,117 +1,36 @@
 <!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#031326">
-<title>HAMASA — Microphone Lab</title>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#061426"><title>HAMASA Live Voice Lab</title>
 <style>
-:root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#031326;color:#f5f7ff}
-*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:22px}
-main{width:min(100%,520px);padding:26px;border:1px solid #29405d;border-radius:24px;background:#0a1c32;box-shadow:0 18px 60px #0005}
-h1{font-size:24px;margin:0 0 8px}p{color:#b8c7d9;line-height:1.5}
-.status{padding:13px;border-radius:12px;background:#102944;margin:18px 0;overflow-wrap:anywhere}
-button{width:100%;min-height:52px;border:0;border-radius:14px;font-size:16px;font-weight:700;cursor:pointer;margin-top:10px}
-#start{background:#d100d1;color:white}#stop{background:#243b56;color:white}button:disabled{opacity:.45}
-.meter{height:12px;border-radius:20px;background:#21364d;overflow:hidden;margin:14px 0}
-#level{height:100%;width:0;background:#45d49a;transition:width .08s linear}
-small{color:#93a9c1}
-</style>
-</head>
-<body><main>
-<h1>HAMASA Microphone Lab</h1>
-<p>This isolated test checks Safari microphone permission and live audio capture only. It does not connect to Gemini or change the chat application.</p>
-<div class="status" id="status" role="status" aria-live="polite">Ready. Tap Start and allow microphone access.</div>
-<div class="meter"><div id="level"></div></div>
-<p><small id="details">No microphone session active.</small></p>
-<button id="start" type="button">Start microphone test</button>
-<button id="stop" type="button" disabled>Stop test</button>
-</main>
-<script>
-(() => {
-  "use strict";
-  const status = document.getElementById("status");
-  const details = document.getElementById("details");
-  const level = document.getElementById("level");
-  const startButton = document.getElementById("start");
-  const stopButton = document.getElementById("stop");
-  let stream = null;
-  let context = null;
-  let analyser = null;
-  let source = null;
-  let frame = 0;
-  let active = false;
-
-  function show(message) { status.textContent = message; }
-  function cleanup() {
-    active = false;
-    if (frame) cancelAnimationFrame(frame);
-    frame = 0;
-    if (source) { try { source.disconnect(); } catch {} }
-    if (analyser) { try { analyser.disconnect(); } catch {} }
-    if (stream) stream.getTracks().forEach(track => track.stop());
-    if (context && context.state !== "closed") context.close().catch(() => {});
-    stream = null; source = null; analyser = null; context = null;
-    level.style.width = "0%";
-    startButton.disabled = false;
-    stopButton.disabled = true;
-    details.textContent = "No microphone session active.";
-  }
-  function sample() {
-    if (!active || !analyser) return;
-    const data = new Uint8Array(analyser.fftSize);
-    analyser.getByteTimeDomainData(data);
-    let sum = 0;
-    for (const sample of data) {
-      const normalized = (sample - 128) / 128;
-      sum += normalized * normalized;
-    }
-    const rms = Math.sqrt(sum / data.length);
-    level.style.width = Math.min(100, Math.round(rms * 320)) + "%";
-    details.textContent = "Microphone active · input level " + Math.round(rms * 1000) / 10 + "% · AudioContext " + context.state;
-    frame = requestAnimationFrame(sample);
-  }
-  async function start() {
-    if (active) return;
-    if (!window.isSecureContext) {
-      show("Error: microphone access requires HTTPS or localhost.");
-      return;
-    }
-    if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== "function") {
-      show("Error: this Safari page does not expose getUserMedia.");
-      return;
-    }
-    startButton.disabled = true;
-    show("Requesting microphone permission…");
-    details.textContent = "Waiting for Safari microphone response.";
-    try {
-      // Invoke getUserMedia directly in the trusted button activation handler.
-      const permissionRequest = navigator.mediaDevices.getUserMedia({ audio: true });
-      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-      if (!AudioContextClass) throw new Error("Web Audio API is unavailable in this browser.");
-      context = new AudioContextClass();
-      const resumeRequest = context.resume();
-      stream = await permissionRequest;
-      await resumeRequest;
-      if (!stream.getAudioTracks().length) throw new Error("Safari returned a stream without an audio track.");
-      source = context.createMediaStreamSource(stream);
-      analyser = context.createAnalyser();
-      analyser.fftSize = 2048;
-      source.connect(analyser);
-      active = true;
-      stopButton.disabled = false;
-      show("Success: microphone permission granted and audio capture is running.");
-      sample();
-    } catch (error) {
-      cleanup();
-      const name = error && error.name ? error.name : "Error";
-      const message = error && error.message ? error.message : String(error);
-      show("Microphone test failed — " + name + ": " + message);
-      details.textContent = "The isolated test stopped safely.";
-    }
-  }
-  startButton.addEventListener("click", start);
-  stopButton.addEventListener("click", () => { cleanup(); show("Test stopped. Microphone tracks and audio context were closed."); });
-  window.addEventListener("pagehide", cleanup);
+:root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#061426;color:#f4f7ff}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:18px}main{width:min(100%,540px);padding:25px;border:1px solid #29405d;border-radius:24px;background:#0b1d33;box-shadow:0 18px 60px #0005}h1{font-size:25px;margin:0 0 8px}p{color:#b8c7d9;line-height:1.65}.status{padding:13px;border-radius:12px;background:#122b46;margin:18px 0;min-height:48px;overflow-wrap:anywhere}.voices{display:flex;gap:10px;margin:16px 0}.voices button{flex:1;background:#1c3551;color:#dce9f8;border:1px solid #35506e}button{min-height:50px;border:0;border-radius:13px;font-size:16px;font-weight:700;cursor:pointer;padding:10px 14px}.voices button.selected{background:#5934a7;border-color:#a88cff;color:white}#start{width:100%;background:#d100d1;color:white}#stop{width:100%;background:#293f58;color:white;margin-top:10px}button:disabled{opacity:.45;cursor:not-allowed}.meter{height:11px;border-radius:20px;background:#20364e;overflow:hidden;margin:14px 0}#level{height:100%;width:0;background:#45d49a;transition:width .07s linear}.transcript{min-height:64px;padding:12px;border-radius:12px;background:#0e263f;margin-top:12px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}small,.label{color:#9bb0c7}.label{font-size:13px;margin-top:14px}
+</style></head><body><main>
+<h1>حماصة — اختبار المحادثة الصوتية</h1><p>نسخة اختبار منفصلة. بتتصل بـ Gemini Live مباشرة بصوت لحظي، ومش بتغيّر الشات الأساسي.</p>
+<div class="label">اختار الصوت</div><div class="voices"><button id="male" class="selected" type="button">🎙️ صوت رجالي</button><button id="female" type="button">🎙️ صوت نسائي</button></div>
+<div id="status" class="status" role="status" aria-live="polite">جاهز. اضغط «ابدأ المحادثة» واسمح للمايك.</div><div class="meter"><div id="level"></div></div><small id="details">الميكروفون غير نشط.</small>
+<div class="label">الكلام اللي اتسمع</div><div id="heard" class="transcript">—</div><div class="label">رد حماصة</div><div id="reply" class="transcript">—</div>
+<button id="start" type="button">ابدأ المحادثة الصوتية</button><button id="stop" type="button" disabled>إنهاء المحادثة</button>
+</main><script>
+(()=>{
+"use strict";
+const $=id=>document.getElementById(id),statusEl=$("status"),details=$("details"),level=$("level"),startBtn=$("start"),stopBtn=$("stop");
+let voice="male",stream=null,context=null,socket=null,source=null,processor=null,mute=null,active=false,nextPlayTime=0,playing=new Set();
+const WS="wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained?access_token=";
+function status(s){statusEl.textContent=s}
+function setVoice(v){if(active)return;voice=v;$("male").classList.toggle("selected",v==="male");$("female").classList.toggle("selected",v==="female")}
+$("male").onclick=()=>setVoice("male");$("female").onclick=()=>setVoice("female");
+function stopPlayback(){for(const n of playing){try{n.stop()}catch{}}playing.clear();nextPlayTime=context?context.currentTime:0}
+function cleanup(message){active=false;if(processor){processor.onaudioprocess=null;try{processor.disconnect()}catch{}}if(source){try{source.disconnect()}catch{}}if(mute){try{mute.disconnect()}catch{}}if(socket){try{socket.close(1000,"Ended")}catch{}}socket=null;if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;processor=null;source=null;mute=null;stopPlayback();if(context&&context.state!=="closed")context.close().catch(()=>{});context=null;level.style.width="0%";startBtn.disabled=false;stopBtn.disabled=true;details.textContent="الميكروفون غير نشط.";if(message)status(message)}
+function downsample(a,from,to){if(from===to)return a;const ratio=from/to,n=Math.floor(a.length/ratio),out=new Float32Array(n);for(let i=0;i<n;i++){const s=Math.floor(i*ratio),e=Math.min(Math.floor((i+1)*ratio),a.length);let sum=0;for(let j=s;j<e;j++)sum+=a[j];out[i]=sum/Math.max(1,e-s)}return out}
+function b64pcm(a){const b=new Uint8Array(a.length*2),v=new DataView(b.buffer);for(let i=0;i<a.length;i++){const s=Math.max(-1,Math.min(1,a[i]));v.setInt16(i*2,s<0?s*32768:s*32767,true)}let x="";for(let i=0;i<b.length;i+=32768)x+=String.fromCharCode(...b.subarray(i,Math.min(i+32768,b.length)));return btoa(x)}
+function playPcm(encoded,rate=24000){if(!context||!active)return;const raw=atob(encoded),bytes=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);const view=new DataView(bytes.buffer),count=Math.floor(bytes.length/2);if(!count)return;const buf=context.createBuffer(1,count,rate),ch=buf.getChannelData(0);for(let i=0;i<count;i++)ch[i]=view.getInt16(i*2,true)/32768;const node=context.createBufferSource();node.buffer=buf;node.connect(context.destination);const at=Math.max(context.currentTime+.03,nextPlayTime);node.start(at);nextPlayTime=at+buf.duration;playing.add(node);node.onended=()=>playing.delete(node)}
+function onMessage(event){let d;try{d=JSON.parse(event.data)}catch{return}if(d.setupComplete){status("اتصلنا بـ Gemini Live. اتكلم براحتك.");return}const c=d.serverContent;if(!c)return;if(c.interrupted){stopPlayback();status("حماصة اتقاطعت وبتسمعك.")}if(c.inputTranscription?.text)$("heard").textContent=c.inputTranscription.text;if(c.outputTranscription?.text)$("reply").textContent=c.outputTranscription.text;for(const p of c.modelTurn?.parts||[]){const a=p.inlineData||p.inline_data;if(a?.data){const rate=Number((a.mimeType||a.mime_type||"").match(/rate=(\d+)/)?.[1]||24000);playPcm(a.data,rate)}}if(c.turnComplete)status("حماصة خلصت ردها — سامعاك.")}
+async function start(){if(active)return;if(!window.isSecureContext||!navigator.mediaDevices?.getUserMedia){status("المتصفح لا يتيح المايك هنا. افتح الصفحة من Safari عبر HTTPS.");return}startBtn.disabled=true;status("بنطلب إذن المايك...");try{
+const permission=navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:true}}),AC=window.AudioContext||window.webkitAudioContext;if(!AC)throw Error("Web Audio غير مدعوم.");context=new AC({sampleRate:16000});await context.resume();stream=await permission;if(!stream.getAudioTracks().length)throw Error("مفيش مسار صوت.");status("بنجهز جلسة Gemini Live...");
+const tr=await fetch("/api/live-token",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({voice})}),td=await tr.json();if(!tr.ok)throw Error(td.detail||"تعذر تجهيز جلسة Gemini.");
+socket=new WebSocket(WS+encodeURIComponent(td.token));await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error("انتهت مهلة الاتصال بـ Gemini.")),15000);socket.onopen=()=>{clearTimeout(timer);resolve()};socket.onerror=()=>{clearTimeout(timer);reject(Error("فشل اتصال WebSocket مع Gemini."))};socket.onclose=e=>{if(active)status("الاتصال اتقفل ("+e.code+"). ابدأ جلسة جديدة.")}});
+socket.onmessage=onMessage;socket.send(JSON.stringify({setup:{model:td.model.startsWith("models/")?td.model:"models/"+td.model,generationConfig:{responseModalities:["AUDIO"],speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:td.voice}}}},systemInstruction:{parts:[{text:"أنت حماصة، مساعد صوتي ذكي وودود. تحدث باللهجة المصرية القاهرية الطبيعية فقط. رد بإيجاز وبشكل تلقائي. استمع للمستخدم ولا تقاطعه، وإذا قاطعك توقف فوراً."}]},inputAudioTranscription:{},outputAudioTranscription:{}}}));
+source=context.createMediaStreamSource(stream);processor=context.createScriptProcessor(4096,1,1);mute=context.createGain();mute.gain.value=0;source.connect(processor);processor.connect(mute);mute.connect(context.destination);active=true;nextPlayTime=context.currentTime;stopBtn.disabled=false;status("اتصلنا. اتكلم بالمصري — حماصة بتسمعك.");
+processor.onaudioprocess=e=>{if(!active||!socket||socket.readyState!==WebSocket.OPEN)return;const input=e.inputBuffer.getChannelData(0),pcm=downsample(input,context.sampleRate,16000);let sum=0;for(const n of input)sum+=n*n;const rms=Math.sqrt(sum/input.length);level.style.width=Math.min(100,Math.round(rms*320))+"%";details.textContent="الميكروفون شغال · مستوى الصوت "+(rms*100).toFixed(1)+"%";if(pcm.length)socket.send(JSON.stringify({realtimeInput:{mediaChunks:[{mimeType:"audio/pcm;rate=16000",data:b64pcm(pcm)}]}}))}
+}catch(e){cleanup("حصلت مشكلة: "+(e?.message||String(e)));details.textContent="الجلسة اتقفلت بأمان."}}
+startBtn.onclick=start;stopBtn.onclick=()=>cleanup("المحادثة انتهت. المايك والاتصال اتقفلوا.");window.addEventListener("pagehide",()=>cleanup());
 })();
 </script></body></html>
