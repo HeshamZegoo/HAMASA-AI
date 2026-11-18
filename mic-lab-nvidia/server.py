@@ -2,11 +2,14 @@ import asyncio
 import io
 import os
 import re
+import time
 import wave
+from collections import defaultdict, deque
 
 import httpx
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, JSONResponse
+from fastapi import Request
 from pydantic import BaseModel, Field
 from pathlib import Path
 
@@ -23,6 +26,21 @@ SYSTEM = (
 )
 
 app = FastAPI(title="HAMASA NVIDIA Voice Lab")
+_rate = defaultdict(deque)
+
+
+@app.middleware("http")
+async def limit_public_requests(request: Request, call_next):
+    if request.url.path.startswith("/api/"):
+        ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "unknown").split(",")[0].strip()
+        now = time.monotonic()
+        bucket = _rate[ip]
+        while bucket and now - bucket[0] > 60:
+            bucket.popleft()
+        if len(bucket) >= 18:
+            return JSONResponse(status_code=429, content={"detail": "طلبات كتير بسرعة. استنى دقيقة وجرب تاني."})
+        bucket.append(now)
+    return await call_next(request)
 
 
 class ChatRequest(BaseModel):
