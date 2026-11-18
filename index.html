@@ -425,7 +425,7 @@ let liveProcessor = null, liveSource = null, silentGain = null;
 let liveReady = false, liveUserText = '', liveAssistantText = '';
 let liveSetupResolve = null, liveSetupReject = null, liveSetupTimer = null, liveSetupDone = false;
 let liveAttemptId = 0;
-let fallbackRecorder = null, fallbackChunks = [], fallbackRecording = false, fallbackMime = '';
+
 let playbackCursor = 0;
 const playbackSources = new Set();
 let voiceGender = store.get('hamasa.voiceGender', 'male') === 'female' ? 'female' : 'male';
@@ -462,12 +462,6 @@ function stopLiveSession(closeSocket = true) {
   liveSetupDone = false;
   liveSetupResolve = null;
   liveSetupReject = null;
-  if (fallbackRecorder && fallbackRecorder.state === 'recording') {
-    fallbackRecorder.onstop = null;
-    try { fallbackRecorder.stop(); } catch {}
-  }
-  fallbackRecorder = null;
-  fallbackRecording = false;
   if (liveProcessor) { try { liveProcessor.disconnect(); } catch {} liveProcessor = null; }
   if (liveSource) { try { liveSource.disconnect(); } catch {} liveSource = null; }
   if (silentGain) { try { silentGain.disconnect(); } catch {} silentGain = null; }
@@ -687,156 +681,6 @@ async function startLiveSession() {
   }
 }
 
-function stopLiveTransportKeepMic() {
-  liveReady = false;
-  if (liveProcessor) { try { liveProcessor.disconnect(); } catch {} liveProcessor = null; }
-  if (liveSource) { try { liveSource.disconnect(); } catch {} liveSource = null; }
-  if (silentGain) { try { silentGain.disconnect(); } catch {} silentGain = null; }
-  if (liveSocket) { const socket = liveSocket; liveSocket = null; try { socket.close(1000, 'Switching to compatible voice mode'); } catch {} }
-}
-async function startFallbackRecorder(reason) {
-  if (!liveStream) throw new Error(reason || 'Microphone stream is unavailable.');
-  if (!window.MediaRecorder) throw new Error('Live voice failed and this browser does not support audio recording.');
-  stopLiveTransportKeepMic();
-  const candidates = ['audio/mp4;codecs=mp4a.40.2', 'audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'];
-  fallbackMime = candidates.find(type => MediaRecorder.isTypeSupported?.(type)) || '';
-  fallbackChunks = [];
-  fallbackRecorder = fallbackMime ? new MediaRecorder(liveStream, { mimeType: fallbackMime }) : new MediaRecorder(liveStream);
-  fallbackMime = fallbackRecorder.mimeType || fallbackMime || 'audio/mp4';
-  fallbackRecorder.ondataavailable = event => { if (event.data?.size) fallbackChunks.push(event.data); };
-  fallbackRecorder.onerror = event => {
-    vErr = event.error?.message || 'Microphone recording failed.';
-    setVoice('idle');
-  };
-  fallbackRecorder.onstop = async () => {
-    fallbackRecording = false;
-    const blob = new Blob(fallbackChunks, { type: fallbackMime });
-    fallbackChunks = [];
-    setVoice('thinking');
-    $('#vhint').textContent = 'بفهم كلامك وبجهز الرد...';
-    try {
-      await processFallbackVoice(blob);
-    } catch (error) {
-      vErr = error?.message || 'Voice processing failed.';
-      setVoice('idle');
-    } finally {
-      if (liveStream) { liveStream.getTracks().forEach(track => track.stop()); liveStream = null; }
-      if (liveContext) { const context = liveContext; liveContext = null; context.close().catch(() => {}); }
-      fallbackRecorder = null;
-    }
-  };
-  fallbackRecorder.start(250);
-  fallbackRecording = true;
-  vErr = 'وضع صوت متوافق: اضغط المايك بعد ما تخلص كلامك لإرسال التسجيل.';
-  setVoice('listening');
-  $('#vhint').textContent = vErr;
-}
-async function processFallbackVoice(blob) {
-  if (!blob || blob.size < 1200) throw new Error('التسجيل قصير جداً. اتكلم ثانية واحدة على الأقل.');
-  const bytes = await blob.arrayBuffer();
-  let binary = '';
-  const data = new Uint8Array(bytes);
-  for (let i = 0; i < data.length; i += 0x8000) binary += String.fromCharCode(...data.subarray(i, i + 0x8000));
-  const audio64 = btoa(binary);
-  const tr = await fetch(API_BASE + '/api/transcribe', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ audio: audio64, mime_type: fallbackMime.split(';')[0] || blob.type || 'audio/mp4' })
-  });
-  const trData = await tr.json();
-  if (!tr.ok) throw new Error(trData.detail || 'تعذر فهم التسجيل الصوتي.');
-  const transcript = (trData.transcript || '').trim();
-  if (!transcript) throw new Error('ماسمعتش كلام واضح. جرّب تتكلم أقرب للمايك.');
-  liveUserText = transcript;
-  liveAssistantText = '';
-  const history = (cur?.messages || []).map(m => ({ role: m.role === 'bot' ? 'assistant' : 'user', text: m.text }));
-  history.push({ role: 'user', text: transcript });
-  const answer = await chatAdapter(history);
-  liveAssistantText = answer.text;
-  saveLiveTurn();
-  const speech = await fetch(API_BASE + '/api/tts', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: answer.text, gender: voiceGender })
-  });
-  const speechData = await speech.json();
-  if (!speech.ok) throw new Error(speechData.detail || 'تعذر تشغيل الرد الصوتي.');
-  if (liveContext && speechData.audio) {
-    await liveContext.resume();
-    const raw = atob(speechData.audio);
-    const audioBytes = new Uint8Array(raw.length);
-    for (let i = 0; i < raw.length; i++) audioBytes[i] = raw.charCodeAt(i);
-    const audioBuffer = await liveContext.decodeAudioData(audioBytes.buffer);
-    const source = liveContext.createBufferSource();
-    source.buffer = audioBuffer;
-    source.connect(liveContext.destination);
-    setVoice('speaking');
-    await new Promise(resolve => { source.onended = resolve; source.start(); });
-  }
-  setVoice('idle');
-}
-async function startPushToTalk() {
-  if (fallbackRecorder?.state === 'recording') {
-    fallbackRecorder.stop();
-    return;
-  }
-  if (vstate !== 'idle') return;
-  vErr = '';
-  setVoice('thinking');
-  try {
-    if (!navigator.mediaDevices?.getUserMedia) throw new Error('الميكروفون غير متاح في المتصفح. افتح الموقع في Safari مباشرة واسمح بالوصول للمايك.');
-    if (!window.isSecureContext) throw new Error('لازم تفتح حماصة من رابط HTTPS آمن.');
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContextClass || !window.MediaRecorder) throw new Error('المتصفح لا يدعم تسجيل الصوت المطلوب.');
-    // Call permission and audio-unlock APIs immediately in the trusted tap handler (iOS Safari).
-    liveContext = new AudioContextClass();
-    const audioUnlock = liveContext.resume();
-    const micRequest = navigator.mediaDevices.getUserMedia({ audio: true });
-    liveStream = await micRequest;
-    await audioUnlock;
-    const types = ['audio/mp4;codecs=mp4a.40.2', 'audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'];
-    fallbackMime = types.find(type => MediaRecorder.isTypeSupported?.(type)) || '';
-    fallbackChunks = [];
-    fallbackRecorder = fallbackMime
-      ? new MediaRecorder(liveStream, { mimeType: fallbackMime })
-      : new MediaRecorder(liveStream);
-    fallbackMime = fallbackRecorder.mimeType || fallbackMime || 'audio/mp4';
-    fallbackRecorder.ondataavailable = event => {
-      if (event.data?.size) fallbackChunks.push(event.data);
-    };
-    fallbackRecorder.onerror = event => {
-      vErr = event.error?.message || 'حصلت مشكلة أثناء تسجيل الصوت.';
-      setVoice('idle');
-      stopLiveSession();
-    };
-    fallbackRecorder.onstop = async () => {
-      const blob = new Blob(fallbackChunks, { type: fallbackMime });
-      fallbackChunks = [];
-      fallbackRecording = false;
-      setVoice('thinking');
-      $('#vhint').textContent = 'بفهم كلامك وبجهز الرد...';
-      try {
-        await processFallbackVoice(blob);
-      } catch (error) {
-        vErr = error?.message || 'معرفتش أعالج التسجيل الصوتي.';
-        setVoice('idle');
-      } finally {
-        if (liveStream) { liveStream.getTracks().forEach(track => track.stop()); liveStream = null; }
-        fallbackRecorder = null;
-      }
-    };
-    fallbackRecorder.start(250);
-    fallbackRecording = true;
-    vErr = 'بتسجل دلوقتي… اضغط المايك مرة تانية لما تخلص كلامك.';
-    setVoice('listening');
-    $('#vhint').textContent = vErr;
-  } catch (error) {
-    console.error('HAMASA microphone start:', error);
-    vErr = error?.message || 'مش قادر أشغل المايك.';
-    setVoice('idle');
-    stopLiveSession();
-  }
-}
 $('#mic').onclick = () => {
   if (liveSocket || liveStream || vstate !== 'idle') {
     stopLiveSession();
