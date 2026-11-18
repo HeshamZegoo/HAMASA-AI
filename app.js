@@ -8,8 +8,8 @@
   let visualMode = localStorage.getItem("hamasa_visual") || "face";
 
   const translations={
-    en:{newChat:"New chat",workspace:"Workspace",chat:"Chat",voiceMode:"Voice mode",settings:"Settings",recent:"Recent",clear:"Clear",historyEmpty:"Your chats will appear here",online:"Online",welcome:"Hi, I’m",welcomeText:"Here to listen, understand, and help you with anything.",voiceEyebrow:"VOICE COMPANION",voiceIdle:"I’m listening",voicePrompt:"Tap the mic and speak naturally",voiceStopHint:"Tap again to stop recording",speakReplies:"Speak replies",speakRepliesHint:"Read Hamasa’s replies aloud",voiceEngine:"Voice engine",voiceGender:"Voice",voiceGenderHint:"Change it anytime",memoryTitle:"Hamasa memory",memoryPrivacy:"This memory is sent with your messages to personalize replies.",memoryHint:"Save useful details, projects and preferences. This memory is stored only in this browser.",saveMemory:"Save memory",clearMemory:"Clear memory",speechLanguage:"Speech recognition language",speechLanguageHint:"Language used to recognize speech",assistantLook:"Assistant appearance",assistantLookHint:"Animated visual style",chatPlaceholder:"Message Hamasa...",footer:"Hamasa can make mistakes. Check important information.",thinking:"Hamasa is thinking…",micEmpty:"I couldn’t hear anything clearly. Try again.",transcribing:"Transcribing your voice…",heard:"Got it. Thinking…",recording:"Listening… tap again when you finish.",recordingEmpty:"No audio was captured. Check microphone permission and try again.",micPermission:"Microphone access was denied. Allow it in Safari settings.",micError:"Could not start microphone: ",memorySaved:"Memory saved on this browser.",memoryCleared:"Saved memory cleared from this browser.",ttsChecking:"Checking voice services…",ttsReady:"Gemini TTS: Ready",ttsMissing:"Add your Gemini API key in Railway.",ttsFailed:"Could not check voice services.",transcriptionFailed:"Voice transcription failed: "},
-    ar:{newChat:"محادثة جديدة",workspace:"مساحتك",chat:"المحادثة",voiceMode:"وضع الصوت",settings:"الإعدادات",recent:"الأخيرة",clear:"مسح",historyEmpty:"محادثاتك هتظهر هنا",online:"متصل",welcome:"أهلاً بيك، أنا",welcomeText:"موجود علشان أسمعك، أفهمك، وأساعدك في أي حاجة.",voiceEyebrow:"مرافقك الصوتي",voiceIdle:"أنا سامعك",voicePrompt:"اضغط على المايك واتكلم براحتك",voiceStopHint:"اضغط تاني لإيقاف التسجيل",speakReplies:"تشغيل الردود صوتياً",speakRepliesHint:"حماصة يقرأ الردود بصوت مسموع",voiceEngine:"محرك الصوت",voiceGender:"نوع الصوت",voiceGenderHint:"تقدر تغيّره في أي وقت",memoryTitle:"ذاكرة حماصة",memoryPrivacy:"الذاكرة دي بتتبعت مع رسائلك عشان تخصص الردود.",memoryHint:"احفظ معلومات ومشاريع وتفضيلات مهمة. الذاكرة دي بتتحفظ على المتصفح ده فقط.",saveMemory:"حفظ الذاكرة",clearMemory:"مسح الذاكرة",speechLanguage:"لغة التعرف على الكلام",speechLanguageHint:"اللغة المستخدمة لفهم كلامك",assistantLook:"شكل المساعد",assistantLookHint:"المظهر المتحرك",chatPlaceholder:"اكتب لحماصة...",footer:"حماصة ممكن يغلط أحياناً — راجع المعلومات المهمة.",thinking:"حماصة بيفكر…",micEmpty:"ملحقتش أسمع كلام واضح. جرّب تاني.",transcribing:"بحوّل كلامك لنص…",heard:"وصلت، بفكر…",recording:"سامعك… اضغط تاني لما تخلص.",recordingEmpty:"ملقتش تسجيل صوت. راجع إذن المايك وجرب تاني.",micPermission:"إذن المايك مرفوض. اسمح بيه من إعدادات Safari.",micError:"مش قادر أشغل المايك: ",memorySaved:"اتحفظت الذاكرة على المتصفح ده.",memoryCleared:"اتمسحت الذاكرة المحفوظة من المتصفح ده.",ttsChecking:"جاري فحص خدمات الصوت…",ttsReady:"Gemini TTS: جاهز",ttsMissing:"أضف مفتاح Gemini في Railway.",ttsFailed:"تعذر فحص خدمات الصوت.",transcriptionFailed:"فشل تحويل الصوت لنص: "}
+    en:{newChat:"New chat",workspace:"Workspace",chat:"Chat",voiceMode:"Voice mode",settings:"Settings",recent:"Recent",clear:"Clear",historyEmpty:"Your chats will appear here",online:"Online",welcome:"Hi, I’m",welcomeText:"Here to listen, understand, and help you with anything.",voiceEyebrow:"VOICE COMPANION",voiceIdle:"I’m listening",voicePrompt:"Tap the mic and speak naturally",voiceStopHint:"Tap to start or end live conversation",speakReplies:"Speak replies",speakRepliesHint:"Read Hamasa’s replies aloud",voiceEngine:"Voice engine",voiceGender:"Voice",voiceGenderHint:"Change it anytime",memoryTitle:"Hamasa memory",memoryPrivacy:"This memory is sent with your messages to personalize replies.",memoryHint:"Save useful details, projects and preferences. This memory is stored only in this browser.",saveMemory:"Save memory",clearMemory:"Clear memory",speechLanguage:"Speech recognition language",speechLanguageHint:"Language used to recognize speech",assistantLook:"Assistant appearance",assistantLookHint:"Animated visual style",chatPlaceholder:"Message Hamasa...",footer:"Hamasa can make mistakes. Check important information.",thinking:"Hamasa is thinking…",micEmpty:"I couldn’t hear anything clearly. Try again.",transcribing:"Transcribing your voice…",heard:"Got it. Thinking…",recording:"Live voice conversation is active.",recordingEmpty:"No audio was captured. Check microphone permission and try again.",micPermission:"Microphone access was denied. Allow it in Safari settings.",micError:"Could not start microphone: ",memorySaved:"Memory saved on this browser.",memoryCleared:"Saved memory cleared from this browser.",ttsChecking:"Checking voice services…",ttsReady:"Gemini TTS: Ready",ttsMissing:"Add your Gemini API key in Railway.",ttsFailed:"Could not check voice services.",transcriptionFailed:"Voice transcription failed: "},
+    ar:{newChat:"محادثة جديدة",workspace:"مساحتك",chat:"المحادثة",voiceMode:"وضع الصوت",settings:"الإعدادات",recent:"الأخيرة",clear:"مسح",historyEmpty:"محادثاتك هتظهر هنا",online:"متصل",welcome:"أهلاً بيك، أنا",welcomeText:"موجود علشان أسمعك، أفهمك، وأساعدك في أي حاجة.",voiceEyebrow:"مرافقك الصوتي",voiceIdle:"أنا سامعك",voicePrompt:"اضغط على المايك واتكلم براحتك",voiceStopHint:"اضغط لبدء المحادثة أو إنهائها",speakReplies:"تشغيل الردود صوتياً",speakRepliesHint:"حماصة يقرأ الردود بصوت مسموع",voiceEngine:"محرك الصوت",voiceGender:"نوع الصوت",voiceGenderHint:"تقدر تغيّره في أي وقت",memoryTitle:"ذاكرة حماصة",memoryPrivacy:"الذاكرة دي بتتبعت مع رسائلك عشان تخصص الردود.",memoryHint:"احفظ معلومات ومشاريع وتفضيلات مهمة. الذاكرة دي بتتحفظ على المتصفح ده فقط.",saveMemory:"حفظ الذاكرة",clearMemory:"مسح الذاكرة",speechLanguage:"لغة التعرف على الكلام",speechLanguageHint:"اللغة المستخدمة لفهم كلامك",assistantLook:"شكل المساعد",assistantLookHint:"المظهر المتحرك",chatPlaceholder:"اكتب لحماصة...",footer:"حماصة ممكن يغلط أحياناً — راجع المعلومات المهمة.",thinking:"حماصة بيفكر…",micEmpty:"ملحقتش أسمع كلام واضح. جرّب تاني.",transcribing:"بحوّل كلامك لنص…",heard:"وصلت، بفكر…",recording:"المحادثة الصوتية المباشرة شغالة.",recordingEmpty:"ملقتش تسجيل صوت. راجع إذن المايك وجرب تاني.",micPermission:"إذن المايك مرفوض. اسمح بيه من إعدادات Safari.",micError:"مش قادر أشغل المايك: ",memorySaved:"اتحفظت الذاكرة على المتصفح ده.",memoryCleared:"اتمسحت الذاكرة المحفوظة من المتصفح ده.",ttsChecking:"جاري فحص خدمات الصوت…",ttsReady:"Gemini TTS: جاهز",ttsMissing:"أضف مفتاح Gemini في Railway.",ttsFailed:"تعذر فحص خدمات الصوت.",transcriptionFailed:"فشل تحويل الصوت لنص: "}
   };
   let locale=localStorage.getItem("hamasa_locale")||"en";
   const tr=k=>translations[locale]?.[k]||translations.en[k]||k;
@@ -143,51 +143,100 @@
       memoryStatus.textContent = tr("memoryCleared");
     };
   }
-  async function transcribeRecordedAudio(blob){
+  let liveSocket=null,liveStream=null,liveAudioContext=null,liveProcessor=null,liveSources=[],liveNextTime=0,liveText="",liveReply="",liveReady=false;
+  function pcm16Base64(float32){
+    const out=new Int16Array(float32.length);
+    for(let i=0;i<float32.length;i++){const s=Math.max(-1,Math.min(1,float32[i]));out[i]=s<0?s*32768:s*32767;}
+    let binary="";const bytes=new Uint8Array(out.buffer);
+    for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,Math.min(i+0x8000,bytes.length)));
+    return btoa(binary);
+  }
+  function downsampleTo16k(buffer,inputRate){
+    if(inputRate===16000)return buffer;
+    const ratio=inputRate/16000, length=Math.floor(buffer.length/ratio), result=new Float32Array(length);
+    for(let i=0;i<length;i++){const start=Math.floor(i*ratio),end=Math.min(Math.floor((i+1)*ratio),buffer.length);let sum=0;for(let j=start;j<end;j++)sum+=buffer[j];result[i]=sum/Math.max(1,end-start);}
+    return result;
+  }
+  function stopLivePlayback(){
+    for(const source of liveSources){try{source.stop();}catch(_){}}
+    liveSources=[];liveNextTime=liveAudioContext?liveAudioContext.currentTime:0;
+  }
+  function queueLiveAudio(base64){
+    if(!liveAudioContext)return;
+    const raw=atob(base64),pcm=new Int16Array(raw.length/2);
+    for(let i=0;i<pcm.length;i++)pcm[i]=(raw.charCodeAt(i*2)|(raw.charCodeAt(i*2+1)<<8));
+    const buffer=liveAudioContext.createBuffer(1,pcm.length,24000),channel=buffer.getChannelData(0);
+    for(let i=0;i<pcm.length;i++)channel[i]=pcm[i]/32768;
+    const source=liveAudioContext.createBufferSource();source.buffer=buffer;source.connect(liveAudioContext.destination);
+    const now=liveAudioContext.currentTime;liveNextTime=Math.max(liveNextTime,now+0.03);source.start(liveNextTime);liveNextTime+=buffer.duration;
+    liveSources.push(source);source.onended=()=>{liveSources=liveSources.filter(x=>x!==source);};
+  }
+  async function startLiveVoice(){
+    if(listening){stopLiveVoice();return;}
     try{
-      $("voiceStatus").textContent=tr("transcribing");
-      const dataUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(",")[1]);reader.onerror=reject;reader.readAsDataURL(blob);});
-      const safeMime=(blob.type||"audio/mp4").split(";")[0];const response=await fetch(API+"/api/transcribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({audio:dataUrl,mime_type:safeMime})});
-      const data=await response.json();
-      if(!response.ok)throw new Error(data.detail||"تعذر فهم التسجيل");
-      input.value=(data.transcript||"").trim();
-      if(!input.value){$("voiceStatus").textContent=tr("micEmpty");return;}
-      $("voiceStatus").textContent=tr("heard");
-      await send(undefined,{speakResponse:true});
-    }catch(e){$("voiceStatus").textContent=tr("transcriptionFailed")+e.message;}
+      if(!navigator.mediaDevices?.getUserMedia||!window.AudioContext)throw new Error("افتح الموقع في Safari واسمح باستخدام المايك.");
+      $("voiceStatus").textContent=locale==="ar"?"بجهّز المحادثة المباشرة...":"Connecting to live voice...";
+      liveStream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+      liveAudioContext=new (window.AudioContext||window.webkitAudioContext)();
+      await liveAudioContext.resume();
+      const wsProtocol=API.startsWith("https")?"wss:":"ws:";
+      const gender=$("ttsGender")?.value||"male";
+      liveSocket=new WebSocket(wsProtocol+"//"+new URL(API).host+"/api/live?gender="+encodeURIComponent(gender));
+      liveSocket.onmessage=event=>{
+        let packet;try{packet=JSON.parse(event.data);}catch(_){return;}
+        if(packet.error){$("voiceStatus").textContent=packet.error;stopLiveVoice();return;}
+        if(packet.setupComplete){liveReady=true;$("voiceStatus").textContent=locale==="ar"?"حماصة معاك، اتكلم براحتك":"Hamasa is here. Speak naturally.";return;}
+        const content=packet.serverContent||{};
+        if(content.interrupted){stopLivePlayback();$("voiceStatus").textContent=locale==="ar"?"سامعك...":"Listening...";}
+        if(content.inputTranscription?.text){liveText+=content.inputTranscription.text;}
+        if(content.outputTranscription?.text){liveReply+=content.outputTranscription.text;$("voiceStatus").textContent=content.outputTranscription.text.slice(-110);}
+        for(const part of (content.modelTurn?.parts||[])){const data=part.inlineData?.data;if(data)queueLiveAudio(data);}
+        if(content.turnComplete){
+          if(liveText.trim())addMessage("user",liveText.trim());
+          if(liveReply.trim())addMessage("assistant",liveReply.trim());
+          liveText="";liveReply="";
+          if(!content.modelTurn?.parts?.length)$("voiceStatus").textContent=locale==="ar"?"أنا سامعك، كمل":"I'm listening. Go ahead.";
+        }
+      };
+      liveSocket.onerror=()=>{$("voiceStatus").textContent=locale==="ar"?"اتعذر الاتصال بالصوت المباشر. راجع إعدادات Gemini Live في Railway.":"Live voice connection failed. Check Gemini Live settings in Railway.";};
+      liveSocket.onclose=()=>{if(listening)stopLiveVoice(false);};
+      await new Promise((resolve,reject)=>{const timeout=setTimeout(()=>reject(new Error("انتهت مهلة الاتصال بالصوت المباشر.")),15000);liveSocket.addEventListener("open",()=>{clearTimeout(timeout);resolve();},{once:true});liveSocket.addEventListener("error",()=>{clearTimeout(timeout);reject(new Error("فشل فتح اتصال Gemini Live."));},{once:true});});
+      const source=liveAudioContext.createMediaStreamSource(liveStream);
+      liveProcessor=liveAudioContext.createScriptProcessor(4096,1,1);
+      liveProcessor.onaudioprocess=e=>{
+        if(!liveReady||!liveSocket||liveSocket.readyState!==WebSocket.OPEN)return;
+        const pcm=downsampleTo16k(e.inputBuffer.getChannelData(0),liveAudioContext.sampleRate);
+        liveSocket.send(JSON.stringify({realtimeInput:{audio:{mimeType:"audio/pcm;rate=16000",data:pcm16Base64(pcm)}}}));
+      };
+      source.connect(liveProcessor);liveProcessor.connect(liveAudioContext.destination);
+      listening=true;$("voiceMic").classList.add("listening");$("micButton").classList.add("listening");
+      $("voiceStatus").textContent=locale==="ar"?"حماصة معاك، اتكلم براحتك":"Hamasa is here. Speak naturally";
+    }catch(e){$("voiceStatus").textContent=e.message||"Could not start live voice.";stopLiveVoice();}
+  }
+  function stopLiveVoice(closeSocket=true){
+    listening=false;liveReady=false;
+    $("voiceMic")?.classList.remove("listening");$("micButton")?.classList.remove("listening");
+    if(liveProcessor){try{liveProcessor.disconnect();}catch(_){}liveProcessor=null;}
+    if(liveStream){liveStream.getTracks().forEach(t=>t.stop());liveStream=null;}
+    stopLivePlayback();
+    if(closeSocket&&liveSocket){try{liveSocket.close();}catch(_){}}
+    liveSocket=null;
+    if(liveAudioContext){liveAudioContext.close().catch(()=>{});liveAudioContext=null;}
+    if($("voiceStatus"))$("voiceStatus").textContent=locale==="ar"?"المحادثة انتهت":"Voice chat ended";
   }
   async function toggleMic(){
-    if(listening){
-      if(recorder&&recorder.state!=="inactive")recorder.stop();
-      else if(recognition)recognition.stop();
-      return;
-    }
     const voiceMode=!$("voiceView").classList.contains("hidden");
-    recognitionSpeaksReply=voiceMode;
-    // Native speech recognition is preferred when available; MediaRecorder + Gemini is the iPhone/Safari fallback.
+    if(voiceMode){await startLiveVoice();return;}
+    if(listening){stopLiveVoice();return;}
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-    const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent);
-    if(SR&&!isIOS){
-      try{
-        recognition=new SR();recognition.lang=$("languageSelect").value;recognition.interimResults=true;recognition.continuous=false;
-        recognition.onstart=()=>{listening=true;$("micButton").classList.add("listening");$("voiceMic").classList.add("listening");$("voiceStatus").textContent="سامعك... اتكلم";};
-        recognition.onresult=e=>{let final="",interim="";for(let i=e.resultIndex;i<e.results.length;i++){if(e.results[i].isFinal)final+=e.results[i][0].transcript;else interim+=e.results[i][0].transcript;}input.value=final||interim;};
-        recognition.onerror=e=>{if(e.error==="not-allowed")$("voiceStatus").textContent="اسمح للمتصفح باستخدام المايك";else $("voiceStatus").textContent="هحوّل لطريقة تسجيل بديلة...";};
-        recognition.onend=()=>{listening=false;$("micButton").classList.remove("listening");$("voiceMic").classList.remove("listening");const shouldSpeak=recognitionSpeaksReply;recognitionSpeaksReply=false;if(input.value.trim())send(undefined,{speakResponse:shouldSpeak});};
-        recognition.start();return;
-      }catch(e){recognition=null;}
+    if(SR){recognition=new SR();recognition.lang=$("languageSelect").value;recognition.interimResults=true;recognition.continuous=false;
+      recognition.onstart=()=>{listening=true;$("micButton").classList.add("listening");};
+      recognition.onresult=e=>{let result="";for(let i=e.resultIndex;i<e.results.length;i++)if(e.results[i].isFinal)result+=e.results[i][0].transcript;input.value=result||input.value;};
+      recognition.onerror=()=>{listening=false;$("micButton").classList.remove("listening");};
+      recognition.onend=()=>{listening=false;$("micButton").classList.remove("listening");if(input.value.trim())send();};
+      recognition.start();return;
     }
-    try{
-      if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder)throw new Error("المتصفح لا يدعم تسجيل الصوت. افتح الموقع في Safari واضغط Allow للمايك.");
-      const stream=await navigator.mediaDevices.getUserMedia({audio:true});
-      const types=["audio/mp4","audio/webm;codecs=opus","audio/webm","audio/ogg;codecs=opus"];
-      const mime=types.find(t=>MediaRecorder.isTypeSupported?.(t));
-      recorder=new MediaRecorder(stream,mime?{mimeType:mime}:undefined);recordedChunks=[];
-      recorder.ondataavailable=e=>{if(e.data&&e.data.size)recordedChunks.push(e.data);};
-      recorder.onerror=()=>{$("voiceStatus").textContent="تعذر تسجيل الصوت. جرّب تاني.";stream.getTracks().forEach(t=>t.stop());listening=false;};
-      recorder.onstop=()=>{listening=false;$("micButton").classList.remove("listening");$("voiceMic").classList.remove("listening");stream.getTracks().forEach(t=>t.stop());const blob=new Blob(recordedChunks,{type:recorder.mimeType||"audio/mp4"});console.info("Hamasa audio capture",{mime:blob.type,size:blob.size,chunks:recordedChunks.length});if(blob.size>1200)transcribeRecordedAudio(blob);else $("voiceStatus").textContent=tr("recordingEmpty");};
-      recorder.start(250);listening=true;$("micButton").classList.add("listening");$("voiceMic").classList.add("listening");$("voiceStatus").textContent=tr("recording");
-    }catch(e){$("voiceStatus").textContent=e.name==="NotAllowedError"?tr("micPermission"):tr("micError")+e.message;listening=false;}
+    $("voiceStatus").textContent=locale==="ar"?"استخدم وضع المحادثة الصوتية للمحادثة المباشرة":"Use Voice mode for live conversation.";
   }
   function view(name){
     $("chatView").classList.toggle("hidden",name!=="chat");$("composerWrap").classList.toggle("hidden",name!=="chat");
