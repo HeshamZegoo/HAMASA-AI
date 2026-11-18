@@ -412,18 +412,25 @@ async function syncMemoriesFromServer() {
     if (!response.ok) return;
     let data = await response.json();
     if (!Array.isArray(data.memories)) return;
-    if (!data.memories.length && memories.length) {
-      for (const item of memories.slice(0, 40)) {
-        const migrated = await fetch(API_BASE + "/api/memory", {
-          method: "POST", headers: memoryHeaders(),
-          body: JSON.stringify({ category: item.category, text: item.text })
-        });
-        if (!migrated.ok && migrated.status !== 409) break;
-      }
+    const cloud = data.memories.slice(0, 40);
+    const known = new Set(cloud.map(x => String(x.category) + "\\n" + String(x.text).trim().toLocaleLowerCase()));
+    let uploaded = false;
+    for (const item of memories.slice(0, 40)) {
+      const key = String(item.category) + "\\n" + String(item.text || "").trim().toLocaleLowerCase();
+      if (!item.text || known.has(key) || cloud.length >= 40) continue;
+      const migrated = await fetch(API_BASE + "/api/memory", {
+        method: "POST", headers: memoryHeaders(),
+        body: JSON.stringify({ category: item.category, text: item.text })
+      });
+      if (!migrated.ok) continue;
+      const saved = await migrated.json();
+      cloud.push(saved); known.add(key); uploaded = true;
+    }
+    if (uploaded) {
       response = await fetch(API_BASE + "/api/memory", { headers: memoryHeaders(), cache: "no-store" });
       if (!response.ok) return;
       data = await response.json();
-    }
+    } else data = { memories: cloud };
     memories = data.memories.slice(0, 40);
     store.set("hamasa.memory", memories);
     renderMemories();
