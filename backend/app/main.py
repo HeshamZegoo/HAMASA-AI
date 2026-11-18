@@ -108,7 +108,9 @@ async def transcribe_audio(body: TranscriptionRequest):
         audio_bytes = base64.b64decode(body.audio, validate=True)
     except (ValueError, base64.binascii.Error):
         raise HTTPException(status_code=400, detail="Audio payload is invalid.")
-    if len(audio_bytes) < 1200:\n        raise HTTPException(status_code=400, detail="Audio recording is empty or too short. Record at least one second.")\n    if len(audio_bytes) > 12_000_000:
+    if len(audio_bytes) < 1200:
+        raise HTTPException(status_code=400, detail="Audio recording is empty or too short. Record at least one second.")
+    if len(audio_bytes) > 12_000_000:
         raise HTTPException(status_code=413, detail="Audio clip is too large. Please record a shorter message.")
     payload = {
         "contents": [{
