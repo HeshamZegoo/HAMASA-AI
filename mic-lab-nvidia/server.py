@@ -77,9 +77,9 @@ def _transcribe_wav(audio: bytes) -> str:
     auth = riva.client.Auth(
         uri="grpc.nvcf.nvidia.com:443",
         use_ssl=True,
-        metadata=[
-            ("function-id", ASR_FUNCTION_ID),
-            ("authorization", f"Bearer {API_KEY}"),
+        metadata_args=[
+            ["function-id", ASR_FUNCTION_ID],
+            ["authorization", f"Bearer {API_KEY}"],
         ],
     )
     service = riva.client.ASRService(auth)
