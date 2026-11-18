@@ -192,7 +192,11 @@ let backendOnline = false;
 const isConnected = () => backendOnline;
 
 function buildChatRequest(messages) {
+  const olderContext = messages.slice(0, -40).slice(-16)
+    .map(m => (m.role === "bot" ? "المساعد: " : "المستخدم: ") + m.text)
+    .join("\\n").slice(-6000);
   return {
+    memory: olderContext,
     messages: messages.slice(-40).map(m => ({
       role: m.role === "bot" ? "assistant" : m.role,
       content: m.text
