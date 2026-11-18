@@ -75,14 +75,24 @@ async def text_to_speech(body: TTSRequest):
             key = os.getenv("TTS_GEMINI_API_KEY", "").strip()
             if not key:
                 raise HTTPException(status_code=503, detail="Gemini TTS is not configured. Add TTS_GEMINI_API_KEY.")
-            # Gemini TTS uses a named expressive voice; language and Egyptian dialect are guided explicitly.
+            # Gemini-only TTS. The style direction prioritizes Egyptian Arabic (Cairene/Masri), not generic MSA.
             voice = "Puck" if body.gender == "male" else "Kore"
+            speech_direction = (
+                "Speak in authentic everyday Egyptian Arabic, specifically the Cairo/Egypt (ar-EG) dialect. "
+                "Sound like a native Egyptian having a relaxed, friendly conversation, not a newsreader. "
+                "Use Egyptian pronunciation, rhythm, intonation, and colloquial delivery. "
+                "Do not use Modern Standard Arabic, Gulf Arabic, Levantine Arabic, or an English/Arabic hybrid accent. "
+                "Keep Egyptian words and expressions Egyptian; for example say 'إزيك', 'عامل إيه', 'ماشي', "
+                "'دلوقتي', 'عايز', and 'مش' naturally when they occur. "
+                "Read the transcript faithfully without translating, paraphrasing, adding words, or reading these directions aloud. "
+                "Speak only the transcript, clearly and at a natural moderate conversational pace."
+            )
             response = await client.post(
                 "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash-tts:generateContent",
                 params={"key": key},
                 headers={"Content-Type": "application/json"},
                 json={
-                    "contents": [{"parts": [{"text": f"Read this transcript in natural conversational Egyptian Arabic (Masri / ar-EG), with warm friendly delivery, clear pronunciation, natural Egyptian intonation, and moderate pace. Do not read instructions aloud; speak only the transcript: {text}"}]}],
+                    "contents": [{"parts": [{"text": f"{speech_direction}\\n\\nالنص المطلوب نطقه بالمصري فقط:\\n{text}"}]}],
                     "generationConfig": {"responseModalities": ["AUDIO"], "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": voice}}}},
                 },
             )
