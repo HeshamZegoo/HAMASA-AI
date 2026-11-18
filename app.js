@@ -63,43 +63,26 @@
       .replace(/\s{2,}/g," ")
       .trim();
   }
-  function chooseArabicVoice(lang){
-    const voices=speechSynthesis.getVoices()||[];
-    const base=(lang||"ar-EG").toLowerCase();
-    const arabic=voices.filter(v=>(v.lang||"").toLowerCase().startsWith("ar"));
-    return arabic.find(v=>(v.lang||"").toLowerCase()===base)
-      ||arabic.find(v=>(v.lang||"").toLowerCase().startsWith("ar-eg"))
-      ||arabic.find(v=>v.default)
-      ||arabic[0]
-      ||null;
-  }
   async function speak(text){
     const clean=cleanSpeechText(text);
     if(!clean)return;
     const gender=$("ttsGender")?.value||"male";
     try{
+      if(!API)throw new Error("رابط السيرفر غير مضبوط.");
       const response=await fetch(API+"/api/tts",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text:clean,gender})});
       const data=await response.json();
-      if(!response.ok)throw new Error(data.detail||"تعذر تشغيل الصوت");
+      if(!response.ok)throw new Error(data.detail||"تعذر تشغيل Gemini TTS");
       const raw=atob(data.audio),bytes=new Uint8Array(raw.length);
       for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
       const blob=new Blob([bytes],{type:data.mime_type||"audio/wav"});
       const url=URL.createObjectURL(blob),audio=new Audio(url);
       audio.onended=()=>URL.revokeObjectURL(url);
+      audio.onerror=()=>{URL.revokeObjectURL(url);if($("ttsStatus"))$("ttsStatus").textContent="Gemini رجّع ملف صوت غير قابل للتشغيل.";};
       await audio.play();
-      return;
     }catch(e){
-      console.warn("Cloud TTS unavailable; using device voice:",e.message);
-      if($("ttsStatus"))$("ttsStatus").textContent="خدمة الصوت السحابي غير جاهزة: "+e.message+" — بنستخدم صوت الجهاز مؤقتاً.";
+      console.error("Gemini TTS error:",e);
+      if($("ttsStatus"))$("ttsStatus").textContent="Gemini TTS مش شغال: "+e.message;
     }
-    if(!("speechSynthesis" in window))return;
-    speechSynthesis.cancel();
-    const u=new SpeechSynthesisUtterance(clean);
-    u.lang="ar-EG";
-    const voice=chooseArabicVoice("ar-EG");
-    if(voice)u.voice=voice;
-    u.rate=.9;u.pitch=1;u.volume=1;
-    speechSynthesis.speak(u);
   }
   async function checkTTSStatus(){
     if(!API)return;
@@ -114,10 +97,6 @@
     const el=$(id);if(el){const saved=localStorage.getItem("hamasa_"+id);if(saved)el.value=saved;el.onchange=()=>localStorage.setItem("hamasa_"+id,el.value);}
   });
   checkTTSStatus();
-  if("speechSynthesis" in window){
-    speechSynthesis.getVoices();
-    speechSynthesis.addEventListener?.("voiceschanged",()=>speechSynthesis.getVoices());
-  }
   function setupRecognition(){
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
     if(!SR){alert("التعرف على الصوت غير مدعوم في المتصفح ده. جرّب Chrome أو Edge.");return null;}
