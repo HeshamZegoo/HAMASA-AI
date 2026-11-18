@@ -78,10 +78,6 @@
         window.alert("حجم الملف أكبر من الحد التقني (64 ميجابايت): " + file.name);
         continue;
       }
-      if (selected.length >= 5) {
-        window.alert("مسموح بإرفاق 5 ملفات كحد أقصى.");
-        break;
-      }
       if (!selected.some(item => item.file === file || item.file.name === file.name && item.file.size === file.size)) selected.push({ file });
     }
     picker.value = "";
