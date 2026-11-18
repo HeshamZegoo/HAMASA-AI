@@ -14,7 +14,7 @@ API_KEY = os.getenv("AI_API_KEY", "").strip()
 BASE_URL = os.getenv("AI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
 MODEL = os.getenv("AI_MODEL", "gpt-4o-mini")
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
-ORIGINS = [x.strip() for x in os.getenv("CORS_ORIGINS", "http://localhost:8000").split(",") if x.strip()]
+ORIGINS = [x.strip() for x in os.getenv("CORS_ORIGINS", "http://localhost:8000,https://heshamzego.github.io").split(",") if x.strip()]
 
 app = FastAPI(title="HAMASA AI API", version="0.1.0")
 app.add_middleware(
