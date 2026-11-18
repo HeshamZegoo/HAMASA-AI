@@ -575,12 +575,29 @@ async function startLiveSession() {
     liveContext = new AudioContextClass();
     // Invoke both browser permission/audio-unlock APIs directly inside the mic tap,
     // before awaiting either one (important for iOS Safari user-activation rules).
+    $('#vst').textContent = 'Allow microphone access';
+    $('#vhint').textContent = 'Waiting for iPhone microphone permission…';
     const audioResume = liveContext.resume();
     const microphoneRequest = navigator.mediaDevices.getUserMedia({
       audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true }
     });
-    liveStream = await microphoneRequest;
+    let micTimedOut = false;
+    let micTimerId;
+    const micTimeout = new Promise((resolve, reject) => {
+      micTimerId = setTimeout(() => {
+        micTimedOut = true;
+        reject(new Error('Microphone permission timed out. On iPhone, open Settings > Safari > Microphone, allow access, then reload this page.'));
+      }, 15000);
+    });
+    // If Safari grants permission after the timeout, immediately release the late stream.
+    microphoneRequest.then(stream => {
+      if (micTimedOut || attemptId !== liveAttemptId) stream.getTracks().forEach(track => track.stop());
+    }).catch(() => {});
+    liveStream = await Promise.race([microphoneRequest, micTimeout]);
+    clearTimeout(micTimerId);
     if (attemptId !== liveAttemptId) { liveStream.getTracks().forEach(track => track.stop()); liveStream = null; return; }
+    $('#vst').textContent = 'Connecting to Gemini';
+    $('#vhint').textContent = 'Microphone ready. Opening live voice connection…';
     await audioResume;
     if (attemptId !== liveAttemptId) return;
     const wsUrl = new URL(HAMASA_CONFIG.voiceUrl);
@@ -652,6 +669,8 @@ async function startLiveSession() {
       liveSocket.addEventListener('open', () => { clearTimeout(timeout); resolve(); }, { once: true });
       liveSocket.addEventListener('error', () => { clearTimeout(timeout); reject(new Error('Could not open Gemini Live connection.')); }, { once: true });
     });
+    $('#vst').textContent = 'Waiting for Gemini';
+    $('#vhint').textContent = 'Connected to server. Waiting for Gemini Live to confirm…';
     // Setup acknowledgement is captured by onmessage from the moment the socket is created,
     // so a fast Gemini setupComplete frame can never be missed.
     await setupComplete;
