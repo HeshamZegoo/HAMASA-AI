@@ -563,13 +563,17 @@ function saveLiveTurn() {
   scrollEnd();
 }
 async function startLiveSession() {
-  // Never silently return: the caller must always receive a visible state/error.
-  if (liveSocket) throw new Error('A voice connection is already open. Tap the microphone once to stop it.');
-  if (vstate !== 'idle') throw new Error('Voice is busy (' + vstate + '). Tap the microphone again after it returns to idle.');
-  const attemptId = ++liveAttemptId;
-  if (!navigator.mediaDevices?.getUserMedia) throw new Error('Safari did not expose microphone access. Open this page directly in Safari and check Microphone permissions.');
-  if (!window.isSecureContext) throw new Error('Microphone access requires a secure HTTPS page.');
+  let attemptId = liveAttemptId;
   try {
+    // Keep every startup guard inside this try block so Safari always shows the
+    // actual failure instead of leaving an unhandled rejected click promise.
+    if (liveSocket) throw new Error('A voice connection is already open. Tap the microphone once to stop it.');
+    if (vstate !== 'idle') throw new Error('Voice was busy (' + vstate + '). The session has been reset; tap the microphone again.');
+    if (!navigator.mediaDevices?.getUserMedia) throw new Error('Safari did not expose microphone access. Open this page directly in Safari and check Microphone permissions.');
+    if (!window.isSecureContext) throw new Error('Microphone access requires a secure HTTPS page.');
+    attemptId = ++liveAttemptId;
+    liveUserText = '';
+    liveAssistantText = '';
     vErr = '';
     setVoice('thinking');
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -580,6 +584,8 @@ async function startLiveSession() {
     $('#vst').textContent = 'Allow microphone access';
     $('#vhint').textContent = 'Waiting for iPhone microphone permission…';
     const audioResume = liveContext.resume();
+    // Attach a handler immediately; we still await the original promise below.
+    audioResume.catch(() => {});
     const microphoneRequest = navigator.mediaDevices.getUserMedia({
       audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true }
     });
@@ -659,6 +665,8 @@ async function startLiveSession() {
     liveSocket.onerror = () => { vErr = t('errB'); };
     liveSocket.onclose = event => {
       liveReady = false;
+      // A user-requested stop is a normal close, not a connection failure.
+      if (event.code === 1000 && event.reason === 'Voice session ended') return;
       const reason = event.reason ? ' — ' + event.reason : '';
       if (!liveSetupDone && liveSetupReject) liveSetupReject(new Error('Gemini Live connection closed (' + event.code + ')' + reason));
       if (voice.classList.contains('on')) {
