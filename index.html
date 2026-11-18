@@ -225,7 +225,7 @@ function buildChatRequest(messages) {
   // Conversation history remains in the user's browser; only this compact context
   // is sent with the current request.
   const previousChats = convs
-    .filter(c => Array.isArray(c.messages) && c.messages.length && c.messages !== messages)
+    .filter(c => c !== cur && Array.isArray(c.messages) && c.messages.length)
     .slice(0, 8)
     .map(c => {
       const excerpt = c.messages.slice(-6)
