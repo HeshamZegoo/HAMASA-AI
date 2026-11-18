@@ -459,9 +459,12 @@ function stopLiveSession(closeSocket = true) {
   liveAttemptId++;
   liveReady = false;
   if (liveSetupTimer) { clearTimeout(liveSetupTimer); liveSetupTimer = null; }
+  // Resolve any pending startup wait when the user stops or closes the panel.
+  const rejectPendingSetup = liveSetupReject;
   liveSetupDone = false;
   liveSetupResolve = null;
   liveSetupReject = null;
+  if (rejectPendingSetup) rejectPendingSetup(new Error('Voice session stopped.'));
   if (liveProcessor) { try { liveProcessor.disconnect(); } catch {} liveProcessor = null; }
   if (liveSource) { try { liveSource.disconnect(); } catch {} liveSource = null; }
   if (silentGain) { try { silentGain.disconnect(); } catch {} silentGain = null; }
@@ -702,6 +705,9 @@ async function startLiveSession() {
     liveSource = source;
     setVoice('listening');
   } catch (error) {
+    // A stopped/older attempt must never tear down a newer session or overwrite
+    // the state chosen by the user.
+    if (attemptId !== liveAttemptId) return;
     console.error('HAMASA Live voice:', error);
     vErr = error?.message || t('micDenied');
     stopLiveSession();
