@@ -124,7 +124,7 @@ class Message(BaseModel):
 class ChatRequest(BaseModel):
     messages: list[Message] = Field(min_length=1, max_length=40)
     memory: str = Field(default="", max_length=6000)
-    attachments: list[AttachmentInput] = Field(default_factory=list, max_length=5)
+    attachments: list[AttachmentInput] = Field(default_factory=list)
 
 class TTSRequest(BaseModel):
     text: str = Field(min_length=1, max_length=5000)
