@@ -1,4 +1,5 @@
 import logging
+import base64
 import os
 import sqlite3
 from pathlib import Path
@@ -83,6 +84,10 @@ class TTSRequest(BaseModel):
     text: str = Field(min_length=1, max_length=5000)
     gender: Literal["male", "female"] = "male"
 
+class TranscriptionRequest(BaseModel):
+    audio: str = Field(min_length=1, max_length=16_000_000)
+    mime_type: str = Field(default="audio/mp4", max_length=100)
+
 def _tts_clean(text: str) -> str:
     import re
     text = re.sub(r"\x60{3}[\s\S]*?\x60{3}", " ", text)
@@ -91,6 +96,46 @@ def _tts_clean(text: str) -> str:
     text = re.sub(r"[\U0001F000-\U0001FAFF\U00002600-\U000027BF]", " ", text)
     text = re.sub(r"\s+", " ", text)
     return text.strip()
+
+@app.post("/api/transcribe")
+async def transcribe_audio(body: TranscriptionRequest):
+    key = os.getenv("TTS_GEMINI_API_KEY", "").strip()
+    if not key:
+        raise HTTPException(status_code=503, detail="Gemini audio input is not configured. Add TTS_GEMINI_API_KEY.")
+    try:
+        audio_bytes = base64.b64decode(body.audio, validate=True)
+    except (ValueError, base64.binascii.Error):
+        raise HTTPException(status_code=400, detail="Audio payload is invalid.")
+    if len(audio_bytes) > 12_000_000:
+        raise HTTPException(status_code=413, detail="Audio clip is too large. Please record a shorter message.")
+    payload = {
+        "contents": [{
+            "parts": [
+                {"text": "حوّل الكلام المسموع إلى نص فقط. الكلام باللهجة المصرية غالباً. اكتب الكلمات كما نطقها المتحدث، ولا تلخص أو تجب عن الكلام. لو مفيش كلام واضح، أرجع نصاً فارغاً."},
+                {"inline_data": {"mime_type": body.mime_type, "data": base64.b64encode(audio_bytes).decode("ascii")}}
+            ]
+        }],
+        "generationConfig": {"temperature": 0}
+    }
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(75.0, connect=15.0)) as client:
+            response = await client.post(
+                "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+                params={"key": key},
+                headers={"Content-Type": "application/json"},
+                json=payload,
+            )
+        if response.status_code >= 400:
+            logger.error("Gemini transcription failed: status=%s body=%s", response.status_code, response.text[:300])
+            raise HTTPException(status_code=502, detail=f"Gemini transcription error ({response.status_code}).")
+        data = response.json()
+        parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+        transcript = " ".join(p.get("text", "") for p in parts if isinstance(p.get("text"), str)).strip()
+        return {"transcript": transcript}
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="Audio transcription timed out.")
+    except httpx.RequestError:
+        raise HTTPException(status_code=502, detail="Could not connect to Gemini audio service.")
 
 @app.get("/api/tts/status")
 def tts_status():
