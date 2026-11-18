@@ -321,7 +321,7 @@ function applyLang() {
   $('#chips').innerHTML = ''; t('s').forEach(s => { const b = document.createElement('button'); b.className = 'chip'; b.type = 'button'; b.textContent = s; b.onclick = () => { const i = $('#inp'); i.value = s; grow(); i.focus(); }; $('#chips').append(b); });
   $$('[data-lang]').forEach(b => b.setAttribute('aria-pressed', b.dataset.lang === lang));
   updStatus(); renderHist(); if (typeof setVoice === 'function') setVoice(vstate); $('#hist').setAttribute('aria-label', t('history'));
-  $('[data-gender]').forEach(b => b.setAttribute('aria-pressed', b.dataset.gender === voiceGender));
+  $$('[data-gender]').forEach(b => b.setAttribute('aria-pressed', b.dataset.gender === voiceGender));
   $('#sb').setAttribute('aria-label', t('menu'));
   $$('#msgs [data-demo]').forEach(e => e.textContent = t('demoTag'));
 }
@@ -341,8 +341,8 @@ function setTheme(x) { theme = x; store.set('hamasa.theme', x); applyTheme(); }
 $('#langBtn').onclick = () => setLang(lang === 'en' ? 'ar' : 'en');
 $('#themeBtn').onclick = () => setTheme(theme === 'dark' ? 'light' : 'dark');
 $$('[data-lang]').forEach(b => b.onclick = () => setLang(b.dataset.lang));
-$('.seg [data-theme]').forEach(b => b.onclick = () => setTheme(b.dataset.theme));
-$('[data-gender]').forEach(b => b.onclick = () => { voiceGender = b.dataset.gender; store.set('hamasa.voiceGender', voiceGender); $('[data-gender]').forEach(x => x.setAttribute('aria-pressed', x.dataset.gender === voiceGender)); });
+$$('.seg [data-theme]').forEach(b => b.onclick = () => setTheme(b.dataset.theme));
+$$('[data-gender]').forEach(b => b.onclick = () => { voiceGender = b.dataset.gender; store.set('hamasa.voiceGender', voiceGender); $$('[data-gender]').forEach(x => x.setAttribute('aria-pressed', x.dataset.gender === voiceGender)); });
 
 /* =====================================================================
    5. UI: sidebar, settings, history
