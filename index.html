@@ -581,18 +581,16 @@ async function startLiveSession() {
     vErr = '';
     setVoice('thinking');
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContextClass) throw new Error('Audio is not supported in this browser.');
-    liveContext = new AudioContextClass();
-    // Invoke both browser permission/audio-unlock APIs directly inside the mic tap,
-    // before awaiting either one (important for iOS Safari user-activation rules).
+    if (!AudioContextClass) throw new Error('المتصفح لا يدعم تشغيل الصوت المباشر.');
+    // Ask Safari for the microphone FIRST, directly inside the physical tap.
+    // Do not await, fetch, resume audio, or open a socket before this call.
     $('#vst').textContent = 'Allow microphone access';
-    $('#vhint').textContent = 'Waiting for iPhone microphone permission…';
-    const audioResume = liveContext.resume();
-    // Attach a handler immediately; we still await the original promise below.
-    audioResume.catch(() => {});
-    // Use the least restrictive audio request first: iOS Safari can reject
-    // optional processing constraints on some devices and OS builds.
+    $('#vhint').textContent = 'اضغط سماح في نافذة إذن الميكروفون التي يعرضها Safari…';
     const microphoneRequest = navigator.mediaDevices.getUserMedia({ audio: true });
+    // Unlock audio in the same user-activation task, after requesting the mic.
+    liveContext = new AudioContextClass();
+    const audioResume = liveContext.resume();
+    audioResume.catch(() => {});
     let micTimedOut = false;
     let micTimerId;
     const micTimeout = new Promise((resolve, reject) => {
@@ -728,7 +726,14 @@ async function startLiveSession() {
     // the state chosen by the user.
     if (attemptId !== liveAttemptId) return;
     console.error('HAMASA Live voice:', error);
-    vErr = error?.message || t('micDenied');
+    const reason = error?.name === 'NotAllowedError' || error?.name === 'PermissionDeniedError'
+      ? 'Safari منع إذن الميكروفون. افتح إعدادات الموقع في Safari واجعل Microphone = Allow، ثم أعد تحميل الصفحة.'
+      : error?.name === 'NotFoundError'
+        ? 'لم يتم العثور على ميكروفون متاح على الجهاز.'
+        : error?.name === 'NotReadableError'
+          ? 'الميكروفون مشغول بتطبيق آخر. اقفل التطبيقات التي تستخدمه وجرب مرة أخرى.'
+          : error?.message || t('micDenied');
+    vErr = reason;
     stopLiveSession();
     setVoice('idle');
     $('#vhint').textContent = 'تعذر تشغيل المحادثة المباشرة: ' + vErr;
