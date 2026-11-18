@@ -185,7 +185,7 @@ dialog h2{font-size:20px;margin-bottom:16px;display:flex;justify-content:space-b
 <section class="voice" id="voice" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="vst">
  <div class="vtop"><button class="ib" id="vExit" data-a="exit"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button><span style="width:42px"></span></div>
  <div class="vmid"><div id="vOrb" data-orb="big" style="width:100%;display:flex;justify-content:center"></div><div class="vst" id="vst" aria-live="polite"></div><div class="vcap" id="vcap"></div></div>
- <div style="text-align:center"><button class="mic" id="mic" data-a="mic"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button><div class="vhint" id="vhint"></div></div>
+ <div style="text-align:center"><button class="mic" id="mic" data-a="mic" type="button" aria-label="Start live voice conversation"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button><div class="vhint" id="vhint"></div></div>
 </section>
 
 <dialog id="dlg" aria-labelledby="dT">
@@ -681,15 +681,35 @@ async function startLiveSession() {
   }
 }
 
-$('#mic').onclick = () => {
+const micButton = $('#mic');
+let micLastActivation = 0;
+async function activateLiveMic(event) {
+  const now = Date.now();
+  if (now - micLastActivation < 450) return;
+  micLastActivation = now;
+  event?.preventDefault?.();
+  event?.stopPropagation?.();
   if (liveSocket || liveStream || vstate !== 'idle') {
     stopLiveSession();
     vErr = '';
     setVoice('idle');
+    micButton.disabled = false;
     return;
   }
-  startLiveSession();
-};
+  // Give immediate, visible feedback on iOS before any permission/network await.
+  vErr = '';
+  setVoice('thinking');
+  $('#vhint').textContent = 'Starting live microphone…';
+  micButton.disabled = true;
+  try {
+    await startLiveSession();
+  } finally {
+    micButton.disabled = false;
+  }
+}
+micButton.type = 'button';
+micButton.addEventListener('pointerup', activateLiveMic, { passive: false });
+micButton.addEventListener('click', activateLiveMic, { passive: false });
 /* INIT */
 mountOrbs(); applyTheme(); applyLang(); renderChat(); checkBackend();
 </script>
