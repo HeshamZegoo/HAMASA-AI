@@ -8,3 +8,23 @@
 .memory-card textarea{width:100%;min-height:120px;resize:vertical;padding:12px;border-radius:12px;border:1px solid var(--border,rgba(255,255,255,.15));background:rgba(0,0,0,.18);color:inherit;font:inherit;line-height:1.7}
 .memory-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
 .memory-actions button{padding:10px 14px;border-radius:10px;border:1px solid var(--border,rgba(255,255,255,.15));background:rgba(125,155,255,.14);color:inherit;font:inherit;cursor:pointer}
+
+/* Hamasa animated face visual */
+.hamasa-face{position:relative;width:180px;height:180px;margin:0 auto 35px;display:grid;place-items:center;filter:drop-shadow(0 0 35px #55dfe866);animation:face-float 4s ease-in-out infinite}
+.hamasa-face.face-hidden{display:none}
+.face-aura{position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle,#78e8e566 0%,#526be955 48%,transparent 72%);filter:blur(14px);animation:face-pulse 3s ease-in-out infinite}
+.face-head{position:relative;width:142px;height:154px;border-radius:48% 48% 45% 45%;background:linear-gradient(145deg,#9bf8ee 0%,#4e9ed4 34%,#373a91 78%,#29235e 100%);border:1px solid #b4fff5aa;box-shadow:inset 0 5px 20px #ffffff70,inset 0 -18px 28px #11184e99,0 0 25px #60d9e866;overflow:hidden}
+.face-head:before{content:"";position:absolute;width:90px;height:42px;top:8px;left:13px;border-radius:50%;background:#eaffff66;filter:blur(18px);transform:rotate(-28deg)}
+.face-eyes{position:absolute;top:62px;left:27px;right:27px;display:flex;justify-content:space-between}
+.face-eyes i{width:17px;height:23px;border-radius:50%;background:linear-gradient(#142b54,#09132e);box-shadow:0 0 0 4px #b4fff533,0 0 12px #b8fff5;animation:face-blink 5s infinite}
+.face-brows{position:absolute;top:48px;left:24px;right:24px;display:flex;justify-content:space-between}
+.face-brows i{width:25px;height:5px;border-radius:100%;background:#263b78;transform:rotate(-8deg)}
+.face-brows i:last-child{transform:rotate(8deg)}
+.face-mouth{position:absolute;left:57px;top:105px;width:29px;height:10px;border-bottom:3px solid #182d66;border-radius:0 0 50% 50%;filter:drop-shadow(0 0 4px #c7fff5);animation:face-talk 1.2s ease-in-out infinite}
+.voice-face{width:180px;height:180px}
+.orb.orb-hidden{display:none!important}
+@keyframes face-float{50%{transform:translateY(-7px)}}
+@keyframes face-pulse{50%{opacity:.65;transform:scale(1.08)}}
+@keyframes face-blink{0%,46%,50%,100%{transform:scaleY(1)}48%{transform:scaleY(.08)}}
+@keyframes face-talk{0%,100%{height:5px}50%{height:15px}}
+@media(max-width:760px){.hamasa-face{transform:scale(.92);margin-bottom:22px}.voice-face{transform:scale(1)}}
