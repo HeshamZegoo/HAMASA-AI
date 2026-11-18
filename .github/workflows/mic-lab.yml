@@ -1,0 +1,24 @@
+name: Validate isolated microphone lab
+on:
+  push:
+    branches: [feature/mic-rebuild]
+    paths:
+      - "mic-lab/**"
+      - "scripts/validate_mic_lab.py"
+      - ".github/workflows/mic-lab.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate isolated microphone test
+        run: python scripts/validate_mic_lab.py
