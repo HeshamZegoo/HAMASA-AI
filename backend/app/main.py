@@ -1,13 +1,16 @@
+import logging
 import os
 import sqlite3
 from pathlib import Path
 from typing import Literal
-from urllib.parse import urlparse
 
 import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+
+logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper())
+logger = logging.getLogger("hamasa.provider")
 
 APP_ENV = os.getenv("APP_ENV", "development")
 API_KEY = os.getenv("AI_API_KEY", "").strip()
@@ -16,7 +19,7 @@ MODEL = os.getenv("AI_MODEL", "gpt-4o-mini")
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 ORIGINS = [x.strip() for x in os.getenv("CORS_ORIGINS", "http://localhost:8000,https://heshamzego.github.io").split(",") if x.strip()]
 
-app = FastAPI(title="HAMASA AI API", version="0.1.0")
+app = FastAPI(title="HAMASA AI API", version="0.1.1")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ORIGINS,
@@ -61,11 +64,13 @@ def health():
 async def chat(body: ChatRequest):
     if not API_KEY:
         raise HTTPException(status_code=503, detail="AI provider is not configured. Set AI_API_KEY in the backend environment.")
+
     payload = {
         "model": MODEL,
         "messages": [{"role": m.role, "content": m.content} for m in body.messages],
         "temperature": 0.7,
     }
+
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(90.0, connect=15.0)) as client:
             response = await client.post(
@@ -73,19 +78,43 @@ async def chat(body: ChatRequest):
                 headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"},
                 json=payload,
             )
+
         if response.status_code >= 400:
-            detail = "AI provider rejected the request."
+            provider_message = "AI provider rejected the request."
             try:
-                detail = response.json().get("error", {}).get("message", detail)
-            except Exception:
+                error_data = response.json()
+                if isinstance(error_data, dict):
+                    error_obj = error_data.get("error")
+                    if isinstance(error_obj, dict):
+                        provider_message = str(error_obj.get("message") or error_obj.get("detail") or provider_message)
+                    elif isinstance(error_obj, str):
+                        provider_message = error_obj
+                    else:
+                        provider_message = str(error_data.get("detail") or error_data.get("message") or provider_message)
+            except (ValueError, TypeError):
                 pass
-            raise HTTPException(status_code=502, detail=detail[:500])
-        data = response.json()
-        reply = data["choices"][0]["message"]["content"]
+
+            # Log only provider status and its error message; never log API keys or chat prompts.
+            logger.error("Provider request failed: status=%s model=%s message=%s",
+                         response.status_code, MODEL, provider_message[:500])
+            raise HTTPException(status_code=502, detail=f"AI provider error ({response.status_code}): {provider_message[:500]}")
+
+        try:
+            data = response.json()
+            reply = data["choices"][0]["message"]["content"]
+        except (ValueError, KeyError, IndexError, TypeError):
+            logger.error("Provider returned an unexpected success payload: status=%s model=%s",
+                         response.status_code, MODEL)
+            raise HTTPException(status_code=502, detail="AI provider returned an unexpected response format.")
+
         if not isinstance(reply, str) or not reply.strip():
             raise HTTPException(status_code=502, detail="AI provider returned an empty response.")
+
         return {"reply": reply.strip(), "model": MODEL}
+
     except httpx.TimeoutException:
+        logger.exception("Provider request timed out: model=%s", MODEL)
         raise HTTPException(status_code=504, detail="AI provider timed out. Try again.")
-    except httpx.RequestError:
+    except httpx.RequestError as exc:
+        logger.error("Provider connection failed: type=%s", type(exc).__name__)
         raise HTTPException(status_code=502, detail="Could not connect to the AI provider.")
