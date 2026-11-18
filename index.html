@@ -563,10 +563,14 @@ async function startLiveSession() {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     if (!AudioContextClass) throw new Error('Audio is not supported in this browser.');
     liveContext = new AudioContextClass();
-    await liveContext.resume();
-    liveStream = await navigator.mediaDevices.getUserMedia({
+    // Invoke both browser permission/audio-unlock APIs directly inside the mic tap,
+    // before awaiting either one (important for iOS Safari user-activation rules).
+    const audioResume = liveContext.resume();
+    const microphoneRequest = navigator.mediaDevices.getUserMedia({
       audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true }
     });
+    liveStream = await microphoneRequest;
+    await audioResume;
     const wsUrl = new URL(HAMASA_CONFIG.voiceUrl);
     wsUrl.protocol = wsUrl.protocol === 'https:' ? 'wss:' : 'ws:';
     wsUrl.searchParams.set('gender', voiceGender);
