@@ -11,7 +11,7 @@
     "text/plain", "text/markdown", "text/csv", "application/json",
     "application/xml"
   ]);
-  const maxBytes = 8 * 1024 * 1024;
+  const maxBytes = 64 * 1024 * 1024;
   const selected = [];
   const picker = document.createElement("input");
   picker.type = "file";
@@ -75,7 +75,7 @@
         continue;
       }
       if (file.size > maxBytes) {
-        window.alert("حجم الملف أكبر من 8 ميجابايت: " + file.name);
+        window.alert("حجم الملف أكبر من الحد التقني (64 ميجابايت): " + file.name);
         continue;
       }
       if (selected.length >= 5) {
