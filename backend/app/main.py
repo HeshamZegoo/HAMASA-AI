@@ -48,6 +48,81 @@ class Message(BaseModel):
 class ChatRequest(BaseModel):
     messages: list[Message] = Field(min_length=1, max_length=40)
 
+class TTSRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=5000)
+    provider: Literal["azure", "gemini"] = "azure"
+    gender: Literal["male", "female"] = "male"
+
+def _tts_clean(text: str) -> str:
+    import re
+    text = re.sub(r"\x60{3}[\s\S]*?\x60{3}", " ", text)
+    text = re.sub(r"https?://\S+", " ", text)
+    text = re.sub(r"[*_~#>|]", " ", text)
+    text = re.sub(r"[\U0001F000-\U0001FAFF\U00002600-\U000027BF]", " ", text)
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
+
+@app.get("/api/tts/status")
+def tts_status():
+    return {
+        "azure_configured": bool(os.getenv("TTS_AZURE_KEY", "").strip() and os.getenv("TTS_AZURE_REGION", "").strip()),
+        "gemini_configured": bool(os.getenv("TTS_GEMINI_API_KEY", "").strip()),
+    }
+
+@app.post("/api/tts")
+async def text_to_speech(body: TTSRequest):
+    text = _tts_clean(body.text)
+    if not text:
+        raise HTTPException(status_code=400, detail="No speakable text.")
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(60.0, connect=15.0)) as client:
+            if body.provider == "azure":
+                key = os.getenv("TTS_AZURE_KEY", "").strip()
+                region = os.getenv("TTS_AZURE_REGION", "").strip()
+                if not key or not region:
+                    raise HTTPException(status_code=503, detail="Azure TTS is not configured. Add TTS_AZURE_KEY and TTS_AZURE_REGION.")
+                voice = "ar-EG-ShakirNeural" if body.gender == "male" else "ar-EG-SalmaNeural"
+                import xml.sax.saxutils as saxutils
+                ssml = f'<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="ar-EG"><voice name="{voice}">{saxutils.escape(text)}</voice></speak>'
+                response = await client.post(
+                    f"https://{region}.tts.speech.microsoft.com/cognitiveservices/v1",
+                    headers={"Ocp-Apim-Subscription-Key": key, "Content-Type": "application/ssml+xml", "X-Microsoft-OutputFormat": "riff-24khz-16bit-mono-pcm", "User-Agent": "HAMASA-AI"},
+                    content=ssml.encode("utf-8"),
+                )
+                if response.status_code >= 400:
+                    logger.error("Azure TTS failed: status=%s body=%s", response.status_code, response.text[:300])
+                    raise HTTPException(status_code=502, detail=f"Azure TTS error ({response.status_code}).")
+                import base64
+                return {"audio": base64.b64encode(response.content).decode("ascii"), "mime_type": "audio/wav", "provider": "azure", "voice": voice}
+            key = os.getenv("TTS_GEMINI_API_KEY", "").strip()
+            if not key:
+                raise HTTPException(status_code=503, detail="Gemini TTS is not configured. Add TTS_GEMINI_API_KEY.")
+            # Gemini TTS uses a named expressive voice; language and Egyptian dialect are guided explicitly.
+            voice = "Charon" if body.gender == "male" else "Kore"
+            response = await client.post(
+                "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent",
+                params={"key": key},
+                headers={"Content-Type": "application/json"},
+                json={
+                    "contents": [{"parts": [{"text": f"Speak naturally in conversational Egyptian Arabic (Masri), with a warm friendly tone. Read this text verbatim: {text}"}]}],
+                    "generationConfig": {"responseModalities": ["AUDIO"], "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": voice}}}},
+                },
+            )
+            if response.status_code >= 400:
+                logger.error("Gemini TTS failed: status=%s body=%s", response.status_code, response.text[:300])
+                raise HTTPException(status_code=502, detail=f"Gemini TTS error ({response.status_code}).")
+            data = response.json()
+            parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+            audio_part = next((p.get("inlineData") for p in parts if p.get("inlineData", {}).get("data")), None)
+            if not audio_part:
+                raise HTTPException(status_code=502, detail="Gemini TTS returned no audio.")
+            import base64
+            return {"audio": audio_part["data"], "mime_type": audio_part.get("mimeType", "audio/wav"), "provider": "gemini", "voice": voice}
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="TTS provider timed out.")
+    except httpx.RequestError:
+        raise HTTPException(status_code=502, detail="Could not connect to TTS provider.")
+
 def init_db():
     if DATABASE_URL.startswith("sqlite:///"):
         path = DATABASE_URL.removeprefix("sqlite:///")
