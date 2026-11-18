@@ -50,7 +50,6 @@ class ChatRequest(BaseModel):
 
 class TTSRequest(BaseModel):
     text: str = Field(min_length=1, max_length=5000)
-    provider: Literal["azure", "gemini"] = "azure"
     gender: Literal["male", "female"] = "male"
 
 def _tts_clean(text: str) -> str:
@@ -64,10 +63,7 @@ def _tts_clean(text: str) -> str:
 
 @app.get("/api/tts/status")
 def tts_status():
-    return {
-        "azure_configured": bool(os.getenv("TTS_AZURE_KEY", "").strip() and os.getenv("TTS_AZURE_REGION", "").strip()),
-        "gemini_configured": bool(os.getenv("TTS_GEMINI_API_KEY", "").strip()),
-    }
+    return {"gemini_configured": bool(os.getenv("TTS_GEMINI_API_KEY", "").strip())}
 
 @app.post("/api/tts")
 async def text_to_speech(body: TTSRequest):
@@ -76,35 +72,17 @@ async def text_to_speech(body: TTSRequest):
         raise HTTPException(status_code=400, detail="No speakable text.")
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(60.0, connect=15.0)) as client:
-            if body.provider == "azure":
-                key = os.getenv("TTS_AZURE_KEY", "").strip()
-                region = os.getenv("TTS_AZURE_REGION", "").strip()
-                if not key or not region:
-                    raise HTTPException(status_code=503, detail="Azure TTS is not configured. Add TTS_AZURE_KEY and TTS_AZURE_REGION.")
-                voice = "ar-EG-ShakirNeural" if body.gender == "male" else "ar-EG-SalmaNeural"
-                import xml.sax.saxutils as saxutils
-                ssml = f'<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="ar-EG"><voice name="{voice}">{saxutils.escape(text)}</voice></speak>'
-                response = await client.post(
-                    f"https://{region}.tts.speech.microsoft.com/cognitiveservices/v1",
-                    headers={"Ocp-Apim-Subscription-Key": key, "Content-Type": "application/ssml+xml", "X-Microsoft-OutputFormat": "riff-24khz-16bit-mono-pcm", "User-Agent": "HAMASA-AI"},
-                    content=ssml.encode("utf-8"),
-                )
-                if response.status_code >= 400:
-                    logger.error("Azure TTS failed: status=%s body=%s", response.status_code, response.text[:300])
-                    raise HTTPException(status_code=502, detail=f"Azure TTS error ({response.status_code}).")
-                import base64
-                return {"audio": base64.b64encode(response.content).decode("ascii"), "mime_type": "audio/wav", "provider": "azure", "voice": voice}
             key = os.getenv("TTS_GEMINI_API_KEY", "").strip()
             if not key:
                 raise HTTPException(status_code=503, detail="Gemini TTS is not configured. Add TTS_GEMINI_API_KEY.")
             # Gemini TTS uses a named expressive voice; language and Egyptian dialect are guided explicitly.
-            voice = "Charon" if body.gender == "male" else "Kore"
+            voice = "Puck" if body.gender == "male" else "Kore"
             response = await client.post(
-                "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent",
+                "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash-tts:generateContent",
                 params={"key": key},
                 headers={"Content-Type": "application/json"},
                 json={
-                    "contents": [{"parts": [{"text": f"Speak naturally in conversational Egyptian Arabic (Masri), with a warm friendly tone. Read this text verbatim: {text}"}]}],
+                    "contents": [{"parts": [{"text": f"Read this transcript in natural conversational Egyptian Arabic (Masri / ar-EG), with warm friendly delivery, clear pronunciation, natural Egyptian intonation, and moderate pace. Do not read instructions aloud; speak only the transcript: {text}"}]}],
                     "generationConfig": {"responseModalities": ["AUDIO"], "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": voice}}}},
                 },
             )
