@@ -211,7 +211,7 @@
       source.connect(liveProcessor);liveProcessor.connect(liveAudioContext.destination);
       listening=true;$("voiceMic").classList.add("listening");$("micButton").classList.add("listening");
       $("voiceStatus").textContent=locale==="ar"?"حماصة معاك، اتكلم براحتك":"Hamasa is here. Speak naturally";
-    }catch(e){$("voiceStatus").textContent=e.message||"Could not start live voice.";stopLiveVoice();}
+    }catch(e){stopLiveVoice();$("voiceStatus").textContent=e.message||"Could not start live voice.";}
   }
   function stopLiveVoice(closeSocket=true){
     listening=false;liveReady=false;
@@ -239,6 +239,7 @@
     $("voiceStatus").textContent=locale==="ar"?"استخدم وضع المحادثة الصوتية للمحادثة المباشرة":"Use Voice mode for live conversation.";
   }
   function view(name){
+    if(name!=="voice"&&listening)stopLiveVoice();
     $("chatView").classList.toggle("hidden",name!=="chat");$("composerWrap").classList.toggle("hidden",name!=="chat");
     $("voiceView").classList.toggle("hidden",name!=="voice");$("settingsView").classList.toggle("hidden",name!=="settings");
     document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.view===name));
