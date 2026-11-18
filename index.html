@@ -315,6 +315,11 @@ let theme = store.get('hamasa.theme', 'dark') === 'light' ? 'light' : 'dark';
 let convs = store.get('hamasa.convs', []); if (!Array.isArray(convs)) convs = [];
 let memories = store.get('hamasa.memory', []);
 if (!Array.isArray(memories)) memories = [];
+let memoryClientId = store.get("hamasa.memoryClientId", "");
+if (!/^[0-9a-f-]{36}$/i.test(memoryClientId)) {
+  memoryClientId = crypto.randomUUID();
+  store.set("hamasa.memoryClientId", memoryClientId);
+}
 memories = memories.filter(x => x && typeof x.text === 'string' && typeof x.category === 'string').slice(0, 40);
 let cur = null, busy = false;
 const t = k => I18N[lang][k];
@@ -388,6 +393,32 @@ const memoryLabels = {
   temporary: () => t('memoryTemporary')
 };
 function saveMemories() { store.set('hamasa.memory', memories); }
+const memoryHeaders = () => ({ "Content-Type": "application/json", "X-Hamasa-Client": memoryClientId });
+async function syncMemoriesFromServer() {
+  try {
+    let response = await fetch(API_BASE + "/api/memory", { headers: memoryHeaders(), cache: "no-store" });
+    if (!response.ok) return;
+    let data = await response.json();
+    if (!Array.isArray(data.memories)) return;
+    if (!data.memories.length && memories.length) {
+      for (const item of memories.slice(0, 40)) {
+        const migrated = await fetch(API_BASE + "/api/memory", {
+          method: "POST", headers: memoryHeaders(),
+          body: JSON.stringify({ category: item.category, text: item.text })
+        });
+        if (!migrated.ok && migrated.status !== 409) break;
+      }
+      response = await fetch(API_BASE + "/api/memory", { headers: memoryHeaders(), cache: "no-store" });
+      if (!response.ok) return;
+      data = await response.json();
+    }
+    memories = data.memories.slice(0, 40);
+    store.set("hamasa.memory", memories);
+    renderMemories();
+  } catch (error) {
+    console.warn("Cloud memory sync unavailable; local memory remains available.", error);
+  }
+}
 function renderMemories() {
   const list = $('#memoryList');
   if (!list) return;
@@ -408,7 +439,20 @@ function renderMemories() {
     content.append(category, value);
     const remove = document.createElement('button');
     remove.type = 'button'; remove.textContent = '×'; remove.setAttribute('aria-label', t('memoryRemove'));
-    remove.onclick = () => { memories.splice(index, 1); saveMemories(); renderMemories(); };
+    remove.onclick = async () => {
+      const item = memories[index];
+      try {
+        if (item.id) {
+          const response = await fetch(API_BASE + "/api/memory/" + encodeURIComponent(item.id), {
+            method: "DELETE", headers: memoryHeaders()
+          });
+          if (!response.ok && response.status !== 404) throw new Error("Cloud delete failed");
+        }
+      } catch {
+        toast(t('errT')); return;
+      }
+      memories.splice(index, 1); saveMemories(); renderMemories();
+    };
     row.append(content, remove); list.append(row);
   });
 }
@@ -420,9 +464,21 @@ $('#memoryAdd').onclick = () => {
   if (memories.some(x => x.text.toLocaleLowerCase() === text.toLocaleLowerCase() && x.category === category)) {
     $('#memoryText').value = ''; toast(t('memorySaved')); return;
   }
-  memories.unshift({ category, text, updatedAt: new Date().toISOString() });
-  memories = memories.slice(0, 40);
-  saveMemories(); $('#memoryText').value = ''; renderMemories(); toast(t('memorySaved'));
+  (async () => {
+    try {
+      const response = await fetch(API_BASE + "/api/memory", {
+        method: "POST", headers: memoryHeaders(),
+        body: JSON.stringify({ category, text })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || "Memory save failed");
+      memories.unshift(data);
+      memories = memories.slice(0, 40);
+      saveMemories(); $('#memoryText').value = ''; renderMemories(); toast(t('memorySaved'));
+    } catch (error) {
+      toast(error.message || t('errT'));
+    }
+  })();
 };
 function renderHist() {
   const h = $('#hist'); h.innerHTML = '';
@@ -539,7 +595,7 @@ $('#attach').onclick = () => toast(t('attachSoon'));   // TODO: attachment uploa
 inp.addEventListener('focus', () => setTimeout(() => { fit(); scrollEnd(); }, 300));
 
 /* INIT */
-mountOrbs(); applyTheme(); applyLang(); renderChat(); checkBackend();
+mountOrbs(); applyTheme(); applyLang(); renderChat(); checkBackend(); syncMemoriesFromServer();
 </script>
 <script src="./attachments.js"></script>
 </body>
