@@ -117,7 +117,15 @@ async def text_to_speech(body: TTSRequest):
             if not audio_part:
                 raise HTTPException(status_code=502, detail="Gemini TTS returned no audio.")
             import base64
-            return {"audio": audio_part["data"], "mime_type": audio_part.get("mimeType", "audio/wav"), "provider": "gemini", "voice": voice}
+            import struct
+            audio_bytes = base64.b64decode(audio_part["data"])
+            mime_type = audio_part.get("mimeType", "audio/pcm")
+            if "wav" not in mime_type.lower():
+                sample_rate = 24000
+                data_size = len(audio_bytes)
+                wav_header = b"RIFF" + struct.pack("<I", 36 + data_size) + b"WAVEfmt " + struct.pack("<IHHIIHH", 16, 1, 1, sample_rate, sample_rate * 2, 2, 16) + b"data" + struct.pack("<I", data_size)
+                audio_bytes = wav_header + audio_bytes
+            return {"audio": base64.b64encode(audio_bytes).decode("ascii"), "mime_type": "audio/wav", "provider": "gemini", "voice": voice}
     except httpx.TimeoutException:
         raise HTTPException(status_code=504, detail="TTS provider timed out.")
     except httpx.RequestError:
