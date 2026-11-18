@@ -563,10 +563,12 @@ function saveLiveTurn() {
   scrollEnd();
 }
 async function startLiveSession() {
-  if (liveSocket || vstate !== 'idle') return;
+  // Never silently return: the caller must always receive a visible state/error.
+  if (liveSocket) throw new Error('A voice connection is already open. Tap the microphone once to stop it.');
+  if (vstate !== 'idle') throw new Error('Voice is busy (' + vstate + '). Tap the microphone again after it returns to idle.');
   const attemptId = ++liveAttemptId;
-  if (!navigator.mediaDevices?.getUserMedia) { vmsg('noSR'); return; }
-  if (!window.isSecureContext) { vmsg('micDenied'); return; }
+  if (!navigator.mediaDevices?.getUserMedia) throw new Error('Safari did not expose microphone access. Open this page directly in Safari and check Microphone permissions.');
+  if (!window.isSecureContext) throw new Error('Microphone access requires a secure HTTPS page.');
   try {
     vErr = '';
     setVoice('thinking');
@@ -729,8 +731,9 @@ async function activateLiveMic(event) {
   }
 }
 micButton.type = 'button';
-micButton.addEventListener('pointerup', activateLiveMic, { passive: false });
-micButton.addEventListener('click', activateLiveMic, { passive: false });
+// Use one activation event only. iOS Safari synthesizes click after pointerup;
+// listening to both can race the Live state transition.
+micButton.addEventListener('click', activateLiveMic);
 /* INIT */
 mountOrbs(); applyTheme(); applyLang(); renderChat(); checkBackend();
 </script>
