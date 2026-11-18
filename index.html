@@ -154,7 +154,7 @@ dialog h2{font-size:20px;margin-bottom:16px;display:flex;justify-content:space-b
 <div class="main">
 <header>
  <button class="ib" id="menuBtn" aria-controls="sb" aria-expanded="false" data-a="menu"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h16"/></svg></button>
- <div class="logo"><span data-orb></span><div style="min-width:0"><b>HAMASA</b><div class="stat" id="stat"><i></i><span id="statT"></span></div></div></div>
+ <div class="logo"><span data-orb></span><div style="min-width:0"><b>HAMASA</b></div></div>
  <button class="ib lang" id="langBtn"></button>
  <button class="ib" id="themeBtn" data-a="theme"><svg viewBox="0 0 24 24" id="themeIc"></svg></button>
  <button class="ib" id="setBtn" data-a="settings"><svg viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h2M10 12h10M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="8" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg></button>
@@ -183,7 +183,7 @@ dialog h2{font-size:20px;margin-bottom:16px;display:flex;justify-content:space-b
 </div>
 
 <section class="voice" id="voice" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="vst">
- <div class="vtop"><button class="ib" id="vExit" data-a="exit"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button><span class="stat" id="vStat"></span><span style="width:42px"></span></div>
+ <div class="vtop"><button class="ib" id="vExit" data-a="exit"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button><span style="width:42px"></span></div>
  <div class="vmid"><div id="vOrb" style="width:100%;display:flex;justify-content:center"></div><div class="vst" id="vst" aria-live="polite"></div><div class="vcap" id="vcap"></div></div>
  <div style="text-align:center"><button class="mic" id="mic" data-a="mic"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button><div class="vhint" id="vhint"></div></div>
 </section>
@@ -193,7 +193,6 @@ dialog h2{font-size:20px;margin-bottom:16px;display:flex;justify-content:space-b
  <div class="row"><span data-i="language"></span><div class="seg"><button data-lang="en" type="button">English</button><button data-lang="ar" type="button">عربي</button></div></div>
  <div class="row"><span data-i="theme"></span><div class="seg"><button data-theme="dark" type="button" data-i="dark"></button><button data-theme="light" type="button" data-i="light"></button></div></div>
  <div class="row"><span data-i="voice"></span><div class="seg"><button data-gender="male" type="button" data-i="maleVoice"></button><button data-gender="female" type="button" data-i="femaleVoice"></button></div></div>
- <div class="row"><span data-i="backend"></span><div class="note" id="beNote"></div></div>
  <button class="danger" id="clearBtn" type="button" data-i="clearAll"></button>
 </dialog>
 <div class="toast" id="toast" role="status"></div>
@@ -331,11 +330,7 @@ function applyTheme() {
   document.querySelector('meta[name=theme-color]').content = theme === 'dark' ? '#031326' : '#f2f6fc';
   $$('[data-theme].seg button, .seg [data-theme]').forEach(b => b.setAttribute('aria-pressed', b.dataset.theme === theme));
 }
-function updStatus() {
-  const s = isConnected() ? t('stLive') : t('stDemo');
-  $('#statT').textContent = s; $('#vStat').innerHTML = '<i></i>' + s; $('#stat').classList.toggle('live', isConnected()); $('#vStat').classList.toggle('live', isConnected());
-  $('#beNote').textContent = isConnected() ? t('beLive') : t('beNone');
-}
+function updStatus() { /* Status banner intentionally hidden; chat remains usable. */ }
 function setLang(l) { lang = l; store.set('hamasa.lang', l); applyLang(); }
 function setTheme(x) { theme = x; store.set('hamasa.theme', x); applyTheme(); }
 $('#langBtn').onclick = () => setLang(lang === 'en' ? 'ar' : 'en');
