@@ -3,7 +3,7 @@
   const API = (window.HAMASA_CONFIG?.API_URL || "").replace(/\/$/, "");
   let conversations = JSON.parse(localStorage.getItem("hamasa_conversations") || "[]");
   let current = {id: crypto.randomUUID(), title:"محادثة جديدة", messages:[]};
-  let recognition = null, listening = false;
+  let recognition = null, listening = false, recognitionSpeaksReply = false;
   const welcome=$("welcome"), messages=$("messages"), input=$("messageInput");
   const persist=()=>localStorage.setItem("hamasa_conversations",JSON.stringify(conversations));
   function renderHistory(){
@@ -31,7 +31,7 @@
     });
     $("chatView").scrollTop=$("chatView").scrollHeight;
   }
-  async function send(text){
+  async function send(text,{speakResponse=false}={}){
     const content=(text||input.value).trim();if(!content)return;
     input.value="";input.style.height="auto";addMessage("user",content);
     const placeholder={role:"assistant",content:""};
@@ -41,7 +41,7 @@
       const response=await fetch(API+"/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages:current.messages.map(m=>({role:m.role,content:m.content}))})});
       const data=await response.json();if(!response.ok)throw new Error(data.detail||"حصل خطأ في الاتصال.");
       placeholder.content=data.reply;current.messages.push(placeholder);saveCurrent();renderMessages();
-      if($("speakToggle").checked)speak(data.reply);
+      if(speakResponse && $("speakToggle").checked) await speak(data.reply);
     }catch(e){row.querySelector(".bubble").textContent=e.message;row.querySelector(".bubble").style.color="#ffadbd";}
   }
   function cleanSpeechText(text){
@@ -100,11 +100,11 @@
   function setupRecognition(){
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
     if(!SR){alert("التعرف على الصوت غير مدعوم في المتصفح ده. جرّب Chrome أو Edge.");return null;}
-    const r=new SR();r.lang=$("languageSelect").value;r.interimResults=true;r.continuous=false;
+    const r=new SR();r.lang=$("languageSelect").value;r.interimResults=true;r.continuous=false;recognitionSpeaksReply=!$("voiceView").classList.contains("hidden");
     r.onstart=()=>{listening=true;$("micButton").classList.add("listening");$("voiceMic").classList.add("listening");$("voiceStatus").textContent="سامعك... اتكلم";};
     r.onresult=e=>{let final="",interim="";for(let i=e.resultIndex;i<e.results.length;i++){if(e.results[i].isFinal)final+=e.results[i][0].transcript;else interim+=e.results[i][0].transcript;}input.value=final||interim;};
     r.onerror=e=>{$("voiceStatus").textContent=e.error==="not-allowed"?"اسمح للمتصفح باستخدام المايك":"الصوت مش واضح، جرّب تاني";};
-    r.onend=()=>{listening=false;$("micButton").classList.remove("listening");$("voiceMic").classList.remove("listening");$("voiceStatus").textContent="أنا سامعك";if(input.value.trim())send();};
+    r.onend=()=>{listening=false;$("micButton").classList.remove("listening");$("voiceMic").classList.remove("listening");$("voiceStatus").textContent="أنا سامعك";const shouldSpeak=recognitionSpeaksReply;recognitionSpeaksReply=false;if(input.value.trim())send(undefined,{speakResponse:shouldSpeak});};
     return r;
   }
   function toggleMic(){if(listening){recognition?.stop();return;}recognition=setupRecognition();if(recognition)recognition.start();}
