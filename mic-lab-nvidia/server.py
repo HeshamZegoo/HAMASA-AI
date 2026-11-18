@@ -86,8 +86,10 @@ def _transcribe_wav(audio: bytes) -> str:
     config = riva.client.RecognitionConfig(
         encoding=riva.client.AudioEncoding.LINEAR_PCM,
         sample_rate_hertz=16000,
+        audio_channel_count=1,
         language_code="ar-AR",
         max_alternatives=1,
+        verbatim_transcripts=True,
         enable_automatic_punctuation=True,
     )
     result = service.offline_recognize(audio, config)
@@ -109,10 +111,13 @@ async def transcribe(file: UploadFile = File(...)):
         with wave.open(io.BytesIO(audio), "rb") as wav:
             if wav.getnchannels() != 1 or wav.getsampwidth() != 2 or wav.getframerate() != 16000:
                 raise HTTPException(status_code=400, detail="الصوت لازم يكون WAV أحادي القناة 16-bit وبتردد 16000.")
+            pcm_audio = wav.readframes(wav.getnframes())
+            if not pcm_audio:
+                raise HTTPException(status_code=400, detail="التسجيل مفيهوش صوت صالح.")
     except wave.Error as exc:
         raise HTTPException(status_code=400, detail="ملف الصوت مش WAV صالح.") from exc
     try:
-        text = await asyncio.to_thread(_transcribe_wav, audio)
+        text = await asyncio.to_thread(_transcribe_wav, pcm_audio)
     except HTTPException:
         raise
     except Exception as exc:
