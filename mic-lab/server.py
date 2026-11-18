@@ -72,7 +72,7 @@ async def live_token(body: TokenRequest, request: Request):
             response = await client.post(
                 "https://generativelanguage.googleapis.com/v1beta/auth_tokens",
                 headers={"x-goog-api-key": API_KEY, "Content-Type": "application/json"},
-                json=payload,
+                json={"authToken": payload},
             )
         if response.status_code >= 400:
             # Log only the provider error payload for diagnosis; never log request headers or API keys.
