@@ -189,13 +189,15 @@ async def transcribe_audio(body: TranscriptionRequest):
 @app.websocket("/api/live")
 async def live_voice(websocket: WebSocket):
     await websocket.accept()
+    gender = websocket.query_params.get("gender", "male")
+    logger.info("Gemini Live: browser WebSocket accepted gender=%s", gender)
+    await websocket.send_json({"stage": "server_connected"})
     key = os.getenv("TTS_GEMINI_API_KEY", "").strip()
     if not key:
         await websocket.send_json({"error": "Gemini Live is not configured. Add TTS_GEMINI_API_KEY in Railway."})
         await websocket.close(code=1011)
         return
 
-    gender = websocket.query_params.get("gender", "male")
     voice = "Puck" if gender == "male" else "Kore"
     model = "models/gemini-3.1-flash-live-preview"
     live_prompt = HAMASA_SYSTEM_PROMPT + """
@@ -204,6 +206,7 @@ async def live_voice(websocket: WebSocket):
     uri = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=" + key
     try:
         logger.info("Gemini Live: opening Gemini Developer API session model=%s voice=%s", model, voice)
+        await websocket.send_json({"stage": "gemini_connecting", "model": model})
         async with websockets.connect(
             uri, max_size=16 * 1024 * 1024, ping_interval=20,
             ping_timeout=20, close_timeout=5, open_timeout=15,
