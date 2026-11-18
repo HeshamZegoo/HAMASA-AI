@@ -567,11 +567,12 @@ function saveLiveTurn() {
   scrollEnd();
 }
 async function startLiveSession(microphoneRequest) {
-  // Visible entry marker: distinguishes a click-handler stall from mic/network waits.
-  $('#vst').textContent = 'Preparing voice session…';
-  $('#vhint').textContent = 'وصلنا لبدء جلسة الصوت؛ جاري تجهيز الميكروفون…';
-  let attemptId = liveAttemptId;
+  let attemptId = 0;
   try {
+    // Keep every startup operation, including the first state read, inside try.
+    $('#vst').textContent = 'Preparing voice session…';
+    $('#vhint').textContent = 'وصلنا لبدء جلسة الصوت؛ جاري تجهيز الميكروفون…';
+    attemptId = liveAttemptId;
     // Keep every startup guard inside this try block so Safari always shows the
     // actual failure instead of leaving an unhandled rejected click promise.
     if (liveSocket) throw new Error('A voice connection is already open. Tap the microphone once to stop it.');
@@ -784,6 +785,12 @@ async function activateLiveMic(event) {
   }, 12000);
   try {
     await startLiveSession(microphoneRequest);
+  } catch (error) {
+    // Catch failures that occur before startLiveSession reaches its own handler.
+    console.error('HAMASA: uncaught voice startup failure', error);
+    vErr = error?.message || String(error);
+    $('#vst').textContent = 'Voice startup error';
+    $('#vhint').textContent = 'حصل خطأ أثناء بدء الصوت: ' + vErr;
   } finally {
     clearTimeout(startupWatchdog);
     micButton.disabled = false;
