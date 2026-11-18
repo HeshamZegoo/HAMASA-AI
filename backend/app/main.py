@@ -285,9 +285,17 @@ async def chat(body: ChatRequest):
                 + body.memory.strip()
             ),
         })
-    context_messages.extend(prepare_messages(body.messages[-40:], body.attachments, MODEL))
+    try:
+        prepared_messages = prepare_messages(body.messages[-40:], body.attachments, MODEL)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    context_messages.extend(prepared_messages)
+    has_images = any(isinstance(m.get("content"), list) for m in prepared_messages)
+    vision_model = os.getenv("AI_VISION_MODEL", "").strip()
+    if has_images and not vision_model:
+        raise HTTPException(status_code=503, detail="Image understanding is not configured. Set AI_VISION_MODEL to an image-capable model.")
     payload = {
-        "model": MODEL,
+        "model": vision_model if has_images else MODEL,
         "messages": context_messages,
         "temperature": 0.7,
     }
