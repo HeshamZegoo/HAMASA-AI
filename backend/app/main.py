@@ -6,7 +6,8 @@ from pathlib import Path
 from typing import Literal
 
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+import websockets
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -136,6 +137,69 @@ async def transcribe_audio(body: TranscriptionRequest):
         raise HTTPException(status_code=504, detail="Audio transcription timed out.")
     except httpx.RequestError:
         raise HTTPException(status_code=502, detail="Could not connect to Gemini audio service.")
+
+
+@app.websocket("/api/live")
+async def live_voice(websocket: WebSocket):
+    await websocket.accept()
+    key = os.getenv("TTS_GEMINI_API_KEY", "").strip()
+    if not key:
+        await websocket.send_json({"error": "Gemini Live is not configured. Add TTS_GEMINI_API_KEY in Railway."})
+        await websocket.close(code=1011)
+        return
+    gender = websocket.query_params.get("gender", "male")
+    voice = "Puck" if gender == "male" else "Kore"
+    live_prompt = HAMASA_SYSTEM_PROMPT + """
+أنت الآن في محادثة صوتية مباشرة. تحدث باللهجة المصرية القاهرية الطبيعية، بجمل قصيرة وتلقائية، واستجب فوراً لما تسمعه. لا تقل إنك تحول الصوت إلى نص، ولا تصف آلية عملك. أنت حماصة. لا تبدأ كل رد بمقدمة، ولا تطل بلا داعٍ. استمع للمستخدم وقاطعه فقط إذا قاطعك هو؛ وإذا بدأ المستخدم الكلام أثناء ردك فتوقف واستمع له.
+"""
+    uri = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=" + key
+    try:
+        async with websockets.connect(uri, max_size=16 * 1024 * 1024, ping_interval=20, ping_timeout=20) as upstream:
+            setup = {
+                "setup": {
+                    "model": "models/gemini-3.8-live",
+                    "generationConfig": {
+                        "responseModalities": ["AUDIO"],
+                        "speechConfig": {
+                            "languageCode": "ar-EG",
+                            "voiceConfig": {"prebuiltVoiceConfig": {"voiceName": voice}}
+                        }
+                    },
+                    "systemInstruction": {"parts": [{"text": live_prompt}]},
+                    "inputAudioTranscription": {},
+                    "outputAudioTranscription": {}
+                }
+            }
+            await upstream.send(__import__("json").dumps(setup))
+            async def browser_to_google():
+                while True:
+                    message = await websocket.receive_text()
+                    await upstream.send(message)
+            async def google_to_browser():
+                async for message in upstream:
+                    await websocket.send_text(message)
+            tasks = [asyncio.create_task(browser_to_google()), asyncio.create_task(google_to_browser())]
+            done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+            for task in pending:
+                task.cancel()
+            for task in done:
+                exc = task.exception()
+                if exc and not isinstance(exc, (WebSocketDisconnect, websockets.exceptions.ConnectionClosed)):
+                    logger.warning("Gemini Live bridge ended: %s", type(exc).__name__)
+    except WebSocketDisconnect:
+        pass
+    except Exception as exc:
+        logger.exception("Gemini Live connection failed: %s", type(exc).__name__)
+        try:
+            await websocket.send_json({"error": "Gemini Live connection failed. Check the Live API model and key permissions."})
+        except Exception:
+            pass
+    finally:
+        try:
+            await websocket.close()
+        except Exception:
+            pass
+
 
 @app.get("/api/tts/status")
 def tts_status():
