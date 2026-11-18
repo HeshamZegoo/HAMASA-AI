@@ -75,7 +75,8 @@ async def live_token(body: TokenRequest, request: Request):
                 json=payload,
             )
         if response.status_code >= 400:
-            # Never return provider response bodies: they may contain sensitive diagnostics.
+            # Log only the provider error payload for diagnosis; never log request headers or API keys.
+            print(f"Gemini token API error {response.status_code}: {response.text[:1500]}", flush=True)
             raise HTTPException(status_code=502, detail=f"Gemini token service rejected the request ({response.status_code}).")
         data = response.json()
         token = data.get("name")
