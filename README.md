@@ -9,7 +9,7 @@ A web-first Arabic/English AI companion with a premium dark interface, animated 
 - **Backend:** FastAPI, deployable to Railway.
 - **AI:** OpenAI-compatible Chat Completions API. Configure a provider and model through server environment variables; Ollama can be used by setting `AI_BASE_URL` to an Ollama-compatible endpoint reachable by the backend.
 - **Voice:** browser speech recognition and speech synthesis where supported. Voice availability depends on the browser and device.
-- **Persistence:** SQLite by default for local development; set `DATABASE_URL` to PostgreSQL for hosted deployments.
+- **Conversation history:** currently stored in the browser's local storage. The backend includes a minimal SQLite initialization scaffold; server-side conversation sync and PostgreSQL persistence are not implemented yet.
 
 ## Quick start — frontend only
 Open `index.html` in a modern browser. The interface loads without a backend; chat requests explain when the API is not configured.
@@ -29,13 +29,13 @@ Set `HAMASA_API_URL=http://localhost:8000` in the frontend configuration in `con
 - `AI_API_KEY` — provider API key (keep secret; never put it in frontend code).
 - `AI_BASE_URL` — OpenAI-compatible base URL, e.g. `https://api.openai.com/v1`.
 - `AI_MODEL` — model identifier supported by your provider.
-- `DATABASE_URL` — optional PostgreSQL URL; defaults to local SQLite.
+- `DATABASE_URL` — reserved for future database integration; PostgreSQL conversation persistence is not implemented in this starter.
 - `CORS_ORIGINS` — comma-separated allowed frontend origins.
 - `APP_ENV` — `development` or `production`.
 
 ## Deploy
 1. Enable GitHub Pages for this repository using **GitHub Actions** as the source. The workflow in `.github/workflows/pages.yml` publishes the static site.
-2. Deploy the `backend` directory to Railway.
+2. Deploy the repository root to Railway; `railway.json` installs `backend/requirements.txt` and starts `backend.app.main:app`.
 3. Add the environment variables above in Railway.
 4. Set the frontend API URL in `config.js` to the deployed backend URL, then commit the change.
 5. Set `CORS_ORIGINS` to the exact GitHub Pages origin.
