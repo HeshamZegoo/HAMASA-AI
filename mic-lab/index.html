@@ -13,7 +13,7 @@
 "use strict";
 const $=id=>document.getElementById(id),statusEl=$("status"),details=$("details"),level=$("level"),startBtn=$("start"),stopBtn=$("stop");
 let voice="male",stream=null,context=null,socket=null,source=null,processor=null,mute=null,active=false,nextPlayTime=0,playing=new Set();
-const WS="wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained?access_token=";
+const WS="wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?access_token=";
 function status(s){statusEl.textContent=s}
 function setVoice(v){if(active)return;voice=v;$("male").classList.toggle("selected",v==="male");$("female").classList.toggle("selected",v==="female")}
 $("male").onclick=()=>setVoice("male");$("female").onclick=()=>setVoice("female");
