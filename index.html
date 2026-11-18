@@ -455,6 +455,12 @@ function stopPlayback() {
 }
 function stopLiveSession(closeSocket = true) {
   liveReady = false;
+  if (fallbackRecorder && fallbackRecorder.state === 'recording') {
+    fallbackRecorder.onstop = null;
+    try { fallbackRecorder.stop(); } catch {}
+  }
+  fallbackRecorder = null;
+  fallbackRecording = false;
   if (liveProcessor) { try { liveProcessor.disconnect(); } catch {} liveProcessor = null; }
   if (liveSource) { try { liveSource.disconnect(); } catch {} liveSource = null; }
   if (silentGain) { try { silentGain.disconnect(); } catch {} silentGain = null; }
@@ -589,9 +595,20 @@ async function startLiveSession() {
       if (packet.error) {
         const message = String(packet.error);
         vErr = message;
-        if (!liveSetupDone && liveSetupReject) liveSetupReject(new Error(message));
-        setVoice('idle');
-        stopLiveSession();
+        if (!liveSetupDone && liveSetupReject) {
+          liveSetupReject(new Error(message));
+          return;
+        }
+        if (liveStream && voice.classList.contains('on')) {
+          startFallbackRecorder(message).catch(fallbackError => {
+            vErr = fallbackError?.message || message;
+            stopLiveSession();
+            setVoice('idle');
+          });
+        } else {
+          stopLiveSession();
+          setVoice('idle');
+        }
         return;
       }
       if (packet.setupComplete) {
