@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#031326">
+<title>HAMASA — Microphone Lab</title>
+<style>
+:root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#031326;color:#f5f7ff}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:22px}
+main{width:min(100%,520px);padding:26px;border:1px solid #29405d;border-radius:24px;background:#0a1c32;box-shadow:0 18px 60px #0005}
+h1{font-size:24px;margin:0 0 8px}p{color:#b8c7d9;line-height:1.5}
+.status{padding:13px;border-radius:12px;background:#102944;margin:18px 0;overflow-wrap:anywhere}
+button{width:100%;min-height:52px;border:0;border-radius:14px;font-size:16px;font-weight:700;cursor:pointer;margin-top:10px}
+#start{background:#d100d1;color:white}#stop{background:#243b56;color:white}button:disabled{opacity:.45}
+.meter{height:12px;border-radius:20px;background:#21364d;overflow:hidden;margin:14px 0}
+#level{height:100%;width:0;background:#45d49a;transition:width .08s linear}
+small{color:#93a9c1}
+</style>
+</head>
+<body><main>
+<h1>HAMASA Microphone Lab</h1>
+<p>This isolated test checks Safari microphone permission and live audio capture only. It does not connect to Gemini or change the chat application.</p>
+<div class="status" id="status" role="status" aria-live="polite">Ready. Tap Start and allow microphone access.</div>
+<div class="meter"><div id="level"></div></div>
+<p><small id="details">No microphone session active.</small></p>
+<button id="start" type="button">Start microphone test</button>
+<button id="stop" type="button" disabled>Stop test</button>
+</main>
+<script>
+(() => {
+  "use strict";
+  const status = document.getElementById("status");
+  const details = document.getElementById("details");
+  const level = document.getElementById("level");
+  const startButton = document.getElementById("start");
+  const stopButton = document.getElementById("stop");
+  let stream = null;
+  let context = null;
+  let analyser = null;
+  let source = null;
+  let frame = 0;
+  let active = false;
+
+  function show(message) { status.textContent = message; }
+  function cleanup() {
+    active = false;
+    if (frame) cancelAnimationFrame(frame);
+    frame = 0;
+    if (source) { try { source.disconnect(); } catch {} }
+    if (analyser) { try { analyser.disconnect(); } catch {} }
+    if (stream) stream.getTracks().forEach(track => track.stop());
+    if (context && context.state !== "closed") context.close().catch(() => {});
+    stream = null; source = null; analyser = null; context = null;
+    level.style.width = "0%";
+    startButton.disabled = false;
+    stopButton.disabled = true;
+    details.textContent = "No microphone session active.";
+  }
+  function sample() {
+    if (!active || !analyser) return;
+    const data = new Uint8Array(analyser.fftSize);
+    analyser.getByteTimeDomainData(data);
+    let sum = 0;
+    for (const sample of data) {
+      const normalized = (sample - 128) / 128;
+      sum += normalized * normalized;
+    }
+    const rms = Math.sqrt(sum / data.length);
+    level.style.width = Math.min(100, Math.round(rms * 320)) + "%";
+    details.textContent = "Microphone active · input level " + Math.round(rms * 1000) / 10 + "% · AudioContext " + context.state;
+    frame = requestAnimationFrame(sample);
+  }
+  async function start() {
+    if (active) return;
+    if (!window.isSecureContext) {
+      show("Error: microphone access requires HTTPS or localhost.");
+      return;
+    }
+    if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== "function") {
+      show("Error: this Safari page does not expose getUserMedia.");
+      return;
+    }
+    startButton.disabled = true;
+    show("Requesting microphone permission…");
+    details.textContent = "Waiting for Safari microphone response.";
+    try {
+      // Invoke getUserMedia directly in the trusted button activation handler.
+      const permissionRequest = navigator.mediaDevices.getUserMedia({ audio: true });
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) throw new Error("Web Audio API is unavailable in this browser.");
+      context = new AudioContextClass();
+      const resumeRequest = context.resume();
+      stream = await permissionRequest;
+      await resumeRequest;
+      if (!stream.getAudioTracks().length) throw new Error("Safari returned a stream without an audio track.");
+      source = context.createMediaStreamSource(stream);
+      analyser = context.createAnalyser();
+      analyser.fftSize = 2048;
+      source.connect(analyser);
+      active = true;
+      stopButton.disabled = false;
+      show("Success: microphone permission granted and audio capture is running.");
+      sample();
+    } catch (error) {
+      cleanup();
+      const name = error && error.name ? error.name : "Error";
+      const message = error && error.message ? error.message : String(error);
+      show("Microphone test failed — " + name + ": " + message);
+      details.textContent = "The isolated test stopped safely.";
+    }
+  }
+  startButton.addEventListener("click", start);
+  stopButton.addEventListener("click", () => { cleanup(); show("Test stopped. Microphone tracks and audio context were closed."); });
+  window.addEventListener("pagehide", cleanup);
+})();
+</script></body></html>
