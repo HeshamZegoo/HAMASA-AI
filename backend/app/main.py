@@ -3,6 +3,11 @@ import base64
 import os
 import sqlite3
 import hashlib
+import hmac
+import json
+import re
+import secrets
+import time
 import uuid
 from pathlib import Path
 from typing import Literal
@@ -22,6 +27,7 @@ API_KEY = os.getenv("AI_API_KEY", "").strip()
 BASE_URL = os.getenv("AI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
 MODEL = os.getenv("AI_MODEL", "gpt-4o-mini")
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+JWT_SECRET = os.getenv("JWT_SECRET", "").strip()
 ORIGINS = [x.strip() for x in os.getenv("CORS_ORIGINS", "http://localhost:8000,https://heshamzegoo.github.io").split(",") if x.strip()]
 
 HAMASA_SYSTEM_PROMPT = """أنت حماصة (HAMASA)، مساعد ذكاء اصطناعي مرن وذكي، عندك شخصية مصرية ودودة، وبتتكيف مع الشخص والموقف بدل ما تمشي على قالب واحد.
@@ -139,6 +145,10 @@ class ChatRequest(BaseModel):
     messages: list[Message] = Field(min_length=1, max_length=40)
     memory: str = Field(default="", max_length=6000)
     attachments: list[AttachmentInput] = Field(default_factory=list)
+
+class AuthRequest(BaseModel):
+    email: str = Field(min_length=5, max_length=254)
+    password: str = Field(min_length=10, max_length=128)
 
 class MemoryCreateRequest(BaseModel):
     category: Literal["preference", "project", "decision", "temporary"]
@@ -267,6 +277,101 @@ async def text_to_speech(body: TTSRequest):
     except httpx.RequestError:
         raise HTTPException(status_code=502, detail="Could not connect to TTS provider.")
 
+
+def _auth_db():
+    return _memory_db()
+
+def _password_hash(password: str) -> str:
+    salt = secrets.token_bytes(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 310000)
+    return "pbkdf2_sha256$310000$" + base64.urlsafe_b64encode(salt).decode() + "$" + base64.urlsafe_b64encode(digest).decode()
+
+def _password_verify(password: str, encoded: str) -> bool:
+    try:
+        scheme, rounds, salt_b64, digest_b64 = encoded.split("$", 3)
+        if scheme != "pbkdf2_sha256" or int(rounds) < 100000:
+            return False
+        salt = base64.urlsafe_b64decode(salt_b64.encode())
+        expected = base64.urlsafe_b64decode(digest_b64.encode())
+        actual = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, int(rounds))
+        return hmac.compare_digest(actual, expected)
+    except (ValueError, TypeError):
+        return False
+
+def _issue_token(user_id: str) -> str:
+    if not JWT_SECRET or len(JWT_SECRET) < 32:
+        raise HTTPException(status_code=503, detail="Authentication is not configured.")
+    header = base64.urlsafe_b64encode(b'{"alg":"HS256","typ":"JWT"}').decode().rstrip("=")
+    payload = base64.urlsafe_b64encode(json.dumps({"sub": user_id, "exp": int(time.time()) + 30 * 86400}, separators=(",", ":")).encode()).decode().rstrip("=")
+    signing = header + "." + payload
+    signature = base64.urlsafe_b64encode(hmac.new(JWT_SECRET.encode(), signing.encode(), hashlib.sha256).digest()).decode().rstrip("=")
+    return signing + "." + signature
+
+def _verified_user(authorization: str = Header(default="")):
+    if not authorization.startswith("Bearer ") or not JWT_SECRET or len(JWT_SECRET) < 32:
+        raise HTTPException(status_code=401, detail="Please sign in.")
+    token = authorization[7:].strip()
+    try:
+        header, payload, signature = token.split(".")
+        signing = header + "." + payload
+        expected = base64.urlsafe_b64encode(hmac.new(JWT_SECRET.encode(), signing.encode(), hashlib.sha256).digest()).decode().rstrip("=")
+        if not hmac.compare_digest(signature, expected):
+            raise ValueError("signature")
+        claims = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
+        if int(claims.get("exp", 0)) <= int(time.time()):
+            raise ValueError("expired")
+        user_id = str(uuid.UUID(claims["sub"]))
+    except (ValueError, KeyError, TypeError, json.JSONDecodeError):
+        raise HTTPException(status_code=401, detail="Session expired. Please sign in again.")
+    with _auth_db() as db:
+        row = db.execute("SELECT id, email FROM hamasa_users WHERE id = " + ("%s" if DATABASE_URL.startswith(("postgres://", "postgresql://")) else "?"), (user_id,)).fetchone()
+    if not row:
+        raise HTTPException(status_code=401, detail="Account not found. Please sign in again.")
+    return {"id": str(row[0]), "email": row[1]}
+
+@app.post("/api/auth/signup")
+def signup(body: AuthRequest):
+    email = body.email.strip().lower()
+    if not re.fullmatch(r"[^@\\s]+@[^@\\s]+\\.[^@\\s]+", email):
+        raise HTTPException(status_code=400, detail="Enter a valid email address.")
+    if len(body.password) < 10:
+        raise HTTPException(status_code=400, detail="Password must be at least 10 characters.")
+    user_id = str(uuid.uuid4())
+    ph = _password_hash(body.password)
+    placeholder = "%s" if DATABASE_URL.startswith(("postgres://", "postgresql://")) else "?"
+    try:
+        with _auth_db() as db:
+            db.execute(f"INSERT INTO hamasa_users (id, email, password_hash) VALUES ({placeholder}, {placeholder}, {placeholder})", (user_id, email, ph))
+    except Exception as exc:
+        if "unique" in str(exc).lower() or "duplicate" in str(exc).lower():
+            raise HTTPException(status_code=409, detail="An account with this email already exists.")
+        logger.error("Account creation failed: %s", type(exc).__name__)
+        raise HTTPException(status_code=503, detail="Could not create account right now.")
+    user = {"id": user_id, "email": email}
+    return {"token": _issue_token(user_id), "user": user}
+
+@app.post("/api/auth/login")
+def login(body: AuthRequest):
+    email = body.email.strip().lower()
+    placeholder = "%s" if DATABASE_URL.startswith(("postgres://", "postgresql://")) else "?"
+    with _auth_db() as db:
+        row = db.execute(f"SELECT id, email, password_hash FROM hamasa_users WHERE email = {placeholder}", (email,)).fetchone()
+    if not row or not _password_verify(body.password, row[2]):
+        raise HTTPException(status_code=401, detail="Email or password is incorrect.")
+    user = {"id": str(row[0]), "email": row[1]}
+    return {"token": _issue_token(user["id"]), "user": user}
+
+@app.get("/api/auth/me")
+def me(authorization: str = Header(default="")):
+    return {"user": _verified_user(authorization)}
+
+def _memory_owner(authorization: str, client_id: str) -> str:
+    if authorization.startswith("Bearer "):
+        user = _verified_user(authorization)
+        return hashlib.sha256(uuid.UUID(user["id"]).bytes).hexdigest()
+    return _client_hash(client_id)
+
+
 def _client_hash(client_id: str) -> str:
     try:
         parsed = uuid.UUID(client_id)
@@ -293,6 +398,14 @@ def init_db():
         import psycopg
         with psycopg.connect(DATABASE_URL, connect_timeout=8) as db:
             db.execute("""
+                CREATE TABLE IF NOT EXISTS hamasa_users (
+                    id UUID PRIMARY KEY,
+                    email VARCHAR(254) NOT NULL UNIQUE,
+                    password_hash TEXT NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+            """)
+            db.execute("""
                 CREATE TABLE IF NOT EXISTS hamasa_memories (
                     id TEXT PRIMARY KEY,
                     owner_hash CHAR(64) NOT NULL,
@@ -307,6 +420,7 @@ def init_db():
     if DATABASE_URL.startswith("sqlite:///") or not DATABASE_URL:
         with _memory_db() as db:
             db.execute("CREATE TABLE IF NOT EXISTS conversations (id INTEGER PRIMARY KEY, created_at TEXT DEFAULT CURRENT_TIMESTAMP, title TEXT NOT NULL)")
+            db.execute("CREATE TABLE IF NOT EXISTS hamasa_users (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP)")
             db.execute("""CREATE TABLE IF NOT EXISTS hamasa_memories (
                 id TEXT PRIMARY KEY, owner_hash TEXT NOT NULL, category TEXT NOT NULL,
                 content TEXT NOT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -317,8 +431,8 @@ def startup():
     init_db()
 
 @app.get("/api/memory")
-def list_memories(x_hamasa_client: str = Header(default="")):
-    owner = _client_hash(x_hamasa_client)
+def list_memories(x_hamasa_client: str = Header(default=""), authorization: str = Header(default="")):
+    owner = _memory_owner(authorization, x_hamasa_client)
     with _memory_db() as db:
         rows = db.execute(
             "SELECT id, category, content, updated_at FROM hamasa_memories WHERE owner_hash = %s ORDER BY updated_at DESC LIMIT 40"
@@ -333,8 +447,8 @@ def list_memories(x_hamasa_client: str = Header(default="")):
     ]}
 
 @app.post("/api/memory")
-def create_memory(body: MemoryCreateRequest, x_hamasa_client: str = Header(default="")):
-    owner = _client_hash(x_hamasa_client)
+def create_memory(body: MemoryCreateRequest, x_hamasa_client: str = Header(default=""), authorization: str = Header(default="")):
+    owner = _memory_owner(authorization, x_hamasa_client)
     memory_id = str(uuid.uuid4())
     with _memory_db() as db:
         count = db.execute(
@@ -352,8 +466,8 @@ def create_memory(body: MemoryCreateRequest, x_hamasa_client: str = Header(defau
     return {"id": memory_id, "category": body.category, "text": body.text}
 
 @app.delete("/api/memory/{memory_id}")
-def delete_memory(memory_id: str, x_hamasa_client: str = Header(default="")):
-    owner = _client_hash(x_hamasa_client)
+def delete_memory(memory_id: str, x_hamasa_client: str = Header(default=""), authorization: str = Header(default="")):
+    owner = _memory_owner(authorization, x_hamasa_client)
     try:
         uuid.UUID(memory_id)
     except ValueError:
