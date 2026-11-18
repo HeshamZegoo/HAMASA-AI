@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parent
 API_KEY = os.getenv("AI_API_KEY", "").strip()
 BASE_URL = os.getenv("AI_BASE_URL", "https://integrate.api.nvidia.com/v1").rstrip("/")
 MODEL = os.getenv("AI_MODEL", "nvidia/nemotron-3-super-120b-a12b")
-ASR_FUNCTION_ID = "71203149-d3b7-4460-8231-1be2543a1fca"
+ASR_FUNCTION_ID = "b702f636-f60c-4a3d-a6f4-f3568c13bd7d"
 TTS_URL = "https://877104f7-e885-42b9-8de8-f6e4c6303969.invocation.api.nvcf.nvidia.com/v1/audio/synthesize"
 SYSTEM = (
     "أنت حماصة، مساعد صوتي ذكي وودود. اتكلم باللهجة المصرية القاهرية الطبيعية، "
@@ -87,7 +87,7 @@ def _transcribe_wav(audio: bytes) -> str:
         encoding=riva.client.AudioEncoding.LINEAR_PCM,
         sample_rate_hertz=16000,
         audio_channel_count=1,
-        language_code="ar-AR",
+        language_code="ar",
         max_alternatives=1,
         verbatim_transcripts=True,
         enable_automatic_punctuation=True,
