@@ -718,7 +718,7 @@ async function startLiveSession() {
 
 const micButton = $('#mic');
 let micLastActivation = 0;
-async async function activateLiveMic(event) {
+async function activateLiveMic(event) {
   const now = Date.now();
   if (now - micLastActivation < 450) return;
   micLastActivation = now;
