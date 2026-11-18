@@ -9,6 +9,7 @@ import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+from .attachments import prepare_messages, AttachmentInput
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper())
 logger = logging.getLogger("hamasa.provider")
@@ -123,6 +124,7 @@ class Message(BaseModel):
 class ChatRequest(BaseModel):
     messages: list[Message] = Field(min_length=1, max_length=40)
     memory: str = Field(default="", max_length=6000)
+    attachments: list[AttachmentInput] = Field(default_factory=list, max_length=5)
 
 class TTSRequest(BaseModel):
     text: str = Field(min_length=1, max_length=5000)
@@ -283,9 +285,7 @@ async def chat(body: ChatRequest):
                 + body.memory.strip()
             ),
         })
-    context_messages.extend(
-        [{"role": m.role, "content": m.content} for m in body.messages[-30:] if m.role in ("user", "assistant")]
-    )
+    context_messages.extend(prepare_messages(body.messages[-40:], body.attachments, MODEL))
     payload = {
         "model": MODEL,
         "messages": context_messages,
