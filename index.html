@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="ar" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#080b12">
+  <meta name="theme-color" content="#031326">
   <meta name="description" content="حماصة — رفيقك الذكي، يتحدث معك ويفهمك.">
   <title>حماصة AI — Your Personal AI Companion</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -16,34 +16,34 @@
   <div class="app-shell">
     <aside class="sidebar" id="sidebar">
       <div class="brand"><div class="brand-mark"><span></span><span></span><span></span></div><div><b>حماصة</b><small>PERSONAL AI</small></div></div>
-      <button class="new-chat" id="newChat"><span>＋</span> محادثة جديدة</button>
-      <div class="side-label">مساحتك</div>
-      <button class="nav-item active" data-view="chat"><span>◈</span> المحادثة</button>
-      <button class="nav-item" data-view="voice"><span>⌁</span> وضع الصوت</button>
-      <button class="nav-item" data-view="settings"><span>⚙</span> الإعدادات</button>
-      <div class="side-label history-label">الأخيرة <button id="clearHistory">مسح</button></div>
-      <div class="history-list" id="historyList"><div class="empty-history">محادثاتك هتظهر هنا</div></div>
+      <button class="new-chat" id="newChat"><span>＋</span> <span data-i18n="newChat">New chat</span></button>
+      <div class="side-label" data-i18n="workspace">Workspace</div>
+      <button class="nav-item active" data-view="chat"><span>◈</span> <span data-i18n="chat">Chat</span></button>
+      <button class="nav-item" data-view="voice"><span>⌁</span> <span data-i18n="voiceMode">Voice mode</span></button>
+      <button class="nav-item" data-view="settings"><span>⚙</span> <span data-i18n="settings">Settings</span></button>
+      <div class="side-label history-label"><span data-i18n="recent">Recent</span> <button id="clearHistory" data-i18n="clear">Clear</button></div>
+      <div class="history-list" id="historyList"><div class="empty-history" data-i18n="historyEmpty">Your chats will appear here</div></div>
       <div class="sidebar-bottom"><div class="status-dot"></div><span>جاهز للمساعدة</span><span class="version">WEB BETA</span></div>
     </aside>
     <main class="main">
-      <header class="topbar"><button class="icon-btn menu-btn" id="menuBtn" aria-label="القائمة">☰</button><div class="top-title"><span class="live-dot"></span> حماصة <small>متصل</small></div><div class="top-actions"><button class="icon-btn" id="themeBtn" title="تغيير المظهر">◐</button><button class="icon-btn" id="settingsBtn" title="الإعدادات">⚙</button></div></header>
+      <header class="topbar"><button class="icon-btn menu-btn" id="menuBtn" aria-label="القائمة">☰</button><div class="top-title"><span class="live-dot"></span> HAMASA <small data-i18n="online">Online</small></div><div class="top-actions"><button class="icon-btn language-btn" id="langBtn" title="Switch language">عربي</button><button class="icon-btn" id="themeBtn" title="Toggle dark mode">◐</button><button class="icon-btn" id="settingsBtn" title="Settings">⚙</button></div></header>
       <section class="chat-view" id="chatView">
         <div class="welcome" id="welcome">
           <div class="orb-wrap" id="orbWrap"><div class="orb-halo"></div><div class="orb"><div class="orb-shine"></div><div class="orb-core"></div></div><div class="orb-rings"></div><div class="hamasa-face" aria-label="وجه حماصة"><div class="face-aura"></div><div class="face-head"><div class="face-eyes"><i></i><i></i></div><div class="face-brows"><i></i><i></i></div><div class="face-mouth"></div></div></div></div>
-          <div class="eyebrow">YOUR PERSONAL AI COMPANION</div>
-          <h1>أهلاً بيك، أنا <span>حماصة</span></h1>
-          <p>موجود علشان أسمعك، أفهمك، وأساعدك في أي حاجة.</p>
-          <div class="suggestions"><button class="suggestion">ساعدني أنظم يومي <span>↗</span></button><button class="suggestion">اشرحلي موضوع صعب <span>↗</span></button><button class="suggestion">خلينا نتكلم شوية <span>↗</span></button></div>
+          <div class="eyebrow" data-i18n="eyebrow">YOUR PERSONAL AI COMPANION</div>
+          <h1><span data-i18n="welcome">Hi, I’m</span> <span>HAMASA</span></h1>
+          <p data-i18n="welcomeText">Here to listen, understand, and help you with anything.</p>
+          <div class="suggestions"><button class="suggestion" data-prompt-en="Help me organize my day">Help me organize my day <span>↗</span></button><button class="suggestion" data-prompt-en="Explain a difficult topic">Explain a difficult topic <span>↗</span></button><button class="suggestion" data-prompt-en="Let’s chat for a bit">Let’s chat for a bit <span>↗</span></button></div>
         </div>
         <div class="messages" id="messages" aria-live="polite"></div>
       </section>
-      <section class="voice-view hidden" id="voiceView"><div class="voice-stage"><div class="voice-orb orb" id="voiceOrb"><div class="orb-shine"></div><div class="orb-core"></div></div><div class="hamasa-face voice-face" aria-label="وجه حماصة"><div class="face-aura"></div><div class="face-head"><div class="face-eyes"><i></i><i></i></div><div class="face-brows"><i></i><i></i></div><div class="face-mouth"></div></div></div><div class="eyebrow">VOICE COMPANION</div><h2 id="voiceStatus">أنا سامعك</h2><p>اضغط على المايك واتكلم براحتك</p><button class="mic-button" id="voiceMic" aria-label="ابدأ التحدث">⌁</button><small>اضغط مرة تانية لإيقاف الاستماع</small></div></section>
-      <section class="settings-view hidden" id="settingsView"><div class="settings-card"><div class="eyebrow">PREFERENCES</div><h2>الإعدادات</h2><label class="setting-row"><span><b>صوت حماصة</b><small>قراءة الردود بصوت مسموع</small></span><input type="checkbox" id="speakToggle" checked></label>
-<div class="setting-row"><span><b>محرك الصوت</b><small>Gemini TTS — نطق عربي باللهجة المصرية</small></span><span class="status-dot"></span></div>
-<label class="setting-row"><span><b>نوع الصوت</b><small>تقدر تغيّره في أي وقت</small></span><select id="ttsGender"><option value="male">رجالي</option><option value="female">نسائي</option></select></label>
-<div class="settings-note" id="ttsStatus">جاري فحص خدمات الصوت...</div>
-<div class="memory-card"><h3>ذاكرة حماصة</h3><p>اكتب معلومات تحب حماصة يفتكرها، زي مشاريعك وتفضيلاتك وطريقة الشغل اللي بتحبها. الذاكرة دي بتتحفظ على المتصفح ده فقط.</p><textarea id="memoryInput" rows="5" maxlength="6000" placeholder="مثال: شغال على مشروع حماصة AI، وبفضّل الشرح بالمصري والخطوات العملية..."></textarea><div class="memory-actions"><button type="button" id="saveMemoryButton">حفظ الذاكرة</button><button type="button" id="clearMemoryButton">مسح الذاكرة</button></div><div class="settings-note" id="memoryStatus">الذاكرة لا تُرسل إلا مع رسائلك إلى حماصة لاستخدامها في الرد.</div></div><label class="setting-row"><span><b>اللغة</b><small>لغة التعرف على الكلام</small></span><select id="languageSelect"><option value="ar-EG">العربية المصرية</option><option value="ar-SA">العربية</option><option value="en-US">English</option></select></label><label class="setting-row"><span><b>شكل المساعد</b><small>المظهر المتحرك</small></span><select id="visualSelect"><option value="face">Face حماصة</option><option value="orb">AI Orb</option></select></label><div class="settings-note">مفتاح مزود الذكاء الاصطناعي بيتحط في السيرفر فقط، مش هنا في المتصفح.</div></div></section>
-      <footer class="composer-wrap" id="composerWrap"><div class="composer"><textarea id="messageInput" rows="1" placeholder="اكتب لحماصة..." aria-label="اكتب رسالتك"></textarea><button class="mic-inline" id="micButton" title="تحدث">⌁</button><button class="send-button" id="sendButton" aria-label="إرسال">↑</button></div><div class="composer-foot"><span>حماصة ممكن تغلط أحياناً — راجع المعلومات المهمة.</span><span>HAMASA AI</span></div></footer>
+      <section class="voice-view hidden" id="voiceView"><div class="voice-stage"><div class="voice-orb orb" id="voiceOrb"><div class="orb-shine"></div><div class="orb-core"></div></div><div class="hamasa-face voice-face" aria-label="وجه حماصة"><div class="face-aura"></div><div class="face-head"><div class="face-eyes"><i></i><i></i></div><div class="face-brows"><i></i><i></i></div><div class="face-mouth"></div></div></div><div class="eyebrow" data-i18n="voiceEyebrow">VOICE COMPANION</div><h2 id="voiceStatus" data-i18n="voiceIdle">I’m listening</h2><p data-i18n="voicePrompt">Tap the mic and speak naturally</p><button class="mic-button" id="voiceMic" aria-label="ابدأ التحدث">⌁</button><small data-i18n="voiceStopHint">Tap again to stop recording</small></div></section>
+      <section class="settings-view hidden" id="settingsView"><div class="settings-card"><div class="eyebrow">PREFERENCES</div><h2 data-i18n="settings">Settings</h2><label class="setting-row"><span><b data-i18n="speakReplies">Speak replies</b><small data-i18n="speakRepliesHint">Read Hamasa’s replies aloud</small></span><input type="checkbox" id="speakToggle" checked></label>
+<div class="setting-row"><span><b data-i18n="voiceEngine">Voice engine</b><small>Gemini TTS</small></span><span class="status-dot"></span></div>
+<label class="setting-row"><span><b data-i18n="voiceGender">Voice</b><small data-i18n="voiceGenderHint">Change it anytime</small></span><select id="ttsGender"><option value="male">Male</option><option value="female">Female</option></select></label>
+<div class="settings-note" id="ttsStatus">Checking voice services...</div>
+<div class="memory-card"><h3 data-i18n="memoryTitle">Hamasa memory</h3><p data-i18n="memoryHint">Save useful details, projects and preferences. This memory is stored only in this browser.</p><textarea id="memoryInput" rows="5" maxlength="6000" placeholder="Example: I’m building Hamasa AI and prefer practical, step-by-step explanations..."></textarea><div class="memory-actions"><button type="button" id="saveMemoryButton" data-i18n="saveMemory" data-i18n="saveMemory">Save memory</button><button type="button" id="clearMemoryButton" data-i18n="clearMemory" data-i18n="clearMemory">Clear memory</button></div><div class="settings-note" id="memoryStatus">This memory is sent with your messages to personalize replies.</div></div><label class="setting-row"><span><b data-i18n="speechLanguage">Speech recognition language</b><small data-i18n="speechLanguageHint">Language used to recognize speech</small></span><select id="languageSelect"><option value="ar-EG">Egyptian Arabic</option><option value="ar-SA">Arabic</option><option value="en-US">English</option></select></label><label class="setting-row"><span><b data-i18n="assistantLook">Assistant appearance</b><small data-i18n="assistantLookHint">Animated visual style</small></span><select id="visualSelect"><option value="face">Hamasa Face</option><option value="orb">AI Orb</option></select></label><div class="settings-note">API keys are stored securely on the server, never in this browser.</div></div></section>
+      <footer class="composer-wrap" id="composerWrap"><div class="composer"><textarea id="messageInput" rows="1" placeholder="Message Hamasa..." aria-label="Message Hamasa"></textarea><button class="mic-inline" id="micButton" title="Speak">⌁</button><button class="send-button" id="sendButton" aria-label="Send">↑</button></div><div class="composer-foot"><span>Hamasa can make mistakes. Check important information.</span><span>HAMASA AI</span></div></footer>
     </main>
   </div>
   <script src="config.js"></script><script src="app.js"></script>
