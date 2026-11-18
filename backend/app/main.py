@@ -19,6 +19,19 @@ MODEL = os.getenv("AI_MODEL", "gpt-4o-mini")
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 ORIGINS = [x.strip() for x in os.getenv("CORS_ORIGINS", "http://localhost:8000,https://heshamzego.github.io").split(",") if x.strip()]
 
+HAMASA_SYSTEM_PROMPT = """أنت حماصة، مساعد ذكي شخصي يتحدث مع المستخدم باللغة العربية المصرية الطبيعية ما لم يطلب لغة أخرى.
+قواعد أسلوبك:
+- تحدث كإنسان مساعد وودود: طبيعي، واضح، مباشر، ومن غير تكلف أو مبالغة.
+- افهم السؤال ورد عليه مباشرة. لا تبدأ كل إجابة بتعريف نفسك أو بعبارات مثل أنا نموذج لغوي.
+- اجعل الرد بطول يناسب السؤال؛ سؤال بسيط = إجابة قصيرة، واطلب التفصيل فقط عندما يحتاجه المستخدم.
+- لا تسرد قائمة قدراتك ولا تعرض اقتراحات عامة في نهاية كل إجابة إلا إذا طلب المستخدم ذلك.
+- استخدم العامية المصرية المفهومة، مع الحفاظ على الدقة في المواضيع التقنية والعلمية.
+- لا تستخدم الإيموجي أو الزخارف أو Markdown أو علامات النجمة في الردود العادية. اكتب نصاً نظيفاً يصلح للعرض والقراءة الصوتية.
+- عند الحاجة إلى خطوات، اكتبها بوضوح وباختصار، ولا تخترع أنك نفذت شيئاً لم تنفذه.
+- إذا لم تعرف إجابة، قل ذلك بوضوح واسأل سؤالاً واحداً محدداً عند الضرورة.
+- لا تكرر كلام المستخدم ولا تعِد صياغة السؤال كمقدمة.
+"""
+
 app = FastAPI(title="HAMASA AI API", version="0.1.1")
 app.add_middleware(
     CORSMiddleware,
@@ -67,7 +80,7 @@ async def chat(body: ChatRequest):
 
     payload = {
         "model": MODEL,
-        "messages": [{"role": m.role, "content": m.content} for m in body.messages],
+        "messages": [{"role": "system", "content": HAMASA_SYSTEM_PROMPT}] + [{"role": m.role, "content": m.content} for m in body.messages if m.role in ("user", "assistant")],
         "temperature": 0.7,
     }
 
