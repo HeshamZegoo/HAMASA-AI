@@ -44,9 +44,52 @@
       if($("speakToggle").checked)speak(data.reply);
     }catch(e){row.querySelector(".bubble").textContent=e.message;row.querySelector(".bubble").style.color="#ffadbd";}
   }
+  function cleanSpeechText(text){
+    return String(text||"")
+      .replace(/```[\\s\\S]*?```/g," ")
+      .replace(/\\[([^\\]]+)\\]\\([^)]+\\)/g,"$1")
+      .replace(/https?:\\/\\/\\S+/g," ")
+      .replace(/\x60([^\x60]+)\x60/g,"$1")
+      .replace(/<[^>]*>/g," ")
+      .replace(/[*_~#>|]/g," ")
+      .replace(/[\\u{1F000}-\\u{1FAFF}\\u{2600}-\\u{27BF}]/gu," ")
+      .replace(/[\\u200D\\uFE0F\\u{1F3FB}-\\u{1F3FF}]/gu,"")
+      .replace(/[→↗↘←↑↓•▪◈⌁]/g," ")
+      .replace(/\\\\n/g," ")
+      .replace(/[\\t\\r]+/g," ")
+      .replace(/\\n{2,}/g,". ")
+      .replace(/\\s+([،؛.!؟])/g,"$1")
+      .replace(/([،؛.!؟])(?=\\S)/g,"$1 ")
+      .replace(/\\s{2,}/g," ")
+      .trim();
+  }
+  function chooseArabicVoice(lang){
+    const voices=speechSynthesis.getVoices()||[];
+    const base=(lang||"ar-EG").toLowerCase();
+    const arabic=voices.filter(v=>(v.lang||"").toLowerCase().startsWith("ar"));
+    return arabic.find(v=>(v.lang||"").toLowerCase()===base)
+      ||arabic.find(v=>(v.lang||"").toLowerCase().startsWith("ar-eg"))
+      ||arabic.find(v=>v.default)
+      ||arabic[0]
+      ||null;
+  }
   function speak(text){
     if(!("speechSynthesis" in window))return;
-    speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang=$("languageSelect").value;u.rate=.96;speechSynthesis.speak(u);
+    const clean=cleanSpeechText(text);
+    if(!clean)return;
+    speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance(clean);
+    u.lang=$("languageSelect").value||"ar-EG";
+    const voice=chooseArabicVoice(u.lang);
+    if(voice)u.voice=voice;
+    u.rate=.88;
+    u.pitch=1;
+    u.volume=1;
+    speechSynthesis.speak(u);
+  }
+  if("speechSynthesis" in window){
+    speechSynthesis.getVoices();
+    speechSynthesis.addEventListener?.("voiceschanged",()=>speechSynthesis.getVoices());
   }
   function setupRecognition(){
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
