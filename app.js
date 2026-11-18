@@ -76,10 +76,9 @@
   async function speak(text){
     const clean=cleanSpeechText(text);
     if(!clean)return;
-    const provider=$("ttsProvider")?.value||"azure";
     const gender=$("ttsGender")?.value||"male";
     try{
-      const response=await fetch(API+"/api/tts",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text:clean,provider,gender})});
+      const response=await fetch(API+"/api/tts",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text:clean,gender})});
       const data=await response.json();
       if(!response.ok)throw new Error(data.detail||"تعذر تشغيل الصوت");
       const raw=atob(data.audio),bytes=new Uint8Array(raw.length);
@@ -107,12 +106,11 @@
     try{
       const r=await fetch(API+"/api/tts/status"),s=await r.json();
       if($("ttsStatus")){
-        $("ttsStatus").textContent="حالة الصوت: Azure "+(s.azure_configured?"جاهز":"يحتاج مفتاح")+
-          " — Gemini "+(s.gemini_configured?"جاهز":"يحتاج مفتاح");
+        $("ttsStatus").textContent="حالة Gemini TTS: "+(s.gemini_configured?"جاهز":"أضف مفتاح Gemini في Railway");
       }
     }catch(e){if($("ttsStatus"))$("ttsStatus").textContent="تعذر فحص خدمات الصوت حالياً.";}
   }
-  ["ttsProvider","ttsGender"].forEach(id=>{
+  ["ttsGender"].forEach(id=>{
     const el=$(id);if(el){const saved=localStorage.getItem("hamasa_"+id);if(saved)el.value=saved;el.onchange=()=>localStorage.setItem("hamasa_"+id,el.value);}
   });
   checkTTSStatus();
