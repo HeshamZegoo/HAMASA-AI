@@ -219,7 +219,7 @@ const isConnected = () => backendOnline;
 function buildChatRequest(messages) {
   const olderContext = messages.slice(0, -40).slice(-16)
     .map(m => (m.role === "bot" ? "المساعد: " : "المستخدم: ") + m.text)
-    .join("\\n").slice(-3500);
+    .join("\n").slice(-3500);
 
   // Bring a small amount of relevant context from other chats on this browser.
   // Conversation history remains in the user's browser; only this compact context
@@ -230,18 +230,18 @@ function buildChatRequest(messages) {
     .map(c => {
       const excerpt = c.messages.slice(-6)
         .map(m => (m.role === "bot" ? "حماصة: " : "المستخدم: ") + String(m.text || ""))
-        .join("\\n");
-      return "موضوع سابق: " + String(c.title || "محادثة") + "\\n" + excerpt;
+        .join("\n");
+      return "موضوع سابق: " + String(c.title || "محادثة") + "\n" + excerpt;
     });
-  const crossChatMemory = previousChats.join("\\n\\n").slice(-1800);
+  const crossChatMemory = previousChats.join("\n\n").slice(-1800);
   const structuredMemory = memories.map(item =>
     "[" + (memoryLabels[item.category]?.() || item.category) + "] " + item.text
-  ).join("\\n").slice(0, 3500);
+  ).join("\n").slice(0, 3500);
   const memory = [
-    structuredMemory ? "ذاكرة منظمة اختار المستخدم حفظها، مرتبة حسب النوع. أعطِ الأولوية للمعلومات الدائمة، وتعامل مع المؤقتة باعتبارها قديمة بعد مرور الوقت، ولا تفترض أن أي معلومة ما زالت صحيحة إذا ظهر ما يخالفها:\\n" + structuredMemory : "",
-    olderContext ? "سياق أقدم من المحادثة الحالية:\\n" + olderContext : "",
-    crossChatMemory ? "مقتطفات من محادثات سابقة على هذا الجهاز؛ استخدمها فقط لو مرتبطة بالسؤال الحالي، ولا تفترض أن كل تفاصيلها ما زالت محدثة:\\n" + crossChatMemory : ""
-  ].filter(Boolean).join("\\n\\n").slice(-6000);
+    structuredMemory ? "ذاكرة منظمة اختار المستخدم حفظها، مرتبة حسب النوع. أعطِ الأولوية للمعلومات الدائمة، وتعامل مع المؤقتة باعتبارها قديمة بعد مرور الوقت، ولا تفترض أن أي معلومة ما زالت صحيحة إذا ظهر ما يخالفها:\n" + structuredMemory : "",
+    olderContext ? "سياق أقدم من المحادثة الحالية:\n" + olderContext : "",
+    crossChatMemory ? "مقتطفات من محادثات سابقة على هذا الجهاز؛ استخدمها فقط لو مرتبطة بالسؤال الحالي، ولا تفترض أن كل تفاصيلها ما زالت محدثة:\n" + crossChatMemory : ""
+  ].filter(Boolean).join("\n\n").slice(-6000);
 
   return {
     memory,
