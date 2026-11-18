@@ -46,21 +46,21 @@
   }
   function cleanSpeechText(text){
     return String(text||"")
-      .replace(/```[\\s\\S]*?```/g," ")
-      .replace(/\\[([^\\]]+)\\]\\([^)]+\\)/g,"$1")
-      .replace(/https?:\\/\\/\\S+/g," ")
+      .replace(/\x60\x60\x60[\s\S]*?\x60\x60\x60/g," ")
+      .replace(/\[([^\]]+)\]\([^)]+\)/g,"$1")
+      .replace(/https?:\/\/\S+/g," ")
       .replace(/\x60([^\x60]+)\x60/g,"$1")
       .replace(/<[^>]*>/g," ")
       .replace(/[*_~#>|]/g," ")
-      .replace(/[\\u{1F000}-\\u{1FAFF}\\u{2600}-\\u{27BF}]/gu," ")
-      .replace(/[\\u200D\\uFE0F\\u{1F3FB}-\\u{1F3FF}]/gu,"")
+      .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/gu," ")
+      .replace(/[\u200D\uFE0F\u{1F3FB}-\u{1F3FF}]/gu,"")
       .replace(/[→↗↘←↑↓•▪◈⌁]/g," ")
-      .replace(/\\\\n/g," ")
-      .replace(/[\\t\\r]+/g," ")
-      .replace(/\\n{2,}/g,". ")
-      .replace(/\\s+([،؛.!؟])/g,"$1")
-      .replace(/([،؛.!؟])(?=\\S)/g,"$1 ")
-      .replace(/\\s{2,}/g," ")
+      .replace(/\\n/g," ")
+      .replace(/[\t\r]+/g," ")
+      .replace(/\n{2,}/g,". ")
+      .replace(/\s+([،؛.!؟])/g,"$1")
+      .replace(/([،؛.!؟])(?=\S)/g,"$1 ")
+      .replace(/\s{2,}/g," ")
       .trim();
   }
   function chooseArabicVoice(lang){
