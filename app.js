@@ -4,6 +4,8 @@
   let conversations = JSON.parse(localStorage.getItem("hamasa_conversations") || "[]");
   let current = {id: crypto.randomUUID(), title:"محادثة جديدة", messages:[]};
   let recognition = null, listening = false, recognitionSpeaksReply = false;
+  const MEMORY_KEY = "hamasa_personal_memory";
+  const getMemory = () => localStorage.getItem(MEMORY_KEY) || "";
   const welcome=$("welcome"), messages=$("messages"), input=$("messageInput");
   const persist=()=>localStorage.setItem("hamasa_conversations",JSON.stringify(conversations));
   function renderHistory(){
@@ -38,7 +40,7 @@
     const row=document.createElement("div");row.className="message assistant";row.innerHTML='<div class="message-avatar">ح</div><div class="bubble">حماصة بيفكر...</div>';messages.append(row);
     try{
       if(!API||API.includes("YOUR-RAILWAY"))throw new Error("لسه السيرفر مش متوصل. اربط Backend حماصة واضبط API_URL في config.js.");
-      const response=await fetch(API+"/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages:current.messages.map(m=>({role:m.role,content:m.content}))})});
+      const response=await fetch(API+"/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages:current.messages.slice(-30).map(m=>({role:m.role,content:m.content})),memory:getMemory()})});
       const data=await response.json();if(!response.ok)throw new Error(data.detail||"حصل خطأ في الاتصال.");
       placeholder.content=data.reply;current.messages.push(placeholder);saveCurrent();renderMessages();
       if(speakResponse && $("speakToggle").checked) await speak(data.reply);
@@ -97,6 +99,20 @@
     const el=$(id);if(el){const saved=localStorage.getItem("hamasa_"+id);if(saved)el.value=saved;el.onchange=()=>localStorage.setItem("hamasa_"+id,el.value);}
   });
   checkTTSStatus();
+  const memoryInput = $("memoryInput");
+  const memoryStatus = $("memoryStatus");
+  if (memoryInput) {
+    memoryInput.value = getMemory();
+    $("saveMemoryButton").onclick = () => {
+      localStorage.setItem(MEMORY_KEY, memoryInput.value.trim().slice(0, 6000));
+      memoryStatus.textContent = "اتحفظت ذاكرة حماصة على الجهاز ده.";
+    };
+    $("clearMemoryButton").onclick = () => {
+      memoryInput.value = "";
+      localStorage.removeItem(MEMORY_KEY);
+      memoryStatus.textContent = "اتمسحت الذاكرة المحفوظة على الجهاز ده.";
+    };
+  }
   function setupRecognition(){
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
     if(!SR){alert("التعرف على الصوت غير مدعوم في المتصفح ده. جرّب Chrome أو Edge.");return null;}
