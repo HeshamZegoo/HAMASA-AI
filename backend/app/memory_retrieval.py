@@ -5,7 +5,7 @@ from math import.sqrt
 from typing import Any
 
 
-_TOKEN = re.compile(r"[a-z0-9_+#.-]{2,}|[\\u0600-\\u06ff]{2,}", re.IGNORECASE)
+_TOKEN = re.compile(r"[a-z0-9_+#.-]{2,}|[\u0600-\u06ff]{2,}", re.IGNORECASE)
 _ARABIC_NORMALIZATION = str.maketrans({
     "أ": "ا", "إ": "ا", "آ": "ا", "ٱ": "ا",
     "ى": "ي", "ة": "ه", "ؤ": "و", "ئ": "ي",
