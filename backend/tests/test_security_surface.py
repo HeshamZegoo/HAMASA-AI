@@ -31,6 +31,23 @@ class PublicStatusDisclosureTests(unittest.TestCase):
         self.assertFalse(status["memory"])
         self.assertFalse(status["accounts"])
 
+    def test_api_rejects_untrusted_origins(self):
+        response = self.client.get(
+            "/api/tts/status",
+            headers={"Origin": "https://untrusted.example"},
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_api_sets_browser_security_headers(self):
+        response = self.client.get(
+            "/api/tts/status",
+            headers={"Origin": "https://heshamzegoo.github.io"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get("X-Content-Type-Options"), "nosniff")
+        self.assertEqual(response.headers.get("X-Frame-Options"), "DENY")
+        self.assertEqual(response.headers.get("Cache-Control"), "no-store")
+
     def test_root_exposes_only_liveness(self):
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
