@@ -57,8 +57,6 @@ app = FastAPI(
 # Lightweight per-instance abuse controls. For multi-replica deployments, use an edge/WAF or shared rate-limit store.
 _RATE_WINDOWS = {
     "/api/auth/signup": (5, 3600),
-    "/api/auth/verify": (10, 900),
-    "/api/auth/resend-verification": (3, 900),
     "/api/auth/login": (10, 900),
     "/api/chat": (20, 60),
     "/api/files/generate": (4, 600),
@@ -129,13 +127,6 @@ class ChatRequest(BaseModel):
 class AuthRequest(BaseModel):
     email: str = Field(min_length=5, max_length=254)
     password: str = Field(min_length=10, max_length=128)
-
-class EmailVerificationRequest(BaseModel):
-    email: str = Field(min_length=5, max_length=254)
-    code: str = Field(min_length=6, max_length=6, pattern=r"^[0-9]{6}$")
-
-class ResendVerificationRequest(BaseModel):
-    email: str = Field(min_length=5, max_length=254)
 
 class MemoryCreateRequest(BaseModel):
     category: Literal["preference", "project", "decision", "temporary"]
@@ -431,169 +422,35 @@ def _verified_user(authorization: str = Header(default=""), hamasa_session: str 
         raise HTTPException(status_code=401, detail="Session expired. Please sign in again.")
     return {"id": str(row[0]), "email": row[1], "_session_id": session_id}
 
-def _email_code_hash(email: str, code: str) -> str:
-    secret = JWT_SECRET.encode("utf-8")
-    return hmac.new(secret, (email + ":" + code).encode("utf-8"), hashlib.sha256).hexdigest()
-
-
-def _send_verification_email(email: str, code: str):
-    api_key = os.getenv("BREVO_API_KEY", "").strip()
-    sender = os.getenv("BREVO_SENDER_EMAIL", "").strip()
-    sender_name = os.getenv("BREVO_SENDER_NAME", "HAMASA AI").strip() or "HAMASA AI"
-    if not api_key or not sender:
-        raise RuntimeError("Brevo email delivery is not configured.")
-    text_content = (
-        f"أهلاً بيك في حماصة!\n\nكود تأكيد حسابك هو: {code}\n"
-        "الكود صالح لمدة 10 دقائق، ولا تشاركه مع أي شخص.\n\n"
-        f"Welcome to HAMASA AI. Your verification code is: {code}\nThis code expires in 10 minutes."
-    )
-    html_content = (
-        "<!doctype html><html lang='ar' dir='rtl'><body "
-        "style='font-family:Arial,sans-serif;background:#f6f7fb;padding:32px'>"
-        "<div style='max-width:520px;margin:auto;background:#fff;border-radius:16px;padding:28px'>"
-        "<h2 style='color:#6d4aff'>أهلاً بيك في حماصة 👋</h2>"
-        "<p>استخدم الكود ده لتأكيد حسابك:</p>"
-        f"<div style='font-size:34px;font-weight:bold;letter-spacing:8px;text-align:center;"
-        f"padding:18px;background:#f1efff;border-radius:12px;color:#38218c'>{code}</div>"
-        "<p>الكود صالح لمدة <b>10 دقائق</b>، وماتشاركوش مع أي حد.</p>"
-        "<hr><p dir='ltr'>Your HAMASA AI verification code expires in 10 minutes.</p>"
-        "</div></body></html>"
-    )
-    payload = {
-        "sender": {"name": sender_name, "email": sender},
-        "to": [{"email": email}],
-        "subject": "كود تأكيد حساب حماصة | HAMASA verification code",
-        "htmlContent": html_content,
-    }
-    try:
-        with httpx.Client(timeout=httpx.Timeout(20.0, connect=8.0)) as client:
-            response = client.post(
-                "https://api.brevo.com/v3/smtp/email",
-                headers={
-                    "accept": "application/json",
-                    "api-key": api_key,
-                    "content-type": "application/json",
-                },
-                json=payload,
-            )
-        if response.status_code >= 400:
-            logger.error("Brevo email delivery failed: status=%s", response.status_code)
-            raise RuntimeError("Brevo rejected the verification email.")
-    except httpx.TimeoutException as exc:
-        raise RuntimeError("Brevo email delivery timed out.") from exc
-    except httpx.RequestError as exc:
-        raise RuntimeError("Could not connect to Brevo.") from exc
-
-
-def _start_email_verification(email: str, password: str):
+@app.post("/api/auth/signup")
+def signup(body: AuthRequest, response: Response):
+    email = body.email.strip().lower()
+    if not re.fullmatch(r"[^@\\s]+@[^@\\s]+\\.[^@\\s]+", email):
+        raise HTTPException(status_code=400, detail="Enter a valid email address.")
     if not JWT_SECRET or len(JWT_SECRET) < 32:
         raise HTTPException(status_code=503, detail="Authentication is not configured.")
-    if not os.getenv("BREVO_API_KEY", "").strip() or not os.getenv("BREVO_SENDER_EMAIL", "").strip():
-        raise HTTPException(status_code=503, detail="Email verification is not configured yet.")
     placeholder = "%s" if DATABASE_URL.startswith(("postgres://", "postgresql://")) else "?"
-    with _auth_db() as db:
-        existing = db.execute(f"SELECT id FROM hamasa_users WHERE email = {placeholder}", (email,)).fetchone()
-        if existing:
-            raise HTTPException(status_code=409, detail="An account with this email already exists.")
-        pending = db.execute(f"SELECT last_sent_at FROM hamasa_pending_verifications WHERE email = {placeholder}", (email,)).fetchone()
-        now = int(time.time())
-        if pending and now - int(pending[0]) < 60:
-            raise HTTPException(status_code=429, detail="Please wait one minute before requesting another code.")
-        code = f"{secrets.randbelow(1_000_000):06d}"
-        db.execute(
-            f"""INSERT INTO hamasa_pending_verifications
-                (email, password_hash, code_hash, expires_at, attempts, last_sent_at)
-                VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, 0, {placeholder})
-                ON CONFLICT (email) DO UPDATE SET
-                password_hash = excluded.password_hash, code_hash = excluded.code_hash,
-                expires_at = excluded.expires_at, attempts = 0, last_sent_at = excluded.last_sent_at""",
-            (email, _password_hash(password), _email_code_hash(email, code), now + 600, now),
-        )
+    user_id = str(uuid.uuid4())
     try:
-        _send_verification_email(email, code)
-    except Exception as exc:
-        logger.error("Verification email delivery failed: %s", type(exc).__name__)
         with _auth_db() as db:
-            db.execute(f"DELETE FROM hamasa_pending_verifications WHERE email = {placeholder}", (email,))
-        raise HTTPException(status_code=503, detail="Could not send the verification email. Check the email settings and try again.")
-    return {"verification_required": True, "email": email, "message": "A verification code was sent to your email."}
-
-
-@app.post("/api/auth/signup")
-async def signup(body: AuthRequest):
-    email = body.email.strip().lower()
-    if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
-        raise HTTPException(status_code=400, detail="Enter a valid email address.")
-    return await asyncio.to_thread(_start_email_verification, email, body.password)
-
-
-@app.post("/api/auth/resend-verification")
-async def resend_verification(body: ResendVerificationRequest):
-    email = body.email.strip().lower()
-    if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
-        raise HTTPException(status_code=400, detail="Enter a valid email address.")
-    placeholder = "%s" if DATABASE_URL.startswith(("postgres://", "postgresql://")) else "?"
-    with _auth_db() as db:
-        row = db.execute(f"SELECT last_sent_at FROM hamasa_pending_verifications WHERE email = {placeholder}", (email,)).fetchone()
-        if not row:
-            raise HTTPException(status_code=404, detail="No pending verification was found. Start signup again.")
-        now = int(time.time())
-        if now - int(row[0]) < 60:
-            raise HTTPException(status_code=429, detail="Please wait one minute before requesting another code.")
-        code = f"{secrets.randbelow(1_000_000):06d}"
-        db.execute(
-            f"UPDATE hamasa_pending_verifications SET code_hash = {placeholder}, expires_at = {placeholder}, attempts = 0, last_sent_at = {placeholder} WHERE email = {placeholder}",
-            (_email_code_hash(email, code), now + 600, now, email),
-        )
-    try:
-        await asyncio.to_thread(_send_verification_email, email, code)
-    except Exception as exc:
-        logger.error("Verification email resend failed: %s", type(exc).__name__)
-        raise HTTPException(status_code=503, detail="Could not resend the verification email.")
-    return {"sent": True}
-
-
-@app.post("/api/auth/verify")
-def verify_email(body: EmailVerificationRequest, response: Response):
-    email = body.email.strip().lower()
-    placeholder = "%s" if DATABASE_URL.startswith(("postgres://", "postgresql://")) else "?"
-    with _auth_db() as db:
-        row = db.execute(
-            f"SELECT password_hash, code_hash, expires_at, attempts FROM hamasa_pending_verifications WHERE email = {placeholder}",
-            (email,),
-        ).fetchone()
-        if not row:
-            raise HTTPException(status_code=400, detail="No pending verification was found. Start signup again.")
-        password_hash, expected_hash, expires_at, attempts = row
-        now = int(time.time())
-        if int(expires_at) <= now:
-            db.execute(f"DELETE FROM hamasa_pending_verifications WHERE email = {placeholder}", (email,))
-            db.commit()
-            raise HTTPException(status_code=400, detail="The code expired. Request a new one.")
-        if int(attempts) >= 5:
-            raise HTTPException(status_code=429, detail="Too many incorrect codes. Request a new code.")
-        if not hmac.compare_digest(str(expected_hash), _email_code_hash(email, body.code)):
-            db.execute(f"UPDATE hamasa_pending_verifications SET attempts = attempts + 1 WHERE email = {placeholder}", (email,))
-            db.commit()
-            raise HTTPException(status_code=400, detail="The verification code is incorrect.")
-        user_id = str(uuid.uuid4())
-        try:
+            existing = db.execute(f"SELECT id FROM hamasa_users WHERE email = {placeholder}", (email,)).fetchone()
+            if existing:
+                raise HTTPException(status_code=409, detail="An account with this email already exists.")
             db.execute(
                 f"INSERT INTO hamasa_users (id, email, password_hash) VALUES ({placeholder}, {placeholder}, {placeholder})",
-                (uuid.UUID(user_id) if DATABASE_URL.startswith(("postgres://", "postgresql://")) else user_id, email, password_hash),
+                (uuid.UUID(user_id) if DATABASE_URL.startswith(("postgres://", "postgresql://")) else user_id, email, _password_hash(body.password)),
             )
-        except Exception as exc:
-            if "unique" in str(exc).lower() or "duplicate" in str(exc).lower():
-                db.execute(f"DELETE FROM hamasa_pending_verifications WHERE email = {placeholder}", (email,))
-                raise HTTPException(status_code=409, detail="An account with this email already exists.")
-            logger.error("Verified account creation failed: %s", type(exc).__name__)
-            raise HTTPException(status_code=503, detail="Could not create account right now.")
-        db.execute(f"DELETE FROM hamasa_pending_verifications WHERE email = {placeholder}", (email,))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        if "unique" in str(exc).lower() or "duplicate" in str(exc).lower():
+            raise HTTPException(status_code=409, detail="An account with this email already exists.")
+        logger.error("Account creation failed: %s", type(exc).__name__)
+        raise HTTPException(status_code=503, detail="Could not create account right now.")
     user = {"id": user_id, "email": email}
     token = _issue_token(user_id)
     _set_session_cookie(response, token)
     return {"token": token, "user": user}
-
 
 @app.post("/api/auth/login")
 def login(body: AuthRequest, response: Response):
