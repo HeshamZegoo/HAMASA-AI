@@ -62,6 +62,11 @@ header{display:flex;align-items:center;gap:8px;padding:calc(10px + env(safe-area
 .bub{max-width:min(86%,620px);padding:12px 16px;border-radius:20px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;font-size:15.5px}
 .user .bub{background:linear-gradient(135deg,var(--acc),#6a1bd6);color:#fff;border-end-end-radius:6px;box-shadow:0 10px 28px rgba(209,0,209,.28)}
 .bot .bub{background:var(--glass);border:1px solid var(--line);border-end-start-radius:6px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.msg-tools{display:flex;gap:7px;margin:6px 2px 0;flex-wrap:wrap}
+.msg-tool{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:var(--glass);color:var(--mut);font-size:12px;line-height:1.2}
+.msg-tool:hover,.msg-tool[aria-pressed=true]{background:var(--glass2);color:var(--fg);border-color:var(--cy)}
+.msg-tool svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
 .tag{display:inline-block;margin-top:8px;font-size:11px;color:var(--mut);border:1px solid var(--line);border-radius:99px;padding:2px 8px;white-space:normal}
 .err .bub{border-color:rgba(255,110,130,.5)}
 .err b{display:block;margin-bottom:4px}
@@ -318,7 +323,7 @@ en:{newChat:'New chat',history:'Recent',noHist:'No conversations yet.',settings:
  stDemo:'Demo mode · no backend',stLive:'Online',placeholder:'Ask Hamasa anything',send:'Send message',attach:'Attach a file',
  greetT:'Ahlan, I’m Hamasa.',greetS:'Ask me anything. I’ll keep it sharp, warm, and a little bit funny.',
  s:['Explain something tricky in simple words','Help me plan my week','Write a short message to a friend','Tell me a joke, Egyptian style'],
- demoTag:'Demo reply · not from the AI',errT:'Couldn’t reach Hamasa',errB:'Check your connection, then try again.',retry:'Try again',
+ demoTag:'Demo reply · not from the AI',copyMessage:'Copy',copied:'Copied',copyFailed:'Could not copy',readAloud:'Read aloud',stopReading:'Stop reading',speechUnavailable:'Speech is not available in this browser.',errT:'Couldn’t reach Hamasa',errB:'Check your connection, then try again.',retry:'Try again',
 cleared:'History cleared.',clearAll:'Clear all conversations',del:'Delete conversation',
 memoryTitle:'Long-term memory',memoryHelp:'Saved only in this browser. Add useful facts you want Hamasa to remember. Avoid passwords or sensitive information.',memoryPreference:'Preferences',memoryProject:'Projects',memoryDecision:'Decisions',memoryTemporary:'Temporary context',memoryPlaceholder:'Write one clear fact to remember…',memoryAdd:'Save memory',memoryEmpty:'No saved memories yet.',memoryRemove:'Delete memory',memorySaved:'Memory saved.',memoryLimit:'Memory list is full. Delete an old item first.',
  backend:'Connection',beNone:'Backend is offline or the NVIDIA provider is not configured.',beLive:'Connected to the HAMASA NVIDIA chat service.',
@@ -327,7 +332,7 @@ ar:{newChat:'محادثة جديدة',history:'الأخيرة',noHist:'لا تو
  stDemo:'وضع تجريبي · بدون خادم',stLive:'متصل',placeholder:'اسأل حماصة في أي حاجة',send:'إرسال الرسالة',attach:'إرفاق ملف',
  greetT:'أهلاً، أنا حماصة.',greetS:'اسألني في أي حاجة. هرد عليك بذكاء ودفا وشوية خفة دم.',
  s:['اشرحلي حاجة معقدة ببساطة','ساعدني أنظّم أسبوعي','اكتبلي رسالة قصيرة لصاحبي','قولّي نكتة مصرية'],
- demoTag:'رد تجريبي · ليس من الذكاء الاصطناعي',errT:'مقدرتش أوصل لحماصة',errB:'اتأكد من الاتصال وجرّب تاني.',retry:'جرّب تاني',
+ demoTag:'رد تجريبي · ليس من الذكاء الاصطناعي',copyMessage:'نسخ',copied:'اتنسخ',copyFailed:'مقدرتش أنسخ الرسالة',readAloud:'اقرأ بصوت',stopReading:'إيقاف القراءة',speechUnavailable:'ميزة القراءة الصوتية مش متاحة في المتصفح ده.',errT:'مقدرتش أوصل لحماصة',errB:'اتأكد من الاتصال وجرّب تاني.',retry:'جرّب تاني',
 cleared:'تم مسح السجل.',clearAll:'مسح كل المحادثات',del:'حذف المحادثة',
 memoryTitle:'الذاكرة طويلة المدى',memoryHelp:'الذاكرة محفوظة على المتصفح ده فقط. أضف المعلومات المهمة اللي عايز حماصة يفتكرها. متحفظش كلمات مرور أو معلومات حساسة.',memoryPreference:'تفضيلات',memoryProject:'مشاريع',memoryDecision:'قرارات',memoryTemporary:'معلومات مؤقتة',memoryPlaceholder:'اكتب معلومة واضحة عايز حماصة يفتكرها…',memoryAdd:'حفظ في الذاكرة',memoryEmpty:'لسه مفيش معلومات محفوظة.',memoryRemove:'حذف المعلومة',memorySaved:'اتحفظت في الذاكرة.',memoryLimit:'الذاكرة وصلت للحد الأقصى. احذف معلومة قديمة الأول.',
  backend:'الاتصال',beNone:'الخادم غير متصل أو مزود NVIDIA غير مُعدّ.',beLive:'متصل بخادم حماصة وNVIDIA.',
@@ -537,10 +542,79 @@ $('#newBtn').onclick = newChat;
    ===================================================================== */
 const msgs = $('#msgs'), chat = $('#chat'), inp = $('#inp'), sendBtn = $('#sendBtn');
 const scrollEnd = () => requestAnimationFrame(() => { chat.scrollTop = chat.scrollHeight; });
+let activeSpeech = null;
+let activeSpeechButton = null;
+function stopReading() {
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+  if (activeSpeechButton) {
+    activeSpeechButton.setAttribute('aria-pressed', 'false');
+    activeSpeechButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M8 7v10M4 10v4M16 7v10M20 10v4"/></svg><span>' + t('readAloud') + '</span>';
+  }
+  activeSpeech = null;
+  activeSpeechButton = null;
+}
+async function copyMessage(text) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      const area = document.createElement('textarea');
+      area.value = text;
+      area.setAttribute('readonly', '');
+      area.style.cssText = 'position:fixed;opacity:0;pointer-events:none';
+      document.body.append(area); area.select();
+      const ok = document.execCommand('copy'); area.remove();
+      if (!ok) throw new Error('copy failed');
+    }
+    toast(t('copied'));
+  } catch (error) {
+    console.warn('Copy failed', error);
+    toast(t('copyFailed'));
+  }
+}
+function readMessageAloud(text, button) {
+  if (!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) {
+    toast(t('speechUnavailable')); return;
+  }
+  if (activeSpeechButton === button) { stopReading(); return; }
+  stopReading();
+  const utterance = new SpeechSynthesisUtterance(text);
+  const arabic = /[\\u0600-\\u06FF]/.test(text);
+  utterance.lang = arabic ? 'ar-EG' : 'en-US';
+  utterance.rate = 1;
+  utterance.pitch = 1;
+  const voices = window.speechSynthesis.getVoices();
+  if (arabic) {
+    utterance.voice = voices.find(v => /^ar[-_]eg$/i.test(v.lang)) ||
+      voices.find(v => /^ar([-_]|$)/i.test(v.lang)) || null;
+  } else {
+    utterance.voice = voices.find(v => /^en([-_]|$)/i.test(v.lang)) || null;
+  }
+  activeSpeech = utterance;
+  activeSpeechButton = button;
+  button.setAttribute('aria-pressed', 'true');
+  button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg><span>' + t('stopReading') + '</span>';
+  utterance.onend = () => { if (activeSpeech === utterance) stopReading(); };
+  utterance.onerror = () => { if (activeSpeech === utterance) stopReading(); };
+  window.speechSynthesis.speak(utterance);
+}
 function bubble(m) {
   const row = document.createElement('div'); row.className = 'm ' + (m.role === 'user' ? 'user' : 'bot');
-  const b = document.createElement('div'); b.className = 'bub'; b.textContent = m.text; row.append(b);
+  const content = document.createElement('div'); content.style.cssText = 'max-width:min(86%,620px);min-width:0';
+  const b = document.createElement('div'); b.className = 'bub'; b.textContent = m.text; content.append(b);
   if (m.demo) { const g = document.createElement('div'); g.className = 'tag'; g.dataset.demo = ''; g.textContent = t('demoTag'); b.append(document.createElement('br'), g); }
+  if (m.role !== 'user' && m.text) {
+    const tools = document.createElement('div'); tools.className = 'msg-tools';
+    const copy = document.createElement('button'); copy.type = 'button'; copy.className = 'msg-tool';
+    copy.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg><span>' + t('copyMessage') + '</span>';
+    copy.addEventListener('click', () => copyMessage(m.text));
+    const speak = document.createElement('button'); speak.type = 'button'; speak.className = 'msg-tool';
+    speak.setAttribute('aria-pressed', 'false');
+    speak.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M8 7v10M4 10v4M16 7v10M20 10v4"/></svg><span>' + t('readAloud') + '</span>';
+    speak.addEventListener('click', () => readMessageAloud(m.text, speak));
+    tools.append(copy, speak); content.append(tools);
+  }
+  row.append(content);
   return row;
 }
 function renderChat() {
