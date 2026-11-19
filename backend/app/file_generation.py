@@ -305,7 +305,7 @@ def build_file(fmt: str, title: str, content: str, rows: list, page_count: int =
         for row in rows:
             if isinstance(row, list):
                 writer.writerow(row[:100])
-        return ("\\ufeff" + output.getvalue()).encode("utf-8")
+        return ("\ufeff" + output.getvalue()).encode("utf-8")
     if fmt == "json":
         import json
         return json.dumps({"title": title, "content": content, "rows": rows}, ensure_ascii=False, indent=2).encode("utf-8")
