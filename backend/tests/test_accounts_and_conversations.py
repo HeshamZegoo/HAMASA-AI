@@ -72,7 +72,7 @@ class AccountAndConversationFlowTests(unittest.TestCase):
                 "title": "Test conversation",
                 "messages": [
                     {"role": "user", "text": "Hello"},
-                    {"role": "bot", "text": "Hi"},
+                    {"role": "bot", "text": "Hi", "sources": [{"title": "Official docs", "url": "https://example.com/docs", "published_date": "2026-11-19"}]},
                 ],
             },
         )
@@ -81,6 +81,7 @@ class AccountAndConversationFlowTests(unittest.TestCase):
         self.assertEqual(listed.status_code, 200)
         self.assertEqual(listed.json()["conversations"][0]["id"], conversation_id)
         self.assertEqual(listed.json()["conversations"][0]["messages"][1]["text"], "Hi")
+        self.assertEqual(listed.json()["conversations"][0]["messages"][1]["sources"][0]["url"], "https://example.com/docs")
 
     def test_saved_memory_is_encrypted_at_rest_and_decrypted_for_owner(self):
         signup = self.client.post("/api/auth/signup", json={
@@ -149,6 +150,14 @@ class AccountAndConversationFlowTests(unittest.TestCase):
         self.assertEqual(logged_out.json(), {"logged_out": True})
         denied = self.client.get("/api/chats", headers=headers)
         self.assertEqual(denied.status_code, 401)
+
+    def test_conversation_sources_reject_unsafe_schemes(self):
+        with self.assertRaises(ValueError):
+            main.ConversationMessage(
+                role="bot",
+                text="Here is a source",
+                sources=[{"title": "Bad", "url": "javascript:alert(1)"}],
+            )
 
     def test_invalid_credentials_are_rejected(self):
         response = self.client.post("/api/auth/login", json={
