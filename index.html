@@ -483,6 +483,8 @@ let lang = store.get('hamasa.lang', 'en') === 'ar' ? 'ar' : 'en';
 let theme = store.get('hamasa.themeVersion', 0) >= 2 ? (store.get('hamasa.theme', 'light') === 'dark' ? 'dark' : 'light') : 'light';
 store.set('hamasa.themeVersion', 2); store.set('hamasa.theme', theme);
 let convs = store.get('hamasa.convs', []); if (!Array.isArray(convs)) convs = [];
+convs.forEach(c => { if (c && !c.id) c.id = crypto.randomUUID(); if (c && !c.updated_at) c.updated_at = Date.now(); });
+let cloudHistoryReady = false, cloudSaveTimer = null, cloudSaveQueue = Promise.resolve();
 let memories = store.get('hamasa.memory', []);
 if (!Array.isArray(memories)) memories = [];
 let memoryClientId = store.get("hamasa.memoryClientId", "");
@@ -569,9 +571,64 @@ const dlg = $('#dlg');
 const openSet = () => { if (innerWidth < 1024) nav(false); renderMemories(); dlg.showModal ? dlg.showModal() : dlg.setAttribute('open', ''); };
 $('#setBtn').onclick = openSet; $('#setSide').onclick = openSet; $('#dX').onclick = () => dlg.close();
 dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
-$('#clearBtn').onclick = () => { convs = []; store.set('hamasa.convs', convs); newChat(); dlg.close(); toast(t('cleared')); };
+$('#clearBtn').onclick = async () => {
+  convs = []; cur = null; store.set('hamasa.convs', convs);
+  if (authUser && cloudHistoryReady) {
+    try { const r = await apiFetch(API_BASE + "/api/chats", { method: "DELETE" }); if (!r.ok) throw new Error("Cloud clear failed"); }
+    catch { toast(lang === "ar" ? "تعذر مسح المحادثات من الحساب." : "Could not clear cloud chats."); }
+  }
+  newChat(); dlg.close(); toast(t('cleared'));
+};
 
-function save() { store.set('hamasa.convs', convs.slice(0, 40)); }
+function save() {
+  if (cur) cur.updated_at = Date.now();
+  store.set('hamasa.convs', convs.slice(0, 40));
+  if (!authUser || !cloudHistoryReady || !cur?.id) return;
+  clearTimeout(cloudSaveTimer);
+  const snapshot = { id: cur.id, title: cur.title || "محادثة", messages: cur.messages.slice(), updated_at: cur.updated_at };
+  cloudSaveTimer = setTimeout(() => {
+    cloudSaveQueue = cloudSaveQueue.then(async () => {
+      if (!authUser || !cloudHistoryReady) return;
+      const response = await apiFetch(API_BASE + "/api/chats/" + encodeURIComponent(snapshot.id), {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: snapshot.title, messages: snapshot.messages, updated_at: snapshot.updated_at })
+      });
+      if (!response.ok) throw new Error("Cloud conversation save failed: " + response.status);
+    }).catch(error => { console.warn(error); toast(lang === "ar" ? "تعذر حفظ المحادثة على الحساب." : "Could not sync this chat to your account."); });
+  }, 450);
+}
+
+async function syncConversationsFromServer() {
+  cloudHistoryReady = false;
+  const response = await apiFetch(API_BASE + "/api/chats", { cache: "no-store" });
+  if (!response.ok) throw new Error("Could not load account conversations.");
+  const data = await response.json();
+  const cloud = Array.isArray(data.conversations) ? data.conversations : [];
+  const local = convs.slice();
+  const cloudIds = new Set(cloud.map(c => String(c.id)));
+  const merged = cloud.slice();
+  for (const c of local) {
+    if (!c || !Array.isArray(c.messages) || !c.messages.length) continue;
+    if (!c.id) c.id = crypto.randomUUID();
+    if (!cloudIds.has(String(c.id))) merged.push(c);
+  }
+  merged.sort((a,b) => Number(b.updated_at || 0) - Number(a.updated_at || 0));
+  convs = merged.slice(0, 40);
+  if (cur?.id) cur = convs.find(c => c.id === cur.id) || cur;
+  else if (!cur && convs.length) cur = convs[0];
+  store.set("hamasa.convs", convs);
+  cloudHistoryReady = true;
+  renderHist(); renderChat();
+  // Migrate conversations that existed only in this browser into the signed-in account.
+  for (const c of convs) {
+    if (cloudIds.has(String(c.id))) continue;
+    const r = await apiFetch(API_BASE + "/api/chats/" + encodeURIComponent(c.id), {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: c.title || "محادثة", messages: c.messages, updated_at: c.updated_at || Date.now() })
+    });
+    if (!r.ok) throw new Error("Could not migrate local conversations.");
+  }
+}
 const memoryLabels = {
   preference: () => t('memoryPreference'),
   project: () => t('memoryProject'),
@@ -680,8 +737,14 @@ function renderHist() {
   convs.forEach(c => {
     const r = document.createElement('div'); r.className = 'hi' + (c === cur ? ' on' : '');
     const b = document.createElement('button'); b.className = 't'; b.textContent = c.title; b.onclick = () => { cur = c; renderChat(); renderHist(); if (innerWidth < 1024) nav(false); };
-    const x = document.createElement('button'); x.className = 'x'; x.setAttribute('aria-label', t('del')); x.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
-    x.onclick = () => { convs = convs.filter(k => k !== c); save(); if (cur === c) newChat(); else renderHist(); };
+    const x = document.createElement('button'); x.className = 'x'; x.setAttribute('aria-label', t('del')); x.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 18L6 6"/></svg>';
+    x.onclick = async () => {
+      if (authUser && cloudHistoryReady && c.id) {
+        try { const response = await apiFetch(API_BASE + "/api/chats/" + encodeURIComponent(c.id), { method: "DELETE" }); if (!response.ok && response.status !== 404) throw new Error("Delete failed"); }
+        catch { toast(lang === "ar" ? "تعذر حذف المحادثة من الحساب." : "Could not delete this chat."); return; }
+      }
+      convs = convs.filter(k => k !== c); save(); if (cur === c) newChat(); else renderHist();
+    };
     r.append(b, x); h.append(r);
   });
 }
@@ -915,7 +978,7 @@ async function respond() {
 }
 async function send(text) {
   text = (text || '').trim(); if (!text || busy) return;
-  if (!cur) { cur = { title: text.slice(0, 40), messages: [] }; convs.unshift(cur); }
+  if (!cur) { cur = { id: crypto.randomUUID(), updated_at: Date.now(), title: text.slice(0, 40), messages: [] }; convs.unshift(cur); }
   $('#empty').style.display = 'none';
   const m = { role: 'user', text }; cur.messages.push(m); msgs.append(bubble(m)); save(); renderHist();
   inp.value = ''; grow(); return respond();
@@ -969,7 +1032,7 @@ $("#authClose").onclick = () => $("#authDlg").close();
 $("#authSwitch").onclick = () => setAuthMode(authMode === "login" ? "signup" : "login");
 $("#authSignout").onclick = () => {
   apiFetch(API_BASE + "/api/auth/logout", { method: "POST" }).catch(() => {});
-  saveAuthToken(""); authUser = null; store.set("hamasa.authUser", null);
+  saveAuthToken(""); authUser = null; cloudHistoryReady = false; store.set("hamasa.authUser", null);
   updateAuthButton(); $("#authDlg").close(); toast(lang === "ar" ? "تم تسجيل الخروج" : "Signed out");
 };
 $("#authForm").addEventListener("submit", async e => {
@@ -987,8 +1050,9 @@ $("#authForm").addEventListener("submit", async e => {
     $("#authPassword").value = "";
     updateAuthButton();
     await syncMemoriesFromServer();
+    await syncConversationsFromServer();
     $("#authDlg").close();
-    toast(lang === "ar" ? "أهلاً بيك! تم تسجيل الدخول." : "You’re signed in!");
+    toast(lang === "ar" ? "أهلاً بيك! محادثاتك اتزامنت مع الحساب." : "You’re signed in! Your chats are synced.");
   } catch (error) {
     toast(error.message || (lang === "ar" ? "حصل خطأ." : "Something went wrong."));
   } finally { submit.disabled = false; }
@@ -1000,12 +1064,19 @@ async function validateSavedSession() {
     const data = await response.json(); authUser = data.user; store.set("hamasa.authUser", authUser);
     updateAuthButton();
   } catch {
-    saveAuthToken(""); authUser = null; store.set("hamasa.authUser", null); updateAuthButton();
+    saveAuthToken(""); authUser = null; cloudHistoryReady = false; store.set("hamasa.authUser", null); updateAuthButton();
   }
 }
 
 /* INIT */
-mountOrbs(); applyTheme(); applyLang(); renderChat(); checkBackend(); validateSavedSession().then(syncMemoriesFromServer);
+mountOrbs(); applyTheme(); applyLang(); renderChat(); checkBackend();
+validateSavedSession().then(async () => {
+  if (authUser) {
+    await syncMemoriesFromServer();
+    try { await syncConversationsFromServer(); }
+    catch (error) { console.warn("Cloud chat history could not be loaded.", error); toast(lang === "ar" ? "تعذر تحميل محادثات الحساب." : "Could not load account chats."); }
+  }
+});
 </script>
 <script src="./attachments.js?v=20261119-2"></script>
 </body>
