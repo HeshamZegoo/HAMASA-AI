@@ -8,59 +8,84 @@ from fastapi import HTTPException
 from backend.app import main
 
 
-class FakeGeminiResponse:
+class FakeNvidiaResponse:
     status_code = 200
     text = ""
+
     def json(self):
-        return {"candidates": [{
-            "content": {"parts": [{"text": "عامل إيه يا حماصة؟"}]}
-        }]}
+        return {"text": "عامل إيه يا حماصة؟ Hello!"}
 
 
-class FakeGeminiClient:
+class FakeNvidiaClient:
     calls = []
+
     def __init__(self, **kwargs):
         pass
+
     async def __aenter__(self):
         return self
+
     async def __aexit__(self, exc_type, exc, tb):
         return False
-    async def post(self, url, headers=None, json=None):
-        self.calls.append({"url": url, "headers": headers, "json": json})
-        return FakeGeminiResponse()
+
+    async def post(self, url, headers=None, data=None, files=None):
+        self.calls.append({"url": url, "headers": headers, "data": data, "files": files})
+        return FakeNvidiaResponse()
 
 
 class AudioTranscriptionTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
-        FakeGeminiClient.calls = []
+        FakeNvidiaClient.calls = []
 
-    async def test_transcription_uses_server_key_and_returns_transcript(self):
+    async def test_transcription_uses_shared_nvidia_key_and_returns_mixed_transcript(self):
+        audio_bytes = bytes(range(256)) * 6
         body = main.TranscriptionRequest(
-            audio=base64.b64encode(bytes(range(256)) * 6).decode("ascii"),
+            audio=base64.b64encode(audio_bytes).decode("ascii"),
+            mime_type="audio/wav",
+        )
+        with patch.dict(os.environ, {"AI_API_KEY": "shared-provider-test-key"}):
+            with patch("backend.app.main.httpx.AsyncClient", FakeNvidiaClient):
+                result = await main.transcribe_audio(body)
+
+        self.assertEqual(result["transcript"], "عامل إيه يا حماصة؟ Hello!")
+        call = FakeNvidiaClient.calls[0]
+        self.assertIn("b702f636-f60c-4a3d-a6f4-f3568c13bd7d", call["url"])
+        self.assertTrue(call["url"].endswith("/v1/audio/transcriptions"))
+        self.assertEqual(call["headers"]["Authorization"], "Bearer shared-provider-test-key")
+        self.assertEqual(call["data"]["language"], "multi")
+        self.assertEqual(call["data"]["response_format"], "json")
+        self.assertEqual(call["files"]["file"][1], audio_bytes)
+        self.assertEqual(call["files"]["file"][2], "audio/wav")
+
+    async def test_invalid_base64_is_rejected_before_provider_lookup(self):
+        body = main.TranscriptionRequest(audio="not-base64!", mime_type="audio/mp4")
+        with patch.dict(os.environ, {"AI_API_KEY": ""}):
+            with patch("backend.app.main.API_KEY", ""):
+                with self.assertRaises(HTTPException) as caught:
+                    await main.transcribe_audio(body)
+        self.assertEqual(caught.exception.status_code, 400)
+
+    async def test_short_recordings_are_rejected_before_provider_lookup(self):
+        body = main.TranscriptionRequest(
+            audio=base64.b64encode(b"short").decode("ascii"),
             mime_type="audio/mp4",
         )
-        with patch.dict(os.environ, {"TTS_GEMINI_API_KEY": "private-test-key"}):
-            with patch("backend.app.main.httpx.AsyncClient", FakeGeminiClient):
-                result = await main.transcribe_audio(body)
-        self.assertEqual(result["transcript"], "عامل إيه يا حماصة؟")
-        call = FakeGeminiClient.calls[0]
-        self.assertNotIn("private-test-key", call["url"])
-        self.assertEqual(call["headers"]["x-goog-api-key"], "private-test-key")
-        self.assertEqual(call["json"]["generationConfig"]["temperature"], 0)
-
-    async def test_transcription_rejects_invalid_base64(self):
-        body = main.TranscriptionRequest(audio="not-base64!", mime_type="audio/mp4")
-        with patch.dict(os.environ, {"TTS_GEMINI_API_KEY": "private-test-key"}):
-            with self.assertRaises(HTTPException) as caught:
-                await main.transcribe_audio(body)
+        with patch.dict(os.environ, {"AI_API_KEY": ""}):
+            with patch("backend.app.main.API_KEY", ""):
+                with self.assertRaises(HTTPException) as caught:
+                    await main.transcribe_audio(body)
         self.assertEqual(caught.exception.status_code, 400)
 
-    async def test_transcription_rejects_too_short_recordings(self):
-        body = main.TranscriptionRequest(audio=base64.b64encode(b"short").decode("ascii"))
-        with patch.dict(os.environ, {"TTS_GEMINI_API_KEY": "private-test-key"}):
-            with self.assertRaises(HTTPException) as caught:
-                await main.transcribe_audio(body)
-        self.assertEqual(caught.exception.status_code, 400)
+    async def test_valid_audio_requires_the_shared_provider_key(self):
+        body = main.TranscriptionRequest(
+            audio=base64.b64encode(b"x" * 2048).decode("ascii"),
+            mime_type="audio/wav",
+        )
+        with patch.dict(os.environ, {"AI_API_KEY": ""}):
+            with patch("backend.app.main.API_KEY", ""):
+                with self.assertRaises(HTTPException) as caught:
+                    await main.transcribe_audio(body)
+        self.assertEqual(caught.exception.status_code, 503)
 
 
 if __name__ == "__main__":
