@@ -903,7 +903,7 @@ async def _live_web_search(query: str) -> list[dict]:
     search_key = os.getenv("TAVILY_API_KEY", "").strip()
     if not search_key:
         return []
-    query = query.strip()[:1200]
+    query = query.strip()[:400]
     if not query:
         return []
     topic = "news" if re.search(r"(news|اخبار|أخبار|خبر|آخر الأخبار)", query, re.IGNORECASE) else "general"
