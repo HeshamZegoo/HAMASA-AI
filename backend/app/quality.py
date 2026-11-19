@@ -5,10 +5,10 @@ from typing import Any
 
 
 _CODING_SIGNALS = re.compile(
-    r"(?:\\b(?:code|coding|program(?:ming)?|debug(?:ging)?|bug|traceback|exception|"
-    r"stack\\s*trace|function|class|method|api|sdk|sql|python|javascript|typescript|"
+    r"(?:\b(?:code|coding|program(?:ming)?|debug(?:ging)?|bug|traceback|exception|"
+    r"stack\s*trace|function|class|method|api|sdk|sql|python|javascript|typescript|"
     r"react|html|css|bash|powershell|terminal|shell|git|github|docker|railway|"
-    r"deploy(?:ment)?|compile|compiler|syntax|database|server|backend|frontend)\\b)"
+    r"deploy(?:ment)?|compile|compiler|syntax|database|server|backend|frontend)\b)"
     r"|(?:كود|برمج(?:ة|ي|يات)|بايثون|جافاسكريبت|تايبسكريبت|ريأكت|دالة|كلاس|"
     r"خطأ في الكود|تصحيح|ديباج|ديباجنج|تيرمنال|طرفية|سطر أوامر|أوامر|"
     r"سيرفر|خادم|باك.?إند|فرونت.?إند|قاعدة بيانات|داتابيز|نشر المشروع|"
