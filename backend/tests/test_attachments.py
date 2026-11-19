@@ -1,5 +1,11 @@
 import base64
 import unittest
+import io
+
+from docx import Document
+from openpyxl import Workbook
+from pptx import Presentation
+from reportlab.pdfgen import canvas
 
 from backend.app.attachments import AttachmentInput, prepare_messages
 from backend.app.main import Message
@@ -44,6 +50,65 @@ class AttachmentUnderstandingTests(unittest.TestCase):
         )
         self.assertIn("Visible result", prepared[-1]["content"])
         self.assertNotIn("stealSecrets()", prepared[-1]["content"])
+
+    def test_docx_extraction_includes_paragraphs_and_tables(self):
+        output = io.BytesIO()
+        doc = Document()
+        doc.add_paragraph("Project summary")
+        table = doc.add_table(rows=1, cols=2)
+        table.cell(0, 0).text = "Owner"
+        table.cell(0, 1).text = "Hamasa"
+        doc.save(output)
+        prepared = prepare_messages(
+            [Message(role="user", content="لخص المستند")],
+            [self._attachment("report.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", output.getvalue())],
+            "test-model",
+        )
+        self.assertIn("Project summary", prepared[-1]["content"])
+        self.assertIn("Owner | Hamasa", prepared[-1]["content"])
+
+    def test_xlsx_extraction_reads_sheet_values(self):
+        output = io.BytesIO()
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "Metrics"
+        sheet.append(["Metric", "Value"])
+        sheet.append(["Users", 42])
+        workbook.save(output)
+        prepared = prepare_messages(
+            [Message(role="user", content="حلل الأرقام")],
+            [self._attachment("metrics.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", output.getvalue())],
+            "test-model",
+        )
+        self.assertIn("ورقة العمل: Metrics", prepared[-1]["content"])
+        self.assertIn("Users | 42", prepared[-1]["content"])
+
+    def test_pptx_extraction_reads_slide_text(self):
+        output = io.BytesIO()
+        presentation = Presentation()
+        slide = presentation.slides.add_slide(presentation.slide_layouts[5])
+        textbox = slide.shapes.add_textbox(100, 100, 500, 100)
+        textbox.text = "Quarterly results"
+        presentation.save(output)
+        prepared = prepare_messages(
+            [Message(role="user", content="اشرح العرض")],
+            [self._attachment("slides.pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation", output.getvalue())],
+            "test-model",
+        )
+        self.assertIn("الشريحة 1", prepared[-1]["content"])
+        self.assertIn("Quarterly results", prepared[-1]["content"])
+
+    def test_pdf_extraction_reads_page_text(self):
+        output = io.BytesIO()
+        pdf = canvas.Canvas(output)
+        pdf.drawString(72, 720, "PDF evidence")
+        pdf.save()
+        prepared = prepare_messages(
+            [Message(role="user", content="اقرأ التقرير")],
+            [self._attachment("evidence.pdf", "application/pdf", output.getvalue())],
+            "test-model",
+        )
+        self.assertIn("PDF evidence", prepared[-1]["content"])
 
     def test_attachments_require_a_user_message(self):
         with self.assertRaises(ValueError):
