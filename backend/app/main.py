@@ -25,7 +25,7 @@ import httpx
 from fastapi import FastAPI, HTTPException, Header, Request, Cookie, Response, Depends
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from cryptography.fernet import Fernet, InvalidToken
 from .attachments import prepare_messages, AttachmentInput
 from .file_generation import build_file
@@ -189,10 +189,25 @@ class MemoryCreateRequest(BaseModel):
     category: Literal["preference", "project", "decision", "temporary"]
     text: str = Field(min_length=1, max_length=500)
 
+class ConversationSource(BaseModel):
+    title: str = Field(default="", max_length=180)
+    url: str = Field(min_length=1, max_length=1000)
+    published_date: str = Field(default="", max_length=40)
+
+    @field_validator("url")
+    @classmethod
+    def require_http_source(cls, value: str) -> str:
+        parsed = urlparse(value.strip())
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ValueError("Source URLs must use HTTP or HTTPS.")
+        return value.strip()
+
+
 class ConversationMessage(BaseModel):
     role: Literal["user", "bot"]
     text: str = Field(min_length=1, max_length=12000)
     demo: bool = False
+    sources: list[ConversationSource] = Field(default_factory=list, max_length=10)
 
 class ConversationSaveRequest(BaseModel):
     title: str = Field(min_length=1, max_length=120)
