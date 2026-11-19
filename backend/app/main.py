@@ -982,10 +982,24 @@ async def generate_file(body: FileCreateRequest):
     vision_model = _vision_model_name()
     if has_images and not vision_model:
         raise HTTPException(status_code=503, detail="Image processing is not configured for this provider.")
+    format_guidance = {
+        "pdf": "Return polished Markdown content with # and ## headings, real pipe tables where useful, and explicit [[PAGE_BREAK]] markers between pages when an exact page count is requested. Never claim a page count you cannot guarantee; the renderer validates it.",
+        "docx": "Use Markdown headings, concise paragraphs, bullet lists, and pipe tables for data that should become real Word tables.",
+        "xlsx": "Return rows as a two-dimensional JSON array. Put column headers in the first row of rows, then data rows. Keep numbers numeric and never put formulas in untrusted cells.",
+        "pptx": "Structure the presentation with one # heading per slide, followed by concise bullets or short paragraphs. Keep each slide focused and avoid overflowing it.",
+        "csv": "Return rows as a two-dimensional JSON array with the header row first. Use consistent columns and no prose outside the rows.",
+        "json": "Return valid structured JSON-compatible data in the rows field when appropriate; content may be a short description.",
+        "html": "Return semantic, well-structured content; the renderer escapes user/model text and wraps it in a safe HTML document.",
+        "md": "Use a clear Markdown document with headings, lists, and tables when appropriate.",
+        "txt": "Use clean plain text with clear section labels and no Markdown syntax."
+    }[body.format]
     prompt = (
         f"Create a {format_names[body.format]}. User request: {body.prompt}. "
         "Use the conversation context below only to understand the requested file. "
-        "Make the result complete, polished, and in the language requested (default Egyptian Arabic)."
+        "Make the result complete, polished, and in the language requested (default Egyptian Arabic). "
+        f"Format-specific production instructions: {format_guidance} "
+        "Return only the structured JSON requested by the API schema. "
+        "Do not invent facts, citations, data, or missing personal details."
     )
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=15.0)) as client:
