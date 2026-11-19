@@ -554,13 +554,15 @@ function errorRow(error) {
 function setBusy(v) { busy = v; sendBtn.disabled = v || !inp.value.trim(); }
 function requestedFileFormat(text) {
   const s = String(text || '').toLowerCase().trim();
+  const formatMention = /\bpdf\b|\.pdf|بي\s*دي\s*اف|بي دي اف|\b(xlsx|excel|spreadsheet)\b|اكسل|إكسل|اكسيل|\b(docx|word)\b|وورد/.test(s);
   const action = /(اعمل|اعملي|اعمله|اعملهولي|اعمللي|اعمليلي|أنشئ|انشئ|انشأ|جهز|جهزي|جهزلي|حضّر|حضر|حوّل|حول|صدّر|صدر|اكتب|اكتبلي|نزّل|نزل|حمّل|حمل|احفظ|جهّز|generate|create|make|export|download|save|please|can you|could you|i need|i want)/.test(s) ||
-    /(عايز|عاوز|عايزة|عاوزة|محتاج|محتاجة|ممكن|ينفع|لو سمحت).{0,30}(ملف|مستند|تقرير|pdf|وورد|word|excel|اكسل|إكسل)/.test(s);
+    /(عايز|عاوز|عايزة|عاوزة|محتاج|محتاجة).{0,30}(ملف|مستند|تقرير|pdf|وورد|word|excel|اكسل|إكسل)/.test(s) ||
+    /ممكن.{0,15}(تعمل|تعملي|تجهز|تنشئ|تطلع|تحول)/.test(s);
   const documentIntent = /(ملف|مستند|تقرير|جدول|document|file).{0,55}(للتنزيل|تحميل|جاهز|في ملف|اعمل|اعملي|جهز|create|generate)/.test(s);
-  if (!action && !documentIntent) return null;
-  if (/\\bpdf\\b|\\.pdf|بي\\s*دي\\s*اف|بي دي اف/.test(s)) return 'pdf';
-  if (/\\b(xlsx|excel|spreadsheet)\\b|اكسل|إكسل|اكسيل/.test(s)) return 'xlsx';
-  if (/\\b(docx|word)\\b|وورد/.test(s)) return 'docx';
+  if ((!action && !documentIntent) || (!formatMention && !documentIntent)) return null;
+  if (/\bpdf\b|\.pdf|بي\s*دي\s*اف|بي دي اف/.test(s)) return 'pdf';
+  if (/\b(xlsx|excel|spreadsheet)\b|اكسل|إكسل|اكسيل/.test(s)) return 'xlsx';
+  if (/\b(docx|word)\b|وورد/.test(s)) return 'docx';
   if (/(ملف|مستند|تقرير|document|file)/.test(s)) return 'docx';
   return null;
 }
