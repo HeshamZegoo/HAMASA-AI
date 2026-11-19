@@ -3,6 +3,7 @@ import io
 import unittest
 import wave
 from unittest.mock import patch
+import os
 
 from backend.app.main import TTSRequest, _pcm_silence, _tts_segments, text_to_speech
 
@@ -46,7 +47,7 @@ class MixedLanguageTTSTests(unittest.TestCase):
                 self.calls.append(data.copy())
                 return FakeResponse(audio)
 
-        with patch("backend.app.main.API_KEY", "test-provider-key"):
+        with patch.dict(os.environ, {"AI_API_KEY": "test-provider-key"}):
             with patch("backend.app.main.httpx.AsyncClient", FakeClient):
                 result = self._run_async(text_to_speech(
                     TTSRequest(text="أهلاً welcome عامل إيه", gender="female")
