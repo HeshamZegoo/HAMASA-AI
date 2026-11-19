@@ -1,0 +1,44 @@
+import io
+import unittest
+
+from docx import Document
+from openpyxl import load_workbook
+from pypdf import PdfReader
+
+from backend.app.file_generation import build_file
+
+
+class FileGenerationTests(unittest.TestCase):
+    def test_docx_contains_title_headings_and_body(self):
+        raw = build_file("docx", "HAMASA Report", "# Summary\nImportant result", [])
+        document = Document(io.BytesIO(raw))
+        text = "\n".join(paragraph.text for paragraph in document.paragraphs)
+        self.assertIn("HAMASA Report", text)
+        self.assertIn("Summary", text)
+        self.assertIn("Important result", text)
+
+    def test_pdf_is_valid_and_contains_document_text(self):
+        raw = build_file("pdf", "HAMASA Report", "Summary\nImportant result", [])
+        reader = PdfReader(io.BytesIO(raw))
+        self.assertGreaterEqual(len(reader.pages), 1)
+        extracted = "\n".join(page.extract_text() or "" for page in reader.pages)
+        self.assertIn("HAMASA Report", extracted)
+        self.assertIn("Important result", extracted)
+
+    def test_xlsx_contains_title_description_and_rows(self):
+        raw = build_file("xlsx", "Sales", "Monthly totals", [["Month", "Total"], ["January", 10]],)
+        workbook = load_workbook(io.BytesIO(raw), data_only=True)
+        sheet = workbook.active
+        self.assertEqual(sheet["A1"].value, "Sales")
+        self.assertEqual(sheet["A2"].value, "Monthly totals")
+        self.assertEqual(sheet["A3"].value, "Month")
+        self.assertEqual(sheet["B4"].value, 10)
+        workbook.close()
+
+    def test_unsupported_format_is_rejected(self):
+        with self.assertRaises(ValueError):
+            build_file("csv", "Title", "Body", [])
+
+
+if __name__ == "__main__":
+    unittest.main()
