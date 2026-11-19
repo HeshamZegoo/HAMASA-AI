@@ -22,7 +22,7 @@ _ARABIC_FONT_PATH = Path(__file__).with_name("fonts") / "Amiri-Regular.ttf.b64"
 def _register_arabic_font():
     if _ARABIC_FONT in pdfmetrics.getRegisteredFontNames():
         return
-    encoded = _ARABIC_FONT_PATH.read_text(encoding="ascii").strip()
+    encoded = "".join(_ARABIC_FONT_PATH.read_text(encoding="ascii").split())
     font_bytes = base64.b64decode(encoded, validate=True)
     pdfmetrics.registerFont(TTFont(_ARABIC_FONT, io.BytesIO(font_bytes)))
 
@@ -93,7 +93,15 @@ def build_file(fmt: str, title: str, content: str, rows: list) -> bytes:
             sheet.append([content])
         for row in rows[:5000]:
             if isinstance(row, list):
-                sheet.append([str(cell)[:32000] if cell is not None else "" for cell in row[:100]])
+                values = [
+                    cell if isinstance(cell, (int, float, bool)) else str(cell)[:32000] if cell is not None else ""
+                    for cell in row[:100]
+                ]
+                sheet.append(values)
+                # Keep untrusted strings as text, never as executable spreadsheet formulas.
+                for cell in sheet[sheet.max_row]:
+                    if isinstance(cell.value, str):
+                        cell.data_type = "s"
         for column in sheet.columns:
             letter = column[0].column_letter
             max_len = min(48, max((len(str(cell.value or "")) for cell in column), default=10))
