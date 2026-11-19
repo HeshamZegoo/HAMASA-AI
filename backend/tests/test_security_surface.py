@@ -21,7 +21,7 @@ class PublicStatusDisclosureTests(unittest.TestCase):
                     with patch.object(main, "DATABASE_URL", ""):
                         with patch.dict(os.environ, {
                             "TAVILY_API_KEY": "search-key",
-                            "TTS_GEMINI_API_KEY": "transcription-key",
+                            "AI_API_KEY": "transcription-key",
                             "AI_VISION_MODEL": "vision-model",
                         }):
                             status = main._runtime_tool_status()
@@ -158,7 +158,7 @@ class PublicStatusDisclosureTests(unittest.TestCase):
         self.assertNotIn("private-search-secret", response.text)
 
     def test_tts_status_does_not_disclose_provider_configuration(self):
-        with patch.dict(os.environ, {"TTS_GEMINI_API_KEY": "private-audio-secret"}):
+        with patch.dict(os.environ, {"AI_API_KEY": "private-audio-secret"}):
             response = self.client.get("/api/tts/status")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"status": "ok"})
