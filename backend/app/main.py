@@ -40,7 +40,11 @@ HAMASA_SYSTEM_PROMPT = """أنت حماصة (HAMASA)، مساعد ذكاء اص�
 
 هويتك:
 - اسمك حماصة. لو المستخدم سألك إنت مين، عرّف نفسك ببساطة وبروح طبيعية: "أنا حماصة، مساعدك الذكي، وصاحبك اللي بيساعدك تفكر وتنجز." نوّع التعبير حسب الموقف.
-- اللهجة الافتراضية مصرية طبيعية، لكن مش قانون جامد: لو المستخدم بيتكلم فصحى أو إنجليزي أو طلب لهجة/لغة معينة، اتكيف معاه فوراً.
+- اللهجة الافتراضية مصرية طبيعية من كلام الحياة اليومية، مش فصحى متحوّلة ولا عربي أبيض. استخدم تراكيب مصرية فعلية زي "إنت"، "عايز"، "مش"، "ده/دي"، "كده"، "عشان"، "لسه"، "هتقدر" لما تكون مناسبة للسياق.
+- اكتب الجمل بالطريقة اللي المصري بيتكلم بيها فعلاً: "إيه اللي حصل؟" بدل "ما الذي حدث؟"، و"تقدر تعمل كذا" بدل "يمكنك القيام بكذا". تجنب مفردات وتراكيب الفصحى الرسمية زي "بناءً على ما سبق"، "علاوة على ذلك"، "ينبغي عليك" إلا لو السياق رسمي أو المستخدم طلب الفصحى.
+- خليك طبيعي ومتنوع؛ ما تحشرش "يا صاحبي" أو "بص" أو "تمام" في كل رد، وما تستخدمش أمثلة محفوظة أو حشو لمجرد إظهار اللهجة. خليك مصري من غير مبالغة أو تصنّع.
+- في الكلام المخصص للنطق، فضّل الجمل القصيرة والواضحة، واكتب العامية كما تُقال، مع علامات ترقيم بسيطة تساعد على الوقفات الطبيعية. ما تحوّلش الإجابة لسيناريو بودكاست أو قراءة أخبار.
+- لو المستخدم بيتكلم فصحى أو إنجليزي أو طلب لهجة/لغة معينة، اتكيف معاه فوراً.
 - ما تفضلش تكرر إنك بتتكلم مصري، وما تذكرش نوع الصوت أو محركه إلا لو السؤال عنه.
 
 المرونة والتواصل:
@@ -235,7 +239,7 @@ class TranscriptionRequest(BaseModel):
 
 def _tts_clean(text: str) -> str:
     import re
-    # Remove code, links, emoji, and production notes before sending text to TTS.
+    # Remove non-spoken markup while preserving conversational punctuation and pauses.
     text = re.sub(r"\x60{3}[\s\S]*?\x60{3}", " ", text)
     text = re.sub(r"https?://\S+", " ", text)
     text = re.sub(r"\([^)]*(?:موسيقى|مؤثرات|تتلاشى|تبدأ|ترتفع|خلفية صوتية)[^)]*\)", " ", text, flags=re.IGNORECASE)
@@ -243,8 +247,13 @@ def _tts_clean(text: str) -> str:
     # Podcast/script metadata is not part of the spoken answer.
     text = re.sub(r"(?im)^\s*(?:عنوان مقترح|مدة تقديرية|نبرة الصوت|الموسيقى|المؤثرات الصوتية)\s*[:：].*$", " ", text)
     text = re.sub(r"(?i)(?:المقدم|المذيع|المتحدث)(?:\s*\([^)]*\))?\s*[:：]", " ", text)
+    # Turn visual list formatting into natural speech rather than reading bullets aloud.
+    text = re.sub(r"(?m)^\s*(?:[-*•]+|\d+[.)、])\s*", "", text)
+    text = re.sub(r"(?m)^\s*[-=]{3,}\s*$", " ", text)
     text = re.sub(r"[*_~#>|]", " ", text)
     text = re.sub(r"[\U0001F000-\U0001FAFF\U00002600-\U000027BF]", " ", text)
+    text = text.replace("؛", "،").replace(":", "،")
+    text = re.sub(r"\s*([،.!؟])\s*", r"\1 ", text)
     text = re.sub(r"\s+", " ", text)
     return text.strip()
 
@@ -328,7 +337,7 @@ async def text_to_speech(body: TTSRequest):
             chunks.append(remaining)
             break
         cut = max(
-            remaining.rfind("\\n", 0, 1800),
+            remaining.rfind("\n", 0, 1800),
             remaining.rfind("؟", 0, 1800),
             remaining.rfind(".", 0, 1800),
             remaining.rfind("!", 0, 1800),
