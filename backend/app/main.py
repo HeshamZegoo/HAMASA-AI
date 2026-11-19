@@ -235,8 +235,14 @@ class TranscriptionRequest(BaseModel):
 
 def _tts_clean(text: str) -> str:
     import re
+    # Remove code, links, emoji, and production notes before sending text to TTS.
     text = re.sub(r"\x60{3}[\s\S]*?\x60{3}", " ", text)
     text = re.sub(r"https?://\S+", " ", text)
+    text = re.sub(r"\([^)]*(?:موسيقى|مؤثرات|تتلاشى|تبدأ|ترتفع|خلفية صوتية)[^)]*\)", " ", text, flags=re.IGNORECASE)
+    text = re.sub(r"\[[^\]]*(?:اسم البودكاست|اسم البرنامج|اسم القناة)[^\]]*\]", " ", text, flags=re.IGNORECASE)
+    # Podcast/script metadata is not part of the spoken answer.
+    text = re.sub(r"(?im)^\s*(?:عنوان مقترح|مدة تقديرية|نبرة الصوت|الموسيقى|المؤثرات الصوتية)\s*[:：].*$", " ", text)
+    text = re.sub(r"(?i)(?:المقدم|المذيع|المتحدث)(?:\s*\([^)]*\))?\s*[:：]", " ", text)
     text = re.sub(r"[*_~#>|]", " ", text)
     text = re.sub(r"[\U0001F000-\U0001FAFF\U00002600-\U000027BF]", " ", text)
     text = re.sub(r"\s+", " ", text)
@@ -302,14 +308,14 @@ async def text_to_speech(body: TTSRequest):
             # Gemini-only TTS. The style direction prioritizes Egyptian Arabic (Cairene/Masri), not generic MSA.
             voice = "Puck" if body.gender == "male" else "Kore"
             speech_direction = (
-                "Speak in authentic everyday Egyptian Arabic, specifically the Cairo/Egypt (ar-EG) dialect. "
-                "Sound like a native Egyptian having a relaxed, friendly conversation, not a newsreader. "
-                "Use Egyptian pronunciation, rhythm, intonation, and colloquial delivery. "
-                "Do not use Modern Standard Arabic, Gulf Arabic, Levantine Arabic, or an English/Arabic hybrid accent. "
-                "Keep Egyptian words and expressions Egyptian; for example say 'إزيك', 'عامل إيه', 'ماشي', "
-                "'دلوقتي', 'عايز', and 'مش' naturally when they occur. "
-                "Read the transcript faithfully without translating, paraphrasing, adding words, or reading these directions aloud. "
-                "Speak only the transcript, clearly and at a natural moderate conversational pace."
+                "Use a natural, direct Egyptian Arabic speaking voice (Cairo dialect), like a person talking normally to a friend. "
+                "This is plain spoken conversation, NOT a podcast, radio show, documentary, audiobook, news bulletin, or dramatic narration. "
+                "Do not add background music, intro or outro, sound effects, humming, singing, or theatrical pauses. "
+                "Do not sound soothing, whispery, overly calm, sentimental, or like a presenter. "
+                "Use a clear, lively but not exaggerated everyday conversational tone and natural Egyptian rhythm. "
+                "Read only the actual answer text. Ignore any remaining headings, labels, stage directions, or production notes. "
+                "Do not announce a title, duration, voice style, or speaker label. "
+                "Do not translate, summarize, paraphrase, or add any words. Speak the supplied answer exactly as written."
             )
             response = await client.post(
                 "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash-tts:generateContent",
