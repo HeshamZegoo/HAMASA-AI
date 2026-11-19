@@ -72,6 +72,12 @@ class MixedLanguageTTSTests(unittest.TestCase):
         self.assertEqual(len(silence), int(22050 * 0.12) * 2 * 2)
         self.assertEqual(silence, bytes(len(silence)))
 
+    def test_leading_year_is_preserved_in_english_speech(self):
+        self.assertEqual(_tts_segments("2026 update"), [("2026 update", "en-US")])
+
+    def test_leading_punctuation_is_preserved(self):
+        self.assertEqual(_tts_segments("—Hello there"), [("—Hello there", "en-US")])
+
     def test_arabic_only_uses_arabic_locale(self):
         self.assertEqual(_tts_segments("عامل إيه يا صاحبي؟"), [("عامل إيه يا صاحبي؟", "ar-XA")])
 
