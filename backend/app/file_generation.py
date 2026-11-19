@@ -19,6 +19,7 @@ from docx.shared import RGBColor
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment
 from pptx import Presentation
 from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor as PptRGBColor
@@ -234,6 +235,17 @@ def build_file(fmt: str, title: str, content: str, rows: list, page_count: int =
                 for cell in sheet[sheet.max_row]:
                     if isinstance(cell.value, str):
                         cell.data_type = "s"
+        sheet["A1"].font = Font(bold=True, size=16, color="FFFFFF")
+        sheet["A1"].fill = PatternFill("solid", fgColor="17324D")
+        for cell in sheet[3]:
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = PatternFill("solid", fgColor="176B87")
+        sheet.freeze_panes = "A4"
+        if sheet.max_row >= 3:
+            sheet.auto_filter.ref = sheet.dimensions
+        for row in sheet.iter_rows():
+            for cell in row:
+                cell.alignment = Alignment(vertical="center", wrap_text=True, horizontal="right" if sheet.sheet_view.rightToLeft else "left")
         for column in sheet.columns:
             letter = column[0].column_letter
             max_len = min(48, max((len(str(cell.value or "")) for cell in column), default=10))
