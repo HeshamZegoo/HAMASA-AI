@@ -115,6 +115,16 @@ def build_file(fmt: str, title: str, content: str, rows: list) -> bytes:
         workbook = Workbook()
         sheet = workbook.active
         sheet.title = "Hamasa"
+        spreadsheet_text = " ".join(
+            [title, content] + [
+                str(value)
+                for row in rows[:5000] if isinstance(row, list)
+                for value in row[:100] if value is not None
+            ]
+        )
+        sheet.sheet_view.rightToLeft = bool(
+            re.search(r"[\\u0600-\\u06FF\\u0750-\\u077F]", spreadsheet_text)
+        )
         sheet.append([title])
         if content:
             sheet.append([content])
