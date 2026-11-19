@@ -305,9 +305,8 @@ def _tts_clean(text: str) -> str:
 
 @app.post("/api/transcribe")
 async def transcribe_audio(body: TranscriptionRequest):
-    api_key = _nvidia_speech_key()
-    if not api_key:
-        raise HTTPException(status_code=503, detail="Audio transcription is temporarily unavailable.")
+    # Validate the payload before checking provider configuration so malformed
+    # recordings receive the correct client error even during provider outages.
     try:
         audio_bytes = base64.b64decode(body.audio, validate=True)
     except (ValueError, base64.binascii.Error):
@@ -316,6 +315,9 @@ async def transcribe_audio(body: TranscriptionRequest):
         raise HTTPException(status_code=400, detail="Audio recording is empty or too short. Record at least one second.")
     if len(audio_bytes) > 12_000_000:
         raise HTTPException(status_code=413, detail="Audio clip is too large. Please record a shorter message.")
+    api_key = _nvidia_speech_key()
+    if not api_key:
+        raise HTTPException(status_code=503, detail="Audio transcription is temporarily unavailable.")
 
     mime_to_ext = {
         "audio/wav": "wav", "audio/x-wav": "wav", "audio/ogg": "ogg",
