@@ -105,6 +105,48 @@ class AccountAndConversationFlowTests(unittest.TestCase):
         self.assertEqual(listed.status_code, 200)
         self.assertEqual(listed.json()["memories"][0]["text"], "أفضل الرد بالمصري")
 
+    def test_users_cannot_read_or_overwrite_another_users_conversation(self):
+        first = self.client.post("/api/auth/signup", json={
+            "email": "owner@example.com",
+            "password": "correct-horse-battery",
+        }).json()["token"]
+        second = self.client.post("/api/auth/signup", json={
+            "email": "outsider@example.com",
+            "password": "correct-horse-battery",
+        }).json()["token"]
+        conversation_id = str(uuid.uuid4())
+        owner_headers = {"Authorization": f"Bearer {first}"}
+        outsider_headers = {"Authorization": f"Bearer {second}"}
+        created = self.client.put(
+            f"/api/chats/{conversation_id}",
+            headers=owner_headers,
+            json={"title": "Private", "messages": [{"role": "user", "text": "secret"}]},
+        )
+        self.assertEqual(created.status_code, 200)
+        outsider_list = self.client.get("/api/chats", headers=outsider_headers)
+        self.assertEqual(outsider_list.json()["conversations"], [])
+        overwrite = self.client.put(
+            f"/api/chats/{conversation_id}",
+            headers=outsider_headers,
+            json={"title": "Stolen", "messages": [{"role": "user", "text": "changed"}]},
+        )
+        self.assertEqual(overwrite.status_code, 404)
+        owner_list = self.client.get("/api/chats", headers=owner_headers)
+        self.assertEqual(owner_list.json()["conversations"][0]["title"], "Private")
+
+    def test_logout_revokes_the_session_token(self):
+        signup = self.client.post("/api/auth/signup", json={
+            "email": "logout@example.com",
+            "password": "correct-horse-battery",
+        })
+        token = signup.json()["token"]
+        headers = {"Authorization": f"Bearer {token}"}
+        logged_out = self.client.post("/api/auth/logout", headers=headers)
+        self.assertEqual(logged_out.status_code, 200)
+        self.assertEqual(logged_out.json(), {"logged_out": True})
+        denied = self.client.get("/api/chats", headers=headers)
+        self.assertEqual(denied.status_code, 401)
+
     def test_invalid_credentials_are_rejected(self):
         response = self.client.post("/api/auth/login", json={
             "email": "missing@example.com",
