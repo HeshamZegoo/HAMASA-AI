@@ -133,6 +133,19 @@ class AttachmentUnderstandingTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "تالف"):
             _extract_text(item, b"not-a-zip-file")
 
+    def test_image_attachment_is_sent_as_a_real_base64_image_input(self):
+        image_bytes = b"\x89PNG\r\n\x1a\nsmall-test-image"
+        prepared = prepare_messages(
+            [Message(role="user", content="حلل الصورة")],
+            [self._attachment("diagram.png", "image/png", image_bytes)],
+            "test-model",
+        )
+        parts = prepared[-1]["content"]
+        self.assertEqual(parts[0]["type"], "text")
+        self.assertIn("حلل الصور المرفقة بصرياً", parts[0]["text"])
+        self.assertEqual(parts[1]["type"], "image_url")
+        self.assertTrue(parts[1]["image_url"]["url"].startswith("data:image/png;base64,"))
+
     def test_attachments_require_a_user_message(self):
         with self.assertRaises(ValueError):
             prepare_messages(
