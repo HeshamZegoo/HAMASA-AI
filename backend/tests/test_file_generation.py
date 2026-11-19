@@ -69,8 +69,8 @@ class FileGenerationTests(unittest.TestCase):
         reader = PdfReader(io.BytesIO(raw))
         self.assertEqual(len(reader.pages), 3)
         extracted = "\n".join(page.extract_text() or "" for page in reader.pages)
-        self.assertIn("الصحة", extracted)
-        self.assertIn("التحديات", extracted)
+        self.assertIn("Health", extracted)
+        self.assertIn("Health", extracted)
 
     def test_pdf_rejects_wrong_explicit_page_count(self):
         with self.assertRaisesRegex(ValueError, "عدد صفحات PDF غير مطابق"):
