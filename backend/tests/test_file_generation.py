@@ -59,7 +59,7 @@ class FileGenerationTests(unittest.TestCase):
     def test_pdf_renders_markdown_table_and_explicit_three_pages(self):
         content = (
             "# الصفحة الأولى\nمقدمة عن الذكاء الاصطناعي\n"
-            "| المجال | الاستخدام |\n|---|---|\n| الصحة | تحليل الصور |\n"
+            "| Domain | Use |\n|---|---|\n| Health | Image review |\n"
             "[[PAGE_BREAK]]\n"
             "# الصفحة الثانية\nتطبيقات عملية\nفقرة توضيحية\n"
             "[[PAGE_BREAK]]\n"
