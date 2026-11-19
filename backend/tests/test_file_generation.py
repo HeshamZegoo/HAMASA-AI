@@ -56,6 +56,26 @@ class FileGenerationTests(unittest.TestCase):
         self.assertEqual(sheet["B5"].data_type, "s")
         workbook.close()
 
+    def test_pdf_renders_markdown_table_and_explicit_three_pages(self):
+        content = (
+            "# الصفحة الأولى\nمقدمة عن الذكاء الاصطناعي\n"
+            "| Domain | Use |\n|---|---|\n| Health | Image review |\n"
+            "[[PAGE_BREAK]]\n"
+            "# الصفحة الثانية\nتطبيقات عملية\nفقرة توضيحية\n"
+            "[[PAGE_BREAK]]\n"
+            "# الصفحة الثالثة\nالتحديات والخلاصة\nنهاية التقرير"
+        )
+        raw = build_file("pdf", "تقرير الذكاء الاصطناعي", content, [], page_count=3)
+        reader = PdfReader(io.BytesIO(raw))
+        self.assertEqual(len(reader.pages), 3)
+        extracted = "\n".join(page.extract_text() or "" for page in reader.pages)
+        self.assertIn("Health", extracted)
+        self.assertIn("Health", extracted)
+
+    def test_pdf_rejects_wrong_explicit_page_count(self):
+        with self.assertRaisesRegex(ValueError, "عدد صفحات PDF غير مطابق"):
+            build_file("pdf", "تقرير", "صفحة واحدة فقط", [], page_count=3)
+
     def test_arabic_xlsx_uses_right_to_left_sheet_view(self):
         raw = build_file("xlsx", "تقرير", "إجمالي المبيعات", [["المنتج", "الكمية"]],)
         workbook = load_workbook(io.BytesIO(raw), data_only=True)
