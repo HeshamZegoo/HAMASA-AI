@@ -64,6 +64,14 @@ class PublicStatusDisclosureTests(unittest.TestCase):
         self.assertIn(active, main._rate_events)
         main._rate_events.clear()
 
+    def test_rate_limit_state_is_capped_under_high_cardinality(self):
+        main._rate_events.clear()
+        for index in range(25001):
+            main._rate_events[(f"198.51.100.{index}", "/api/chat", "POST")].append(999.0)
+        main._prune_rate_events(1000.0)
+        self.assertLessEqual(len(main._rate_events), 25000)
+        main._rate_events.clear()
+
     def test_api_rejects_untrusted_origins(self):
         response = self.client.get(
             "/api/tts/status",
