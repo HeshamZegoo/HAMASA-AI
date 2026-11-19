@@ -56,6 +56,11 @@ class MixedLanguageTTSTests(unittest.TestCase):
                 ))
 
         self.assertEqual([call["language"] for call in FakeClient.calls], ["ar-XA", "en-US", "ar-XA"])
+        self.assertEqual(
+            [segment["language"] for segment in result["audio_segments"]],
+            ["ar-XA", "en-US", "ar-XA"],
+        )
+        self.assertTrue(all(segment["audio"] for segment in result["audio_segments"]))
         self.assertTrue(all(headers["Authorization"] == "Bearer test-provider-key" for headers in FakeClient.auth_headers))
         self.assertTrue(all(call["voice"].endswith(".Sofia") for call in FakeClient.calls))
         decoded = base64.b64decode(result["audio"])
