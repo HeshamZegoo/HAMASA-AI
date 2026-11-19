@@ -6,9 +6,10 @@ from urllib.parse import urlparse
 
 
 _SEARCH_INTENT = re.compile(
-    r"(?:\b(?:search (?:the )?web|look up|find (?:current|latest)|latest|current|"
-    r"up.?to.?date|today|tonight|this week|recent|news|sources|citations|price|"
-    r"release notes|latest version|what changed|as of 202[5-9])\b)"
+    r"(?:\b(?:search(?:\s+for)?|browse(?:\s+the\s+web)?|google|research|look\s+up|look\s+for|"
+    r"find(?:\s+me)?(?:\s+(?:current|latest|recent))?|latest|current|up.?to.?date|today|tonight|"
+    r"this week|recent|news|sources|citations|price|release notes|latest version|what changed|"
+    r"as of 202[5-9])\b)"
     r"|(?:ابحث(?:\s+(?:على|في)\s+(?:النت|الإنترنت|الويب|مصادر))?|دور\s+على\s+النت|"
     r"آخر\s+(?:الأخبار|التحديثات|إصدار|نسخة|المستجدات)|أحدث|احدث|إيه الجديد|ايه الجديد|فيه جديد|مستجدات|حالي(?:اً|ا)?|دلوقتي|"
     r"النهارده|اليوم|الأسبوع ده|مصادر موثوقة|مصادر|روابط|سعر(?:ه|ها)?|أسعار|"
