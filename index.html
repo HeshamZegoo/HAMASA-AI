@@ -225,6 +225,16 @@ const API_BASE = (window.HAMASA_CONFIG?.API_URL || "https://hamasa-api-productio
 const HAMASA_CONFIG = {
   chatUrl: API_BASE + "/api/chat",
 };
+
+// Prefer HttpOnly SameSite=None cookies. A tab-scoped bearer fallback keeps Safari
+// usable when its cross-site tracking protection blocks third-party cookies.
+async function apiFetch(url, options = {}) {
+  const headers = new Headers(options.headers || {});
+  const method = String(options.method || "GET").toUpperCase();
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) headers.set("X-Hamasa-Request", "1");
+  if (authToken && !headers.has("Authorization")) headers.set("Authorization", "Bearer " + authToken);
+  return fetch(url, { ...options, headers, credentials: "include" });
+}
 let backendOnline = false;
 const isConnected = () => backendOnline;
 
@@ -269,7 +279,7 @@ function parseChatResponse(json) {
 }
 async function checkBackend() {
   try {
-    const response = await fetch(API_BASE + "/health", { cache: "no-store" });
+    const response = await apiFetch(API_BASE + "/health", { cache: "no-store" });
     const data = await response.json();
     backendOnline = response.ok && data.status === "ok" && data.provider_configured === true;
   } catch {
@@ -278,7 +288,7 @@ async function checkBackend() {
   updStatus();
 }
 async function chatAdapter(messages) {
-  const response = await fetch(HAMASA_CONFIG.chatUrl, {
+  const response = await apiFetch(HAMASA_CONFIG.chatUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(buildChatRequest(messages)),
@@ -408,7 +418,7 @@ function saveMemories() { store.set('hamasa.memory', memories); }
 const memoryHeaders = () => ({ "Content-Type": "application/json", "X-Hamasa-Client": memoryClientId, ...(authToken ? { "Authorization": "Bearer " + authToken } : {}) });
 async function syncMemoriesFromServer() {
   try {
-    let response = await fetch(API_BASE + "/api/memory", { headers: memoryHeaders(), cache: "no-store" });
+    let response = await apiFetch(API_BASE + "/api/memory", { headers: memoryHeaders(), cache: "no-store" });
     if (!response.ok) return;
     let data = await response.json();
     if (!Array.isArray(data.memories)) return;
@@ -418,7 +428,7 @@ async function syncMemoriesFromServer() {
     for (const item of memories.slice(0, 40)) {
       const key = String(item.category) + "\\n" + String(item.text || "").trim().toLocaleLowerCase();
       if (!item.text || known.has(key) || cloud.length >= 40) continue;
-      const migrated = await fetch(API_BASE + "/api/memory", {
+      const migrated = await apiFetch(API_BASE + "/api/memory", {
         method: "POST", headers: memoryHeaders(),
         body: JSON.stringify({ category: item.category, text: item.text })
       });
@@ -427,7 +437,7 @@ async function syncMemoriesFromServer() {
       cloud.push(saved); known.add(key); uploaded = true;
     }
     if (uploaded) {
-      response = await fetch(API_BASE + "/api/memory", { headers: memoryHeaders(), cache: "no-store" });
+      response = await apiFetch(API_BASE + "/api/memory", { headers: memoryHeaders(), cache: "no-store" });
       if (!response.ok) return;
       data = await response.json();
     } else data = { memories: cloud };
@@ -462,7 +472,7 @@ function renderMemories() {
       const item = memories[index];
       try {
         if (item.id) {
-          const response = await fetch(API_BASE + "/api/memory/" + encodeURIComponent(item.id), {
+          const response = await apiFetch(API_BASE + "/api/memory/" + encodeURIComponent(item.id), {
             method: "DELETE", headers: memoryHeaders()
           });
           if (!response.ok && response.status !== 404) throw new Error("Cloud delete failed");
@@ -485,7 +495,7 @@ $('#memoryAdd').onclick = () => {
   }
   (async () => {
     try {
-      const response = await fetch(API_BASE + "/api/memory", {
+      const response = await apiFetch(API_BASE + "/api/memory", {
         method: "POST", headers: memoryHeaders(),
         body: JSON.stringify({ category, text })
       });
@@ -550,7 +560,7 @@ async function generateRequestedFile() {
   const latest = cur.messages[cur.messages.length - 1];
   const format = requestedFileFormat(latest?.text);
   if (!format) return null;
-  const response = await fetch(API_BASE + '/api/files/generate', {
+  const response = await apiFetch(API_BASE + '/api/files/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -615,7 +625,17 @@ inp.addEventListener('focus', () => setTimeout(() => { fit(); scrollEnd(); }, 30
 
 
 /* Account authentication: passwords are sent only over HTTPS and stored as salted PBKDF2 hashes on the API. */
-let authToken = store.get("hamasa.authToken", "");
+let authToken = sessionStorage.getItem("hamasa.authToken") || store.get("hamasa.authToken", "");
+if (authToken) sessionStorage.setItem("hamasa.authToken", authToken);
+try { localStorage.removeItem("hamasa.authToken"); } catch {}
+function saveAuthToken(value) {
+  authToken = value || "";
+  try {
+    if (authToken) sessionStorage.setItem("hamasa.authToken", authToken);
+    else sessionStorage.removeItem("hamasa.authToken");
+    localStorage.removeItem("hamasa.authToken");
+  } catch {}
+}
 let authUser = store.get("hamasa.authUser", null);
 let authMode = "login";
 function updateAuthButton() {
@@ -644,21 +664,22 @@ $("#authOpen").onclick = () => { updateAuthButton(); setAuthMode(authUser ? "log
 $("#authClose").onclick = () => $("#authDlg").close();
 $("#authSwitch").onclick = () => setAuthMode(authMode === "login" ? "signup" : "login");
 $("#authSignout").onclick = () => {
-  authToken = ""; authUser = null; store.set("hamasa.authToken", ""); store.set("hamasa.authUser", null);
+  apiFetch(API_BASE + "/api/auth/logout", { method: "POST" }).catch(() => {});
+  saveAuthToken(""); authUser = null; store.set("hamasa.authUser", null);
   updateAuthButton(); $("#authDlg").close(); toast(lang === "ar" ? "تم تسجيل الخروج" : "Signed out");
 };
 $("#authForm").addEventListener("submit", async e => {
   e.preventDefault();
   const submit = $("#authSubmit"); submit.disabled = true;
   try {
-    const response = await fetch(API_BASE + (authMode === "signup" ? "/api/auth/signup" : "/api/auth/login"), {
+    const response = await apiFetch(API_BASE + (authMode === "signup" ? "/api/auth/signup" : "/api/auth/login"), {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: $("#authEmail").value.trim(), password: $("#authPassword").value })
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.detail || (lang === "ar" ? "تعذر تسجيل الدخول." : "Authentication failed."));
-    authToken = data.token; authUser = data.user;
-    store.set("hamasa.authToken", authToken); store.set("hamasa.authUser", authUser);
+    saveAuthToken(data.token); authUser = data.user;
+    store.set("hamasa.authUser", authUser);
     $("#authPassword").value = "";
     updateAuthButton();
     await syncMemoriesFromServer();
@@ -669,14 +690,13 @@ $("#authForm").addEventListener("submit", async e => {
   } finally { submit.disabled = false; }
 });
 async function validateSavedSession() {
-  if (!authToken) { updateAuthButton(); return; }
   try {
-    const response = await fetch(API_BASE + "/api/auth/me", { headers: { "Authorization": "Bearer " + authToken }, cache: "no-store" });
+    const response = await apiFetch(API_BASE + "/api/auth/me", { cache: "no-store" });
     if (!response.ok) throw new Error("expired");
     const data = await response.json(); authUser = data.user; store.set("hamasa.authUser", authUser);
     updateAuthButton();
   } catch {
-    authToken = ""; authUser = null; store.set("hamasa.authToken", ""); store.set("hamasa.authUser", null); updateAuthButton();
+    saveAuthToken(""); authUser = null; store.set("hamasa.authUser", null); updateAuthButton();
   }
 }
 
