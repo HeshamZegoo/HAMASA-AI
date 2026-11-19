@@ -7,7 +7,7 @@ from typing import Any
 _CODING_SIGNALS = re.compile(
     r"(?:\b(?:code|coding|program(?:ming)?|debug(?:ging)?|bug|traceback|exception|"
     r"stack\s*trace|function|class|method|api|sdk|sql|python|javascript|typescript|"
-    r"react|html|css|bash|powershell|terminal|shell|git|github|docker|railway|node(?:\\.js)?|npm|pnpm|yarn|vite|next\\.js|fastapi|django|flask|pytest|unittest|linux|windows|macos|regex|regular\\s+expression|algorithm|data\\s+structure|refactor|review|pull\\s+request|merge\\s+conflict|"
+    r"react|html|css|bash|powershell|terminal|shell|git|github|docker|railway|node(?:\.js)?|npm|pnpm|yarn|vite|next\.js|fastapi|django|flask|pytest|unittest|linux|windows|macos|regex|regular\s+expression|algorithm|data\s+structure|refactor|review|pull\s+request|merge\s+conflict|"
     r"deploy(?:ment)?|compile|compiler|syntax|database|server|backend|frontend)\b)"
     r"|(?:كود|برمج(?:ة|ي|يات)|بايثون|جافاسكريبت|تايبسكريبت|ريأكت|دالة|كلاس|"
     r"خطأ في الكود|تصحيح|ديباج|ديباجنج|تيرمنال|طرفية|سطر أوامر|أوامر|"
