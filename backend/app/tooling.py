@@ -130,8 +130,8 @@ def build_tool_capabilities_prompt(status: dict[str, bool]) -> str:
         "file_generation": "DOCX/PDF/XLSX file generation",
         "transcription": "Audio transcription",
         "speech": "Text-to-speech",
-        "memory": "Encrypted saved memory",
-        "accounts": "Account login and cloud conversations",
+        "memory": "Cloud encrypted saved memory",
+        "accounts": "Durable account login and cloud conversations",
     }
     lines = [
         "RUNTIME TOOL AVAILABILITY (authoritative for this request; never infer secrets):"
