@@ -3,6 +3,7 @@ import unittest
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
+from cryptography.fernet import Fernet
 
 from backend.app import main
 
@@ -30,6 +31,19 @@ class PublicStatusDisclosureTests(unittest.TestCase):
         self.assertTrue(status["speech"])
         self.assertFalse(status["memory"])
         self.assertFalse(status["accounts"])
+
+    def test_memory_and_account_capabilities_validate_key_formats(self):
+        with patch.object(main, "DATABASE_URL", "postgresql://db.example/test"):
+            with patch.object(main, "MEMORY_ENCRYPTION_KEY", "not-a-fernet-key"):
+                with patch.object(main, "JWT_SECRET", "too-short"):
+                    unavailable = main._runtime_tool_status()
+            with patch.object(main, "MEMORY_ENCRYPTION_KEY", Fernet.generate_key().decode("ascii")):
+                with patch.object(main, "JWT_SECRET", "j" * 40):
+                    available = main._runtime_tool_status()
+        self.assertFalse(unavailable["memory"])
+        self.assertFalse(unavailable["accounts"])
+        self.assertTrue(available["memory"])
+        self.assertTrue(available["accounts"])
 
     def test_sqlite_does_not_claim_cloud_persistent_memory_or_accounts(self):
         with patch.object(main, "JWT_SECRET", "j" * 40):
