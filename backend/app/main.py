@@ -196,6 +196,12 @@ def _tts_segments(text: str) -> list[tuple[str, str]]:
     return [(part, language) for part, language in segments if part.strip()]
 
 
+def _pcm_silence(nchannels: int, sampwidth: int, framerate: int, seconds: float = 0.12) -> bytes:
+    """Return correctly sized silent PCM frames for a WAV stream."""
+    samples = max(0, int(framerate * seconds))
+    return b"\\x00" * (samples * nchannels * sampwidth)
+
+
 def _tts_clean(text: str) -> str:
     import re
     # Remove non-spoken markup while preserving conversational punctuation and pauses.
@@ -369,9 +375,9 @@ async def text_to_speech(body: TTSRequest):
                 ):
                     raise ValueError("NVIDIA TTS returned inconsistent audio formats.")
                 if previous_language and previous_language != chunk_language:
-                    silence_samples = int(params.framerate * 0.12)
-                    silence_bytes = silence_samples * params.nchannels * params.sampwidth
-                    combined_frames.append(b"\\x00" * silence_bytes)
+                    combined_frames.append(
+                        _pcm_silence(params.nchannels, params.sampwidth, params.framerate)
+                    )
                 combined_frames.append(audio.readframes(audio.getnframes()))
                 previous_language = chunk_language
 
