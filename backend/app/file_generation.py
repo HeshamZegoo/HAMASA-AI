@@ -228,7 +228,8 @@ def build_file(fmt: str, title: str, content: str, rows: list, page_count: int =
         sheet.sheet_view.rightToLeft = bool(_ARABIC_RE.search(spreadsheet_text))
         sheet.append([title])
         if content:
-            sheet.append([content])
+            sheet.append([content[:32000]])
+        header_row = sheet.max_row + 1
         for row in rows[:5000]:
             if isinstance(row, list):
                 values = [cell if isinstance(cell, (int, float, bool)) else str(cell)[:32000] if cell is not None else "" for cell in row[:100]]
@@ -238,12 +239,12 @@ def build_file(fmt: str, title: str, content: str, rows: list, page_count: int =
                         cell.data_type = "s"
         sheet["A1"].font = Font(bold=True, size=16, color="FFFFFF")
         sheet["A1"].fill = PatternFill("solid", fgColor="17324D")
-        for cell in sheet[3]:
-            cell.font = Font(bold=True, color="FFFFFF")
-            cell.fill = PatternFill("solid", fgColor="176B87")
-        sheet.freeze_panes = "A4"
-        if sheet.max_row >= 3:
-            sheet.auto_filter.ref = sheet.dimensions
+        if sheet.max_row >= header_row and rows:
+            for cell in sheet[header_row]:
+                cell.font = Font(bold=True, color="FFFFFF")
+                cell.fill = PatternFill("solid", fgColor="176B87")
+            sheet.freeze_panes = f"A{header_row + 1}"
+            sheet.auto_filter.ref = f"A{header_row}:{sheet.cell(sheet.max_row, sheet.max_column).coordinate}"
         for row in sheet.iter_rows():
             for cell in row:
                 cell.alignment = Alignment(vertical="center", wrap_text=True, horizontal="right" if sheet.sheet_view.rightToLeft else "left")
