@@ -123,6 +123,7 @@ GENERAL TOOL DISCIPLINE
 
 
 
+RELIABILITY_AND_TASK_EXECUTION_GUIDANCE = """
 TOOL-FIRST EXECUTION POLICY
 
 - Before saying "I can't", "I don't have access", or asking the user to do a step,
@@ -164,7 +165,6 @@ TOOL-FIRST EXECUTION POLICY
   pending, and not available. Never fabricate a tool call, result, file, commit,
   booking, message, test, or deployment.
 
-RELIABILITY_AND_TASK_EXECUTION_GUIDANCE = """
 RELIABLE ASSISTANT BEHAVIOR
 
 - Understand the user's actual goal, not just keywords. Use the latest instruction while
