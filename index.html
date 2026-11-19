@@ -576,17 +576,21 @@ async function generateRequestedFile() {
   const latest = cur.messages[cur.messages.length - 1];
   const format = requestedFileFormat(latest?.text);
   if (!format) return null;
+  const fileRequest = {
+    prompt: latest.text,
+    format,
+    messages: cur.messages.slice(-20).map(m => ({
+      role: m.role === 'bot' ? 'assistant' : 'user',
+      content: m.text
+    }))
+  };
+  const payload = window.HAMASA_ATTACHMENTS
+    ? await window.HAMASA_ATTACHMENTS.addToPayload(fileRequest)
+    : fileRequest;
   const response = await apiFetch(API_BASE + '/api/files/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      prompt: latest.text,
-      format,
-      messages: cur.messages.slice(-20).map(m => ({
-        role: m.role === 'bot' ? 'assistant' : 'user',
-        content: m.text
-      }))
-    }),
+    body: JSON.stringify(payload),
     signal: AbortSignal.timeout ? AbortSignal.timeout(130000) : undefined
   });
   if (!response.ok) {
@@ -613,6 +617,7 @@ async function respond() {
   try {
     const generated = await generateRequestedFile();
     if (generated) {
+      window.HAMASA_ATTACHMENTS?.clear();
       $('#typing')?.remove();
       const m = { role: 'bot', text: generated.message || 'جهزتلك الملف.' };
       cur.messages.push(m);
