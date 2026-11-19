@@ -38,7 +38,6 @@ logger = logging.getLogger("hamasa.provider")
 
 APP_ENV = os.getenv("APP_ENV", "development").strip().lower()
 API_KEY = os.getenv("AI_API_KEY", "").strip()
-NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY", "").strip()
 BASE_URL = os.getenv("AI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
 MODEL = os.getenv("AI_MODEL", "gpt-4o-mini")
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
@@ -51,14 +50,8 @@ HAMASA_SYSTEM_PROMPT = os.getenv("HAMASA_SYSTEM_PROMPT", "").strip()
 
 
 def _nvidia_speech_key() -> str:
-    """Use a dedicated NVIDIA key; allow legacy reuse only for an NVIDIA chat provider."""
-    dedicated_key = os.getenv("NVIDIA_API_KEY", "").strip() or NVIDIA_API_KEY
-    if dedicated_key:
-        return dedicated_key
-    provider_host = (urlparse(BASE_URL).hostname or "").lower()
-    if provider_host == "integrate.api.nvidia.com" or provider_host.endswith(".nvidia.com"):
-        return os.getenv("AI_API_KEY", "").strip() or API_KEY
-    return ""
+    """Chat and NVIDIA speech use the same provider credential."""
+    return os.getenv("AI_API_KEY", "").strip() or API_KEY
 
 
 def _runtime_tool_status() -> dict[str, bool]:
