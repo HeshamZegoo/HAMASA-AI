@@ -72,7 +72,7 @@ def main() -> None:
     if "voiceUrl" in config or "/api/live" in config:
         fail("live voice endpoint is still present in config.js")
 
-    api_match = re.search(r'API_URL:\\s*"([^"]+)"', config)
+    api_match = re.search(r'API_URL:\s*"([^"]+)"', config)
     if not api_match:
         fail("config.js must define API_URL")
     api_url = urlparse(api_match.group(1))
