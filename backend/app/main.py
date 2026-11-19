@@ -189,8 +189,9 @@ def _tts_segments(text: str) -> list[tuple[str, str]]:
         text,
     )
     segments: list[tuple[str, str]] = []
+    prefix = ""
     for token in tokens:
-        if re.search(r"[\u0600-\u06FF\u0750-\u077F]", token):
+        if re.search(r"[\\u0600-\\u06FF\\u0750-\\u077F]", token):
             language = "ar-XA"
         elif re.search(r"[A-Za-z]", token):
             language = "en-US"
@@ -199,9 +200,13 @@ def _tts_segments(text: str) -> list[tuple[str, str]]:
             segments[-1] = (previous_text + token, previous_language)
             continue
         else:
-            # Leading whitespace/punctuation belongs with the first spoken run.
+            # Preserve leading numbers, whitespace, and punctuation with the first spoken run.
+            prefix += token
             continue
 
+        if not segments and prefix:
+            token = prefix + token
+            prefix = ""
         if segments and segments[-1][1] == language:
             previous_text, _ = segments[-1]
             segments[-1] = (previous_text + token, language)
