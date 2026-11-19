@@ -1,8 +1,10 @@
 import os
+import asyncio
 import unittest
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
+from fastapi import Request, Response
 from cryptography.fernet import Fernet
 
 from backend.app import main
@@ -71,6 +73,35 @@ class PublicStatusDisclosureTests(unittest.TestCase):
         main._prune_rate_events(1000.0)
         self.assertLessEqual(len(main._rate_events), 25000)
         main._rate_events.clear()
+
+    def test_oversized_chat_and_audio_bodies_are_rejected_before_parsing(self):
+        async def invoke(path, content_length):
+            scope = {
+                "type": "http",
+                "asgi": {"version": "3.0", "spec_version": "2.3"},
+                "http_version": "1.1",
+                "method": "POST",
+                "scheme": "https",
+                "path": path,
+                "raw_path": path.encode("ascii"),
+                "query_string": b"",
+                "headers": [
+                    (b"host", b"testserver"),
+                    (b"content-length", str(content_length).encode("ascii")),
+                ],
+                "client": ("192.0.2.250", 12345),
+                "server": ("testserver", 443),
+            }
+            async def receive():
+                return {"type": "http.request", "body": b"", "more_body": False}
+            async def call_next(_request):
+                return Response("ok")
+            return await main.security_and_rate_limit(Request(scope, receive), call_next)
+
+        chat = asyncio.run(invoke("/api/chat", 91 * 1024 * 1024))
+        audio = asyncio.run(invoke("/api/transcribe", 18 * 1024 * 1024))
+        self.assertEqual(chat.status_code, 413)
+        self.assertEqual(audio.status_code, 413)
 
     def test_api_rejects_untrusted_origins(self):
         response = self.client.get(
