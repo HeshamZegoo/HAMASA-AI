@@ -51,7 +51,7 @@ HAMASA_SYSTEM_PROMPT = os.getenv("HAMASA_SYSTEM_PROMPT", "").strip()
 
 def _runtime_tool_status() -> dict[str, bool]:
     """Report only capabilities backed by the required runtime configuration."""
-    has_database = bool(DATABASE_URL)
+    has_database = DATABASE_URL.startswith(("postgres://", "postgresql://"))
     return {
         "chat": bool(API_KEY),
         "web_search": bool(os.getenv("TAVILY_API_KEY", "").strip()),
