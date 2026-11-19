@@ -15,6 +15,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.shared import RGBColor
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from openpyxl import Workbook
@@ -193,7 +194,7 @@ def build_file(fmt: str, title: str, content: str, rows: list, page_count: int =
                             for run in cell_paragraph.runs:
                                 if row_index == 0:
                                     run.bold = True
-                                    run.font.color.rgb = __import__("docx").shared.RGBColor(255, 255, 255)
+                                    run.font.color.rgb = RGBColor(255, 255, 255)
                         if row_index == 0:
                             shading = OxmlElement("w:shd")
                             shading.set(qn("w:fill"), "176B87")
