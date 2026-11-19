@@ -1079,13 +1079,30 @@ $("#authForm").addEventListener("submit", async e => {
   } finally { submit.disabled = false; }
 });
 async function validateSavedSession() {
+  if (!authToken) {
+    authUser = null; cloudHistoryReady = false; store.set("hamasa.authUser", null);
+    updateAuthButton();
+    return;
+  }
   try {
     const response = await apiFetch(API_BASE + "/api/auth/me", { cache: "no-store" });
-    if (!response.ok) throw new Error("expired");
+    if (response.status === 401) {
+      saveAuthToken(""); authUser = null; cloudHistoryReady = false;
+      store.set("hamasa.authUser", null); updateAuthButton();
+      return;
+    }
+    if (!response.ok) {
+      // Keep the saved token through temporary outages or server-side configuration errors.
+      console.warn("Session validation is temporarily unavailable:", response.status);
+      updateAuthButton();
+      return;
+    }
     const data = await response.json(); authUser = data.user; store.set("hamasa.authUser", authUser);
     updateAuthButton();
-  } catch {
-    saveAuthToken(""); authUser = null; cloudHistoryReady = false; store.set("hamasa.authUser", null); updateAuthButton();
+  } catch (error) {
+    // A network failure is not proof that the user's session expired.
+    console.warn("Could not validate the saved session; keeping it for the next retry.", error);
+    updateAuthButton();
   }
 }
 
