@@ -52,6 +52,12 @@ HAMASA_SYSTEM_PROMPT = os.getenv("HAMASA_SYSTEM_PROMPT", "").strip()
 def _runtime_tool_status() -> dict[str, bool]:
     """Report only capabilities backed by the required runtime configuration."""
     has_database = DATABASE_URL.startswith(("postgres://", "postgresql://"))
+    try:
+        has_valid_memory_key = bool(MEMORY_ENCRYPTION_KEY) and bool(
+            Fernet(MEMORY_ENCRYPTION_KEY.encode("ascii"))
+        )
+    except (ValueError, TypeError, UnicodeEncodeError):
+        has_valid_memory_key = False
     return {
         "chat": bool(API_KEY),
         "web_search": bool(os.getenv("TAVILY_API_KEY", "").strip()),
@@ -59,8 +65,8 @@ def _runtime_tool_status() -> dict[str, bool]:
         "file_generation": bool(API_KEY),
         "transcription": bool(os.getenv("TTS_GEMINI_API_KEY", "").strip()),
         "speech": bool(API_KEY),
-        "memory": bool(MEMORY_ENCRYPTION_KEY and has_database),
-        "accounts": bool(JWT_SECRET and has_database),
+        "memory": bool(has_valid_memory_key and has_database),
+        "accounts": bool(len(JWT_SECRET) >= 32 and has_database),
     }
 
 app = FastAPI(
