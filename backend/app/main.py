@@ -68,7 +68,7 @@ def _runtime_tool_status() -> dict[str, bool]:
         "web_search": bool(os.getenv("TAVILY_API_KEY", "").strip()),
         "vision": bool(API_KEY and os.getenv("AI_VISION_MODEL", "").strip()),
         "file_generation": bool(API_KEY),
-        "transcription": bool(os.getenv("TTS_GEMINI_API_KEY", "").strip()),
+        "transcription": bool(_nvidia_speech_key()),
         "speech": bool(_nvidia_speech_key()),
         "memory": bool(has_valid_memory_key and has_database),
         "accounts": bool(len(JWT_SECRET) >= 32 and has_database),
@@ -305,8 +305,8 @@ def _tts_clean(text: str) -> str:
 
 @app.post("/api/transcribe")
 async def transcribe_audio(body: TranscriptionRequest):
-    key = os.getenv("TTS_GEMINI_API_KEY", "").strip()
-    if not key:
+    api_key = _nvidia_speech_key()
+    if not api_key:
         raise HTTPException(status_code=503, detail="Audio transcription is temporarily unavailable.")
     try:
         audio_bytes = base64.b64decode(body.audio, validate=True)
@@ -316,34 +316,43 @@ async def transcribe_audio(body: TranscriptionRequest):
         raise HTTPException(status_code=400, detail="Audio recording is empty or too short. Record at least one second.")
     if len(audio_bytes) > 12_000_000:
         raise HTTPException(status_code=413, detail="Audio clip is too large. Please record a shorter message.")
-    payload = {
-        "contents": [{
-            "parts": [
-                {"text": "حوّل الكلام المسموع إلى نص فقط. الكلام باللهجة المصرية غالباً. اكتب الكلمات كما نطقها المتحدث، ولا تلخص أو تجب عن الكلام. لو مفيش كلام واضح، أرجع نصاً فارغاً."},
-                {"inline_data": {"mime_type": body.mime_type, "data": base64.b64encode(audio_bytes).decode("ascii")}}
-            ]
-        }],
-        "generationConfig": {"temperature": 0}
+
+    mime_to_ext = {
+        "audio/wav": "wav", "audio/x-wav": "wav", "audio/ogg": "ogg",
+        "audio/opus": "opus", "audio/flac": "flac", "audio/mpeg": "mp3",
+        "audio/mp3": "mp3", "audio/mp4": "m4a", "audio/aac": "aac",
+        "audio/webm": "webm",
     }
+    mime_type = body.mime_type.split(";", 1)[0].strip().lower()
+    extension = mime_to_ext.get(mime_type, "audio")
+    endpoint = (
+        "https://b702f636-f60c-4a3d-a6f4-f3568c13bd7d."
+        "invocation.api.nvcf.nvidia.com/v1/audio/transcriptions"
+    )
     try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(75.0, connect=15.0)) as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(90.0, connect=20.0)) as client:
             response = await client.post(
-                "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
-                # Send the API key in a header, never in the URL where proxies/logs may record it.
-                headers={"Content-Type": "application/json", "x-goog-api-key": key},
-                json=payload,
+                endpoint,
+                headers={"Authorization": f"Bearer {api_key}", "Accept": "application/json"},
+                data={"language": "multi", "response_format": "json"},
+                files={"file": (f"hamasa-audio.{extension}", audio_bytes, mime_type or "application/octet-stream")},
             )
         if response.status_code >= 400:
-            logger.error("Gemini transcription failed: status=%s body=%s", response.status_code, response.text[:300])
-            raise HTTPException(status_code=502, detail="Audio transcription service could not process the request.")
+            logger.error("NVIDIA transcription failed: status=%s body=%s", response.status_code, response.text[:300])
+            raise HTTPException(status_code=502, detail="NVIDIA transcription service could not process this audio format or request.")
         data = response.json()
-        parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
-        transcript = " ".join(p.get("text", "") for p in parts if isinstance(p.get("text"), str)).strip()
-        return {"transcript": transcript}
+        transcript = data.get("text", data.get("transcript", "")) if isinstance(data, dict) else ""
+        if not isinstance(transcript, str):
+            transcript = ""
+        return {"transcript": transcript.strip()}
+    except HTTPException:
+        raise
     except httpx.TimeoutException:
-        raise HTTPException(status_code=504, detail="Audio transcription timed out.")
+        raise HTTPException(status_code=504, detail="NVIDIA transcription timed out.")
     except httpx.RequestError:
-        raise HTTPException(status_code=502, detail="Could not connect to Gemini audio service.")
+        raise HTTPException(status_code=502, detail="Could not connect to NVIDIA transcription service.")
+    except ValueError:
+        raise HTTPException(status_code=502, detail="NVIDIA transcription returned an invalid response.")
 
 
 @app.get("/api/tts/status")
