@@ -1,6 +1,7 @@
 import unittest
 
 from backend.app.memory_retrieval import select_relevant_memories
+from backend.app.main import ChatRequest
 
 
 class RelevantMemoryRetrievalTests(unittest.TestCase):
@@ -37,6 +38,19 @@ class RelevantMemoryRetrievalTests(unittest.TestCase):
         )
         self.assertLessEqual(len(selected), 2)
         self.assertLessEqual(sum(len(item["text"]) + len(item["category"]) + 4 for item in selected), 500)
+
+    def test_chat_request_accepts_structured_memories_and_legacy_memory(self):
+        request = ChatRequest(
+            messages=[{"role": "user", "content": "Fix HAMASA"}],
+            memory="legacy context",
+            saved_memories=[{
+                "category": "project",
+                "text": "HAMASA backend uses FastAPI",
+                "updated_at": "2026-11-19T12:00:00Z",
+            }],
+        )
+        self.assertEqual(request.memory, "legacy context")
+        self.assertEqual(request.saved_memories[0].category, "project")
 
     def test_invalid_categories_and_empty_memories_are_ignored(self):
         selected = select_relevant_memories(
