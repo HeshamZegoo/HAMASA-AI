@@ -12,6 +12,10 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from docx import Document
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+import re
 from openpyxl import Workbook
 
 
@@ -27,6 +31,23 @@ def _register_arabic_font():
     pdfmetrics.registerFont(TTFont(_ARABIC_FONT, io.BytesIO(font_bytes)))
 
 
+def _apply_docx_direction(paragraph, text: str) -> None:
+    """Set proper bidirectional paragraph and run properties for Arabic text."""
+    if not re.search(r"[\\u0600-\\u06FF\\u0750-\\u077F]", text):
+        paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        return
+    paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    paragraph_properties = paragraph._p.get_or_add_pPr()
+    if paragraph_properties.find(qn("w:bidi")) is None:
+        paragraph_properties.append(OxmlElement("w:bidi"))
+    for run in paragraph.runs:
+        run_properties = run._element.get_or_add_rPr()
+        if run_properties.find(qn("w:rtl")) is None:
+            run_properties.append(OxmlElement("w:rtl"))
+        run.font.name = "Arial"
+        run._element.get_or_add_rPr().rFonts.set(qn("w:eastAsia"), "Arial")
+
+
 def _pdf_rtl(text: str) -> str:
     # ReportLab does not perform Arabic shaping or bidirectional layout itself.
     try:
@@ -40,17 +61,23 @@ def _pdf_rtl(text: str) -> str:
 def build_file(fmt: str, title: str, content: str, rows: list) -> bytes:
     if fmt == "docx":
         doc = Document()
-        doc.add_heading(title, 0)
+        title_paragraph = doc.add_heading(title, 0)
+        _apply_docx_direction(title_paragraph, title)
         for line in content.splitlines():
             line = line.strip()
             if not line:
                 continue
             if line.startswith("# "):
-                doc.add_heading(line[2:], level=1)
+                heading = line[2:]
+                paragraph = doc.add_heading(heading, level=1)
+                _apply_docx_direction(paragraph, heading)
             elif line.startswith("## "):
-                doc.add_heading(line[3:], level=2)
+                heading = line[3:]
+                paragraph = doc.add_heading(heading, level=2)
+                _apply_docx_direction(paragraph, heading)
             else:
-                doc.add_paragraph(line)
+                paragraph = doc.add_paragraph(line)
+                _apply_docx_direction(paragraph, line)
         output = BytesIO()
         doc.save(output)
         return output.getvalue()
