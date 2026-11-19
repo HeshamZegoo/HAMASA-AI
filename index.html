@@ -859,22 +859,44 @@ async function readMessageAloud(text, button) {
     const data = await response.json();
     if (!data.audio) throw new Error('خدمة الصوت رجّعت ملف صوت فارغ.');
     if (activeSpeechButton !== button) return;
-    const binary = atob(data.audio);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    const blob = new Blob([bytes], { type: data.mime_type || 'audio/wav' });
-    activeSpeechUrl = URL.createObjectURL(blob);
-    const audio = new Audio(activeSpeechUrl);
-    activeSpeech = audio;
-    audio.onended = () => { if (activeSpeech === audio) stopReading(); };
-    audio.onerror = () => {
-      if (activeSpeech === audio) {
-        stopReading();
-        toast('حصلت مشكلة أثناء تشغيل الصوت.');
-      }
+    const segments = Array.isArray(data.audio_segments) && data.audio_segments.length
+      ? data.audio_segments
+      : [{ audio: data.audio, mime_type: data.mime_type || 'audio/wav' }];
+    let segmentIndex = 0;
+    const playNextSegment = async () => {
+      if (activeSpeechButton !== button) return;
+      if (segmentIndex >= segments.length) { stopReading(); return; }
+      const segment = segments[segmentIndex++];
+      if (!segment.audio) throw new Error('مقطع صوت رجع فاضي.');
+      const binary = atob(segment.audio);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const blob = new Blob([bytes], { type: segment.mime_type || 'audio/wav' });
+      if (activeSpeechUrl) URL.revokeObjectURL(activeSpeechUrl);
+      activeSpeechUrl = URL.createObjectURL(blob);
+      const audio = new Audio(activeSpeechUrl);
+      activeSpeech = audio;
+      audio.onended = () => {
+        if (activeSpeech !== audio) return;
+        activeSpeech = null;
+        if (activeSpeechUrl) URL.revokeObjectURL(activeSpeechUrl);
+        activeSpeechUrl = null;
+        playNextSegment().catch(error => {
+          if (activeSpeechButton === button) stopReading();
+          console.error('HAMASA TTS segment playback failed:', error);
+          toast(error.message || 'تعذر تشغيل مقطع الصوت.');
+        });
+      };
+      audio.onerror = () => {
+        if (activeSpeech === audio) {
+          stopReading();
+          toast('حصلت مشكلة أثناء تشغيل الصوت.');
+        }
+      };
+      await audio.play();
     };
     try {
-      await audio.play();
+      await playNextSegment();
     } catch (error) {
       // Keep the generated audio ready; the next tap is a direct play gesture.
       console.warn('Audio playback needs another tap:', error);
