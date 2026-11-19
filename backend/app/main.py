@@ -152,6 +152,14 @@ class TranscriptionRequest(BaseModel):
     audio: str = Field(min_length=1, max_length=16_000_000)
     mime_type: str = Field(default="audio/mp4", max_length=100)
 
+def _tts_language(text: str) -> str:
+    """Choose the NVIDIA Magpie locale from the actual spoken script."""
+    import re
+    arabic_letters = len(re.findall(r"[\\u0600-\\u06FF\\u0750-\\u077F]", text))
+    latin_letters = len(re.findall(r"[A-Za-z]", text))
+    return "ar-XA" if arabic_letters > latin_letters else "en-US"
+
+
 def _tts_clean(text: str) -> str:
     import re
     # Remove non-spoken markup while preserving conversational punctuation and pauses.
@@ -230,9 +238,11 @@ async def text_to_speech(body: TTSRequest):
     if not text:
         raise HTTPException(status_code=400, detail="No speakable text.")
 
-    # NVIDIA Nemotron Speech / Magpie TTS Multilingual hosted NIM.
-    # Arabic voices currently listed by NVIDIA: Sofia, Ray, Jason.
-    # Jason is selected for the male read-aloud voice.
+    # NVIDIA Magpie TTS Multilingual supports separate Arabic and English locales.
+    # Use the matching locale so English is not synthesized with an Arabic voice.
+    language = _tts_language(text)
+    speaker = "Jason" if body.gender == "male" else "Sofia"
+    voice = f"Magpie-Multilingual.{language.upper()}.{speaker}"
     api_key = os.getenv("AI_API_KEY", "").strip()
     if not api_key:
         raise HTTPException(status_code=503, detail="Speech generation is temporarily unavailable.")
@@ -241,9 +251,6 @@ async def text_to_speech(body: TTSRequest):
         "https://877104f7-e885-42b9-8de8-f6e4c6303969."
         "invocation.api.nvcf.nvidia.com/v1/audio/synthesize"
     )
-    voice = "Magpie-Multilingual.AR-XA.Jason"
-    language = "ar-XA"
-
     # NVIDIA's synthesis endpoint accepts up to 2,000 normalized characters.
     # Split longer answers at natural boundaries and join the returned WAV frames.
     chunks = []
