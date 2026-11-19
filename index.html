@@ -1124,6 +1124,29 @@ validateSavedSession().then(async () => {
     catch (error) { console.warn("Cloud chat history could not be loaded.", error); toast(lang === "ar" ? "تعذر تحميل محادثات الحساب." : "Could not load account chats."); }
   }
 });
+
+// Recover automatically if the backend is temporarily unavailable during page load.
+let backendReconnectBusy = false;
+setInterval(async () => {
+  if (backendReconnectBusy) return;
+  backendReconnectBusy = true;
+  try {
+    const wasOnline = backendOnline;
+    await checkBackend();
+    if (!wasOnline && backendOnline && authToken) {
+      await validateSavedSession();
+      if (authUser) {
+        await syncMemoriesFromServer();
+        try { await syncConversationsFromServer(); }
+        catch (error) {
+          console.warn("Cloud chat history is still unavailable after reconnect.", error);
+        }
+      }
+    }
+  } finally {
+    backendReconnectBusy = false;
+  }
+}, 30000);
 </script>
 <script src="./attachments.js?v=20261119-3"></script>
 </body>
