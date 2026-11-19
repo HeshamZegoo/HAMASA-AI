@@ -1,7 +1,7 @@
 """Small, deterministic relevance filter for account-scoped saved memories."""
 
 import re
-from math import.sqrt
+from math import sqrt
 from typing import Any
 
 
