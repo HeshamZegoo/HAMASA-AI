@@ -276,7 +276,7 @@ def _tts_clean(text: str) -> str:
 async def transcribe_audio(body: TranscriptionRequest):
     key = os.getenv("TTS_GEMINI_API_KEY", "").strip()
     if not key:
-        raise HTTPException(status_code=503, detail="Gemini audio input is not configured. Add TTS_GEMINI_API_KEY.")
+        raise HTTPException(status_code=503, detail="Audio transcription is temporarily unavailable.")
     try:
         audio_bytes = base64.b64decode(body.audio, validate=True)
     except (ValueError, base64.binascii.Error):
@@ -304,7 +304,7 @@ async def transcribe_audio(body: TranscriptionRequest):
             )
         if response.status_code >= 400:
             logger.error("Gemini transcription failed: status=%s body=%s", response.status_code, response.text[:300])
-            raise HTTPException(status_code=502, detail=f"Gemini transcription error ({response.status_code}).")
+            raise HTTPException(status_code=502, detail="Audio transcription service could not process the request.")
         data = response.json()
         parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
         transcript = " ".join(p.get("text", "") for p in parts if isinstance(p.get("text"), str)).strip()
@@ -317,7 +317,8 @@ async def transcribe_audio(body: TranscriptionRequest):
 
 @app.get("/api/tts/status")
 def tts_status():
-    return {"gemini_configured": bool(os.getenv("TTS_GEMINI_API_KEY", "").strip())}
+    # Public status endpoint intentionally reveals no provider or credential state.
+    return {"status": "ok"}
 
 @app.post("/api/tts")
 async def text_to_speech(body: TTSRequest):
@@ -334,7 +335,7 @@ async def text_to_speech(body: TTSRequest):
     # Jason is selected for the male read-aloud voice.
     api_key = os.getenv("AI_API_KEY", "").strip()
     if not api_key:
-        raise HTTPException(status_code=503, detail="NVIDIA API is not configured. Add AI_API_KEY.")
+        raise HTTPException(status_code=503, detail="Speech generation is temporarily unavailable.")
 
     endpoint = (
         "https://877104f7-e885-42b9-8de8-f6e4c6303969."
@@ -401,11 +402,11 @@ async def text_to_speech(body: TTSRequest):
                 if response.status_code in (401, 403):
                     raise HTTPException(
                         status_code=502,
-                        detail="NVIDIA rejected the API key or this TTS endpoint is not enabled for it.",
+                        detail="Speech generation is temporarily unavailable.",
                     )
                 raise HTTPException(
                     status_code=502,
-                    detail=f"NVIDIA TTS error ({response.status_code}).",
+                    detail="Speech generation failed. Please try again.",
                 )
             wav_parts.append(response.content)
 
@@ -439,8 +440,6 @@ async def text_to_speech(body: TTSRequest):
     return {
         "audio": base64.b64encode(audio_bytes).decode("ascii"),
         "mime_type": "audio/wav",
-        "provider": "nvidia",
-        "voice": voice,
     }
 
 
@@ -836,7 +835,7 @@ def health():
 @app.post("/api/files/generate")
 async def generate_file(body: FileCreateRequest):
     if not API_KEY:
-        raise HTTPException(status_code=503, detail="AI provider is not configured.")
+        raise HTTPException(status_code=503, detail="File generation is temporarily unavailable.")
     format_names = {"docx": "Microsoft Word document", "pdf": "PDF document", "xlsx": "Excel spreadsheet"}
     system = (
         "You create useful, complete downloadable files. Return ONLY valid JSON with keys "
@@ -855,7 +854,7 @@ async def generate_file(body: FileCreateRequest):
     has_images = any(isinstance(message.get("content"), list) for message in history)
     vision_model = os.getenv("AI_VISION_MODEL", "").strip()
     if has_images and not vision_model:
-        raise HTTPException(status_code=503, detail="Image understanding is not configured for file creation.")
+        raise HTTPException(status_code=503, detail="Image processing is temporarily unavailable.")
     prompt = (
         f"Create a {format_names[body.format]}. User request: {body.prompt}. "
         "Use the conversation context below only to understand the requested file. "
@@ -986,7 +985,7 @@ async def _live_web_search(query: str) -> list[dict]:
 @app.post("/api/chat")
 async def chat(body: ChatRequest):
     if not API_KEY:
-        raise HTTPException(status_code=503, detail="AI provider is not configured. Set AI_API_KEY in the backend environment.")
+        raise HTTPException(status_code=503, detail="Chat is temporarily unavailable.")
 
     context_messages = [{"role": "system", "content": HAMASA_SYSTEM_PROMPT}]
     context_messages.append({
@@ -1074,7 +1073,7 @@ async def chat(body: ChatRequest):
 
     context_messages.extend(prepared_messages)
     if has_images and not vision_model:
-        raise HTTPException(status_code=503, detail="Image understanding is not configured. Set AI_VISION_MODEL to an image-capable model.")
+        raise HTTPException(status_code=503, detail="Image processing is temporarily unavailable.")
     payload = {
         "model": vision_model if has_images else MODEL,
         "messages": context_messages,
@@ -1119,7 +1118,7 @@ async def chat(body: ChatRequest):
         if not isinstance(reply, str) or not reply.strip():
             raise HTTPException(status_code=502, detail="AI provider returned an empty response.")
 
-        return {"reply": reply.strip(), "model": MODEL, "sources": [{"title": str(item.get("title") or "")[:180], "url": str(item.get("url") or "")[:1000], "published_date": str(item.get("published_date") or "")[:40]} for item in web_sources if str(item.get("url") or "").startswith(("https://", "http://"))]}
+        return {"reply": reply.strip(), "sources": [{"title": str(item.get("title") or "")[:180], "url": str(item.get("url") or "")[:1000], "published_date": str(item.get("published_date") or "")[:40]} for item in web_sources if str(item.get("url") or "").startswith(("https://", "http://"))]}
 
     except httpx.TimeoutException:
         logger.exception("Provider request timed out: model=%s", MODEL)
