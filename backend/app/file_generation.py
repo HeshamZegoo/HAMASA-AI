@@ -33,7 +33,7 @@ def _register_arabic_font():
 
 def _apply_docx_direction(paragraph, text: str) -> None:
     """Set proper bidirectional paragraph and run properties for Arabic text."""
-            re.search(r"[\u0600-\u06FF\u0750-\u077F]", spreadsheet_text)
+    if not re.search(r"[\u0600-\u06FF\u0750-\u077F]", text):
         paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
         return
     paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
@@ -123,7 +123,7 @@ def build_file(fmt: str, title: str, content: str, rows: list) -> bytes:
             ]
         )
         sheet.sheet_view.rightToLeft = bool(
-            re.search(r"[\\u0600-\\u06FF\\u0750-\\u077F]", spreadsheet_text)
+            re.search(r"[\u0600-\u06FF\u0750-\u077F]", spreadsheet_text)
         )
         sheet.append([title])
         if content:
