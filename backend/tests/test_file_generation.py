@@ -49,6 +49,12 @@ class FileGenerationTests(unittest.TestCase):
         self.assertEqual(sheet["B5"].data_type, "s")
         workbook.close()
 
+    def test_arabic_xlsx_uses_right_to_left_sheet_view(self):
+        raw = build_file("xlsx", "تقرير", "إجمالي المبيعات", [["المنتج", "الكمية"]],)
+        workbook = load_workbook(io.BytesIO(raw), data_only=True)
+        self.assertTrue(workbook.active.sheet_view.rightToLeft)
+        workbook.close()
+
     def test_unsupported_format_is_rejected(self):
         with self.assertRaises(ValueError):
             build_file("csv", "Title", "Body", [])
