@@ -10,6 +10,19 @@ class ResearchIntentTests(unittest.TestCase):
     def test_egyptian_arabic_search_request_triggers_search(self):
         self.assertTrue(should_search_web([{"role": "user", "content": "ابحث على النت عن آخر تحديثات Railway"}]))
 
+    def test_common_egyptian_search_phrases_trigger_search(self):
+        for phrase in (
+            "ابحثلي عن آخر تحديثات Railway",
+            "دورلي على النت عن أسعار الاستضافة",
+            "شوفلي آخر أخبار الذكاء الاصطناعي",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertTrue(should_search_web([{"role": "user", "content": phrase}]))
+
+    def test_english_online_lookup_phrases_trigger_search(self):
+        self.assertTrue(should_search_web([{"role": "user", "content": "Can you check online for the current API limits?"}]))
+        self.assertTrue(should_search_web([{"role": "user", "content": "Look into the latest FastAPI release"}]))
+
     def test_normal_question_does_not_trigger_search(self):
         self.assertFalse(should_search_web([{"role": "user", "content": "Explain what a Python list is"}]))
 
