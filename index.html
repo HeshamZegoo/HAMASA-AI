@@ -989,7 +989,7 @@ function errorRow(error) {
 function setBusy(v) { busy = v; sendBtn.disabled = v || !inp.value.trim(); }
 function requestedFileFormat(text) {
   const s = String(text || '').toLowerCase().trim();
-  const formatMention = /\bpdf\b|\.pdf|بي\s*دي\s*اف|بي دي اف|\b(xlsx|excel|spreadsheet)\b|اكسل|إكسل|اكسيل|\b(docx|word)\b|وورد/.test(s);
+  const formatMention = /\b(pdf|xlsx|excel|spreadsheet|docx|word|pptx|powerpoint|slides|presentation|csv|json|html|markdown|md|txt)\b|\.pdf|بي\s*دي\s*اف|بي دي اف|اكسل|إكسل|اكسيل|وورد|باوربوينت|عرض تقديمي|شرائح|ملف نصي/.test(s);
   const action = /(اعمل|اعملي|اعمله|اعملهولي|اعمللي|اعمليلي|أنشئ|انشئ|انشأ|جهز|جهزي|جهزلي|حضّر|حضر|حوّل|حول|صدّر|صدر|اكتب|اكتبلي|نزّل|نزل|حمّل|حمل|احفظ|جهّز|generate|create|make|export|download|save|please|can you|could you|i need|i want)/.test(s) ||
     /(عايز|عاوز|عايزة|عاوزة|محتاج|محتاجة).{0,30}(ملف|مستند|تقرير|pdf|وورد|word|excel|اكسل|إكسل)/.test(s) ||
     /ممكن.{0,15}(تعمل|تعملي|تجهز|تنشئ|تطلع|تحول)/.test(s);
