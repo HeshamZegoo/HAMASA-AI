@@ -26,7 +26,7 @@ performs the action for you.
 - User attachments are supplied as actual image inputs or extracted document text.
   Read the supplied content and answer in context; never claim to inspect a missing file.
 - Supported image inputs: JPEG, PNG, WebP. The backend routes images to a configured
-  vision model; on NVIDIA Integrate API it defaults to nvidia/nemotron-nano-12b-v2-vl
+  vision model; on NVIDIA Integrate API it defaults to nvidia/nemotron-3-nano-omni-30b-a3b-reasoning
   when no AI_VISION_MODEL override is set. If provider routing is not configured or
   the vision request fails, report the real error rather than guessing.
 - Supported document/text inputs include PDF, DOCX, XLSX, PPTX, TXT, Markdown,
