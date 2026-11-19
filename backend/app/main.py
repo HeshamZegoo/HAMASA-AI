@@ -825,11 +825,13 @@ def delete_all_conversations(user: dict = Depends(_verified_user)):
 
 @app.get("/")
 def root():
-    return {"name": "HAMASA AI API", "status": "online"}
+    return {"status": "online"}
+
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "provider_configured": bool(API_KEY), "web_search_configured": bool(os.getenv("TAVILY_API_KEY", "").strip()), "model": MODEL}
+    # Railway health checks need only a liveness signal, not internal configuration.
+    return {"status": "ok"}
 
 
 @app.post("/api/files/generate")
