@@ -38,7 +38,7 @@ class ToolCapabilityPolicyTests(unittest.TestCase):
         self.assertIn("Live web search: UNAVAILABLE", prompt)
         self.assertIn("Image understanding: AVAILABLE", prompt)
         self.assertIn("Audio transcription: UNAVAILABLE", prompt)
-        self.assertIn("Encrypted saved memory: UNAVAILABLE", prompt)
+        self.assertIn("Cloud encrypted saved memory: UNAVAILABLE", prompt)
         self.assertIn("do not promise it", prompt)
 
     def test_retrieved_content_is_untrusted(self):
