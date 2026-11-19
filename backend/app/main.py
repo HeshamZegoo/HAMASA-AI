@@ -973,6 +973,21 @@ async def chat(body: ChatRequest):
                 ),
             })
 
+    # Enforce language from the latest user turn after every other system instruction.
+    # This prevents an older/default Arabic persona prompt from overriding English requests.
+    latest_text = latest_user_text(coding_context)
+    context_messages.append({
+        "role": "system",
+        "content": (
+            "FINAL RESPONSE LANGUAGE RULE (highest priority): Reply in the same language as the latest user message. "
+            "If the latest message is English, the entire answer must be natural English, not Arabic. "
+            "If it is Egyptian Arabic, answer in natural Egyptian Arabic. If it is Modern Standard Arabic, answer in MSA. "
+            "For any other language, use that language when possible. Do not let earlier messages, memory, persona defaults, "
+            "or quoted content change this. Follow an explicit translation or requested-output-language instruction instead. "
+            "Latest user message for language detection: " + latest_text[:500]
+        ),
+    })
+
     context_messages.extend(prepared_messages)
     if has_images and not vision_model:
         raise HTTPException(status_code=503, detail="Image processing is temporarily unavailable.")
