@@ -992,15 +992,19 @@ inp.addEventListener('focus', () => setTimeout(() => { fit(); scrollEnd(); }, 30
 
 
 /* Account authentication: passwords are sent only over HTTPS and stored as salted PBKDF2 hashes on the API. */
-let authToken = sessionStorage.getItem("hamasa.authToken") || store.get("hamasa.authToken", "");
-if (authToken) sessionStorage.setItem("hamasa.authToken", authToken);
-try { localStorage.removeItem("hamasa.authToken"); } catch {}
+// Keep the signed-in session across browser/app restarts. The API token is
+// scoped to this site, expires server-side, and is revoked on explicit sign-out.
+let authToken = store.get("hamasa.authToken", "") || sessionStorage.getItem("hamasa.authToken") || "";
+if (authToken) {
+  store.set("hamasa.authToken", authToken);
+  try { sessionStorage.removeItem("hamasa.authToken"); } catch {}
+}
 function saveAuthToken(value) {
   authToken = value || "";
   try {
-    if (authToken) sessionStorage.setItem("hamasa.authToken", authToken);
-    else sessionStorage.removeItem("hamasa.authToken");
-    localStorage.removeItem("hamasa.authToken");
+    if (authToken) store.set("hamasa.authToken", authToken);
+    else localStorage.removeItem("hamasa.authToken");
+    sessionStorage.removeItem("hamasa.authToken");
   } catch {}
 }
 let authUser = store.get("hamasa.authUser", null);
