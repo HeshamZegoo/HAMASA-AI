@@ -946,7 +946,7 @@ async def generate_file(body: FileCreateRequest):
     if not API_KEY:
         raise HTTPException(status_code=503, detail="File generation is temporarily unavailable.")
     format_names = {"docx": "Microsoft Word document", "pdf": "PDF document", "xlsx": "Excel spreadsheet"}
-    requested_pages_match = re.search(r"(?:exactly|\u0628\u0639\u062f\u062f|\u0645\u0646)\\s*(\\d+|[\\u0660-\\u0669]+)\\s*(?:pages?|\\u0635\\u0641\\u062d\\u0627\\u062a)", body.prompt, re.IGNORECASE)
+    requested_pages_match = re.search(r"(?:(?:exactly|بعدد|من)\\s*)?(\\d+|[٠-٩]+)\\s*(?:pages?|صفحات)", body.prompt, re.IGNORECASE)
     requested_pages = 0
     if requested_pages_match:
         page_token = requested_pages_match.group(1).translate(str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789"))
