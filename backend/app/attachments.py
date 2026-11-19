@@ -3,6 +3,7 @@ import io
 import json
 import logging
 import re
+import zipfile
 from html.parser import HTMLParser
 
 from pydantic import BaseModel, Field
@@ -63,6 +64,20 @@ def _decode(item: AttachmentInput) -> bytes:
         raise ValueError(f"حجم الملف {item.name} غير مسموح. الحد الأقصى 64 ميجابايت.")
     return raw
 
+def _validate_office_archive(raw: bytes, name: str) -> None:
+    """Reject malformed or oversized Office ZIP containers before parsing."""
+    try:
+        with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+            entries = archive.infolist()
+            if len(entries) > 5000:
+                raise ValueError(f"ملف Office يحتوي على عناصر كثيرة بشكل غير آمن: {name}.")
+            expanded_size = sum(entry.file_size for entry in entries)
+            if expanded_size > 128 * 1024 * 1024:
+                raise ValueError(f"الحجم الداخلي لملف Office كبير جداً: {name}.")
+    except zipfile.BadZipFile as exc:
+        raise ValueError(f"ملف Office تالف أو غير صالح: {name}.") from exc
+
+
 def _extract_text(item: AttachmentInput, raw: bytes) -> str:
     mime = item.mime_type.lower().split(";")[0].strip()
     suffix = item.name.rsplit(".", 1)[-1].lower() if "." in item.name else ""
@@ -95,6 +110,7 @@ def _extract_text(item: AttachmentInput, raw: bytes) -> str:
             raise ValueError(f"مقدرتش أقرأ محتوى PDF: {item.name}.") from exc
 
     if mime == DOCX_MIME or suffix == "docx":
+        _validate_office_archive(raw, item.name)
         try:
             from docx import Document
             doc = Document(io.BytesIO(raw))
@@ -108,6 +124,7 @@ def _extract_text(item: AttachmentInput, raw: bytes) -> str:
             raise ValueError(f"مقدرتش أقرأ ملف Word: {item.name}.") from exc
 
     if mime == XLSX_MIME or suffix == "xlsx":
+        _validate_office_archive(raw, item.name)
         try:
             from openpyxl import load_workbook
             workbook = load_workbook(io.BytesIO(raw), read_only=True, data_only=True)
@@ -125,6 +142,7 @@ def _extract_text(item: AttachmentInput, raw: bytes) -> str:
             raise ValueError(f"مقدرتش أقرأ ملف Excel: {item.name}.") from exc
 
     if mime == PPTX_MIME or suffix == "pptx":
+        _validate_office_archive(raw, item.name)
         try:
             from pptx import Presentation
             presentation = Presentation(io.BytesIO(raw))
