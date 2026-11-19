@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field
 from cryptography.fernet import Fernet, InvalidToken
 from .attachments import prepare_messages, AttachmentInput
 from .file_generation import build_file
+from .quality import coding_instructions_for
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper())
 logger = logging.getLogger("hamasa.provider")
