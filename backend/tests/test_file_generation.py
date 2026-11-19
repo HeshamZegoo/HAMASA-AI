@@ -58,17 +58,17 @@ class FileGenerationTests(unittest.TestCase):
 
     def test_pdf_renders_markdown_table_and_explicit_three_pages(self):
         content = (
-            "# الصفحة الأولى\\nمقدمة عن الذكاء الاصطناعي\\n"
-            "| المجال | الاستخدام |\\n|---|---|\\n| الصحة | تحليل الصور |\\n"
-            "[[PAGE_BREAK]]\\n"
-            "# الصفحة الثانية\\nتطبيقات عملية\\nفقرة توضيحية\\n"
-            "[[PAGE_BREAK]]\\n"
-            "# الصفحة الثالثة\\nالتحديات والخلاصة\\nنهاية التقرير"
+            "# الصفحة الأولى\nمقدمة عن الذكاء الاصطناعي\n"
+            "| المجال | الاستخدام |\n|---|---|\n| الصحة | تحليل الصور |\n"
+            "[[PAGE_BREAK]]\n"
+            "# الصفحة الثانية\nتطبيقات عملية\nفقرة توضيحية\n"
+            "[[PAGE_BREAK]]\n"
+            "# الصفحة الثالثة\nالتحديات والخلاصة\nنهاية التقرير"
         )
         raw = build_file("pdf", "تقرير الذكاء الاصطناعي", content, [], page_count=3)
         reader = PdfReader(io.BytesIO(raw))
         self.assertEqual(len(reader.pages), 3)
-        extracted = "\\n".join(page.extract_text() or "" for page in reader.pages)
+        extracted = "\n".join(page.extract_text() or "" for page in reader.pages)
         self.assertIn("الصحة", extracted)
         self.assertIn("التحديات", extracted)
 
