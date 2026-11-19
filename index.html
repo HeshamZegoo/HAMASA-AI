@@ -1040,6 +1040,7 @@ function setAuthMode(mode) {
   $("#authSwitch").textContent = mode === "signup" ? (ar ? "عندك حساب؟ سجّل دخولك" : "Already have an account? Sign in") : (ar ? "مستخدم جديد؟ أنشئ حساب" : "New here? Create an account");
   $("#authPassword").autocomplete = mode === "signup" ? "new-password" : "current-password";
   $("#authPassword").minLength = 10;
+  $("#authPassword").required = true;
   $("#authEmail").disabled = false;
   $("#authPasswordRow").hidden = false;
   $("#authCodeRow").hidden = true;
@@ -1077,6 +1078,7 @@ $("#authForm").addEventListener("submit", async e => {
       $("#authEmail").value = pendingVerificationEmail;
       $("#authEmail").disabled = true;
       $("#authPasswordRow").hidden = true;
+      $("#authPassword").required = false;
       $("#authCodeRow").hidden = false;
       $("#authCode").required = true;
       $("#authResend").hidden = false;
