@@ -480,7 +480,8 @@ const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAl
 const store = { get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
                 set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
 let lang = store.get('hamasa.lang', 'en') === 'ar' ? 'ar' : 'en';
-let theme = store.get('hamasa.theme', 'light') === 'dark' ? 'dark' : 'light';
+let theme = store.get('hamasa.themeVersion', 0) >= 2 ? (store.get('hamasa.theme', 'light') === 'dark' ? 'dark' : 'light') : 'light';
+store.set('hamasa.themeVersion', 2); store.set('hamasa.theme', theme);
 let convs = store.get('hamasa.convs', []); if (!Array.isArray(convs)) convs = [];
 let memories = store.get('hamasa.memory', []);
 if (!Array.isArray(memories)) memories = [];
