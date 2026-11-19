@@ -169,7 +169,7 @@ header{border-bottom:1px solid var(--line);background:var(--glass);backdrop-filt
 .logo svg,.brand svg{filter:grayscale(1)}
 .ib{background:var(--glass);border-color:var(--line);transition:transform .22s,background .22s,border-color .22s}
 .ib:hover{transform:translateY(-2px);background:var(--glass2);border-color:var(--fg)}
-.btn-new,.send,.user .bub,.seg button[aria-pressed=true),.memory-add{
+.btn-new,.send,.user .bub,.seg button[aria-pressed=true],.memory-add{
   background:#111!important;color:#fff!important;box-shadow:0 9px 24px rgba(0,0,0,.16)!important
 }
 [data-theme=dark] .btn-new,[data-theme=dark] .send,[data-theme=dark] .user .bub,[data-theme=dark] .seg button[aria-pressed=true],[data-theme=dark] .memory-add{background:#f4f4f4!important;color:#080808!important}
@@ -185,6 +185,15 @@ header{border-bottom:1px solid var(--line);background:var(--glass);backdrop-filt
 [data-theme=dark] .stat i{background:#eee;box-shadow:0 0 9px rgba(255,255,255,.4)}
 .sb{background:var(--glass);border-color:var(--line)}
 dialog{background:var(--bg2)}
+.logo [data-orb],.brand [data-orb]{display:block;flex:none;width:40px;height:40px;overflow:visible}
+.logo [data-orb] .robot-stage{width:40px;min-width:40px;margin:0;filter:none}
+.brand [data-orb]{width:32px;height:32px}
+.brand [data-orb] .robot-stage{width:32px;min-width:32px;margin:0;filter:none}
+.logo [data-orb] .robot-orbit,.brand [data-orb] .robot-orbit,
+.logo [data-orb] .robot-aura,.brand [data-orb] .robot-aura,
+.logo [data-orb] .robot-shadow,.brand [data-orb] .robot-shadow,
+.logo [data-orb] .robot-floor,.brand [data-orb] .robot-floor{display:none}
+.logo [data-orb] .robot-3d,.brand [data-orb] .robot-3d{width:88%;height:88%}
 /* Animated layered robot: CSS 3D, no external model or dependency */
 .robot-stage{
   position:relative;width:min(58vw,270px,calc(var(--vh)*.34));aspect-ratio:1;
