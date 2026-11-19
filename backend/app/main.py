@@ -50,6 +50,16 @@ ORIGINS = [x.strip() for x in os.getenv("CORS_ORIGINS", DEFAULT_ORIGINS).split("
 HAMASA_SYSTEM_PROMPT = os.getenv("HAMASA_SYSTEM_PROMPT", "").strip()
 
 
+def _nvidia_speech_key() -> str:
+    """Use a dedicated NVIDIA key; allow legacy reuse only for an NVIDIA chat provider."""
+    if NVIDIA_API_KEY:
+        return NVIDIA_API_KEY
+    provider_host = (urlparse(BASE_URL).hostname or "").lower()
+    if provider_host == "integrate.api.nvidia.com" or provider_host.endswith(".nvidia.com"):
+        return API_KEY
+    return ""
+
+
 def _runtime_tool_status() -> dict[str, bool]:
     """Report only capabilities backed by the required runtime configuration."""
     has_database = DATABASE_URL.startswith(("postgres://", "postgresql://"))
@@ -65,7 +75,7 @@ def _runtime_tool_status() -> dict[str, bool]:
         "vision": bool(API_KEY and os.getenv("AI_VISION_MODEL", "").strip()),
         "file_generation": bool(API_KEY),
         "transcription": bool(os.getenv("TTS_GEMINI_API_KEY", "").strip()),
-        "speech": bool(NVIDIA_API_KEY or API_KEY),
+        "speech": bool(_nvidia_speech_key()),
         "memory": bool(has_valid_memory_key and has_database),
         "accounts": bool(len(JWT_SECRET) >= 32 and has_database),
     }
@@ -359,7 +369,7 @@ async def text_to_speech(body: TTSRequest):
 
     # Keep the selected speaker consistent while switching locale per language run.
     speaker = "Jason" if body.gender == "male" else "Sofia"
-    api_key = os.getenv("NVIDIA_API_KEY", "").strip() or os.getenv("AI_API_KEY", "").strip()  # Legacy fallback.
+    api_key = _nvidia_speech_key()
     if not api_key:
         raise HTTPException(status_code=503, detail="Speech generation is temporarily unavailable.")
 
