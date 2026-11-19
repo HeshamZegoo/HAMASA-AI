@@ -31,6 +31,7 @@ from .attachments import prepare_messages, AttachmentInput
 from .file_generation import build_file
 from .quality import coding_instructions_for
 from .research import latest_user_text, should_search_web, format_search_context, rank_search_results
+from .tooling import TOOL_CAPABILITIES_PROMPT
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper())
 logger = logging.getLogger("hamasa.provider")
@@ -959,6 +960,7 @@ async def chat(body: ChatRequest):
         raise HTTPException(status_code=503, detail="Chat is temporarily unavailable.")
 
     context_messages = [{"role": "system", "content": HAMASA_SYSTEM_PROMPT}]
+    context_messages.append({"role": "system", "content": TOOL_CAPABILITIES_PROMPT})
     context_messages.append({
         "role": "system",
         "content": (
