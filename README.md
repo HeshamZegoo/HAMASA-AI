@@ -1,52 +1,142 @@
 # HAMASA AI — حماصة
 
-Your Personal AI Companion.
+**Your personal AI assistant | مساعدك الذكي**
 
-A web-first Arabic/English AI companion with a premium dark interface, animated orb/avatar, and browser-local conversation history.
+HAMASA is an Arabic/English AI assistant built as a web application. It combines a responsive chat interface with a FastAPI backend, configurable AI providers, optional live web research, account-based conversation sync, saved memory, file and image attachments, and text-to-speech.
 
-## Current architecture
-- **Frontend:** static HTML/CSS/JavaScript, deployable to GitHub Pages.
-- **Backend:** FastAPI, deployable to Railway.
-- **AI:** OpenAI-compatible Chat Completions API. Configure a provider and model through server environment variables; Ollama can be used by setting `AI_BASE_URL` to an Ollama-compatible endpoint reachable by the backend. Optional live web research uses Tavily when `TAVILY_API_KEY` is configured; HAMASA searches only when the latest user request asks for current information or external sources, then grounds the answer with source links.
-- **Conversation history:** stored locally in the browser and synchronized to the account for signed-in users through the authenticated `/api/chats` endpoints. The API receives the latest 40 messages for response continuity.
-- **Memory:** user-managed memories are stored per account, encrypted at rest when `MEMORY_ENCRYPTION_KEY` is configured, and included as relevant context by the frontend.
-- **Attachments:** supports images (through an image-capable provider model), PDF, DOCX, TXT, Markdown, CSV, JSON and XML. See `backend/app/attachments.py` for current size and count limits.
+- **Live app:** https://heshamzegoo.github.io/HAMASA-AI/
+- **Backend API:** https://hamasa-api-production.up.railway.app
+- **Repository:** https://github.com/HeshamZegoo/HAMASA-AI
 
-## Quick start — frontend only
-Open `index.html` through HTTPS (for example GitHub Pages).
+> HAMASA is an actively developed project. Available features depend on the configured AI provider, model capabilities, and server environment.
 
-## Run the backend locally
+## Features
+
+- **Arabic and English chat:** interact in either language.
+- **AI provider configuration:** connect an OpenAI-compatible chat-completions provider and choose its model through backend environment variables.
+- **Live web research:** when a request asks for current information or external sources, HAMASA can use Tavily and include source links in its answer. News searches use a freshness window and filter common social-media domains.
+- **Accounts and conversation sync:** authenticated users can save and retrieve conversations through the backend.
+- **Saved memory:** account memories can be supplied as relevant context; configure encryption for stored memory in production.
+- **Attachments:** text documents and supported office/PDF formats can be extracted for chat context. Images require a vision-capable model. See `backend/app/attachments.py` for supported formats and limits.
+- **Voice:** speech input and spoken responses are available in the web interface; provider credentials and browser support affect availability.
+- **Responsive interface:** web UI designed for desktop and mobile browsers.
+
+## Architecture
+
+| Component | Technology | Purpose |
+|---|---|---|
+| Frontend | HTML, CSS, JavaScript | Chat interface, browser interaction and local settings |
+| Frontend hosting | GitHub Pages | Publishes the static website |
+| Backend | Python, FastAPI, Uvicorn | Authentication, chat orchestration, files, memory and API routes |
+| AI provider | OpenAI-compatible API | Generates assistant responses |
+| Web research | Tavily (optional) | Retrieves current web sources |
+| Production hosting | Railway | Runs the backend and connects persistent services |
+
+The frontend's public API address is configured in `config.js`. **Never put provider API keys or other secrets in frontend files.**
+
+## Run locally
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/HeshamZegoo/HAMASA-AI.git
+cd HAMASA-AI
+```
+
+### 2. Configure and run the backend
+
 ```bash
 cd backend
 python -m venv .venv
+
+# macOS / Linux
 source .venv/bin/activate
+
+# Windows PowerShell:
+# .venv\Scripts\Activate.ps1
+
 pip install -r requirements.txt
 cp .env.example .env
 uvicorn app.main:app --reload --port 8000
 ```
-Set `HAMASA_API_URL=http://localhost:8000` in the frontend configuration in `config.js` (or edit it before deployment).
 
-## Backend environment
-- `AI_API_KEY` — provider API key (keep secret; never put it in frontend code).
-- `AI_BASE_URL` — OpenAI-compatible base URL, e.g. `https://api.openai.com/v1`.
-- `AI_MODEL` — text model identifier supported by your provider.
-- `AI_VISION_MODEL` — optional image-capable model identifier supported by the same OpenAI-compatible provider; required for image analysis.
-- `DATABASE_URL` — PostgreSQL connection string for persistent accounts, sessions, conversations, and memories. SQLite is used only as a local-development fallback.
-- `TAVILY_API_KEY` — optional Tavily key enabling live web research and source-grounded answers. Keep it server-side.
-- `MEMORY_ENCRYPTION_KEY` — Fernet key required in production to encrypt saved memory.
-- `JWT_SECRET` — signing secret (at least 32 characters) required for account authentication.
-- `CORS_ORIGINS` — comma-separated allowed frontend origins.
-- `APP_ENV` — `development` or `production`.
+On Windows, create `.env` by copying `.env.example` if the `cp` command is unavailable.
 
-## Deploy
-1. Enable GitHub Pages for this repository using **GitHub Actions** as the source. The workflow in `.github/workflows/pages.yml` publishes the static site.
-2. Deploy the repository root to Railway; `railway.json` installs `backend/requirements.txt` and starts `backend.app.main:app`.
-3. Add the environment variables above in Railway.
-4. Set the frontend API URL in `config.js` to the deployed backend URL, then commit the change.
-5. Set `CORS_ORIGINS` to the exact GitHub Pages origin.\n6. Confirm `/health` reports the chat provider configured, then test `/api/chat`.
+Edit `backend/.env` and provide the required provider settings. Keep this file private and do not commit it.
 
-## Security and limitations
-- API credentials belong only on the backend.
-- Do not expose private provider endpoints to untrusted users without authentication, rate limiting, and abuse controls.
-- A local Ollama model is only local if the backend can reach the user's Ollama instance; a hosted Railway backend cannot automatically access a computer on the user's private network.
-- No AI response is simulated. If no provider is configured, the API returns a clear configuration error.
+### 3. Point the frontend to your local API
+
+In the repository-root `config.js`, set:
+
+```js
+window.HAMASA_CONFIG = Object.freeze({
+  API_URL: "http://localhost:8000"
+});
+```
+
+Then serve the repository root through a local web server and open the frontend from that server. Do not rely on opening the HTML file directly with a `file://` URL.
+
+## Backend environment variables
+
+Set these in `backend/.env` for local development or in the Railway service's Variables page for production.
+
+| Variable | Purpose |
+|---|---|
+| `AI_API_KEY` | Secret API key for the selected AI provider |
+| `AI_BASE_URL` | OpenAI-compatible API base URL; defaults to OpenAI's API |
+| `AI_MODEL` | Chat model identifier supported by the provider |
+| `AI_VISION_MODEL` | Optional vision-capable model for image understanding |
+| `TAVILY_API_KEY` | Optional server-side key for live web research |
+| `DATABASE_URL` | Database connection string for persistent account data |
+| `JWT_SECRET` | Strong secret used to sign authentication tokens |
+| `MEMORY_ENCRYPTION_KEY` | Fernet key used to encrypt saved memories at rest |
+| `CORS_ORIGINS` | Comma-separated list of permitted frontend origins |
+| `APP_ENV` | Set to `development` or `production` |
+
+See [`backend/.env.example`](backend/.env.example) for the current variable template. Never share real keys in issues, screenshots, chat messages, or source control.
+
+## Deployment
+
+### Frontend — GitHub Pages
+
+1. Open the repository's **Settings → Pages**.
+2. Choose **GitHub Actions** as the build and deployment source.
+3. The workflow in `.github/workflows/pages.yml` publishes the static frontend from the repository.
+4. Confirm that `config.js` points to the intended production API URL.
+
+### Backend — Railway
+
+1. Connect this GitHub repository to the existing Railway backend service and deploy the `main` branch.
+2. Set the backend environment variables in Railway. Add secrets there, not to GitHub or the frontend.
+3. Set `CORS_ORIGINS` to the exact frontend origin, for example `https://heshamzegoo.github.io`.
+4. Confirm the service health endpoint at `/health`.
+5. Review the deployment logs and test chat, authentication, conversation sync, attachments, and web research after deployment.
+
+The repository includes `railway.json` for Railway build/start configuration and GitHub Actions workflows for validation and Pages deployment.
+
+## Security notes
+
+- Keep `AI_API_KEY`, `TAVILY_API_KEY`, `JWT_SECRET`, database credentials, and encryption keys on the backend only.
+- Use HTTPS for deployed frontend and backend services.
+- Configure CORS with trusted origins rather than a wildcard in production.
+- Use a strong, unique `JWT_SECRET` and a valid Fernet `MEMORY_ENCRYPTION_KEY` when memory encryption is enabled.
+- Do not expose a private AI provider endpoint to untrusted users without appropriate authentication, rate limits, and abuse protections.
+- A hosted Railway backend cannot automatically reach an Ollama instance running on a computer inside a private home network. A reachable, secured endpoint is required.
+
+## Development and tests
+
+Run the backend test suite from the repository root:
+
+```bash
+python -m unittest discover -s backend/tests -v
+```
+
+The backend test workflow is defined in `.github/workflows/backend-tests.yml`. Run the tests and review the changes before deploying to production.
+
+## Project status
+
+HAMASA is under active development. This README describes the current application architecture and configured capabilities; it does not imply that every optional provider or feature is enabled in every deployment. Actual AI quality, image understanding, web research, and voice behavior depend on the selected provider, model, credentials, and runtime environment.
+
+---
+
+Made with care for Arabic-first AI experiences.
