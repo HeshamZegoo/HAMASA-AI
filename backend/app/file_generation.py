@@ -45,7 +45,7 @@ def _apply_docx_direction(paragraph, text: str) -> None:
         if run_properties.find(qn("w:rtl")) is None:
             run_properties.append(OxmlElement("w:rtl"))
         run.font.name = "Arial"
-        run._element.get_or_add_rPr().rFonts.set(qn("w:eastAsia"), "Arial")
+        run._element.get_or_add_rPr().get_or_add_rFonts().set(qn("w:eastAsia"), "Arial")
 
 
 def _pdf_rtl(text: str) -> str:
