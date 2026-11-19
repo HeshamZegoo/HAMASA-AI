@@ -70,6 +70,14 @@ class LiveWebSearchTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(fake_client.request_body["query"]), 400)
 
 
+    async def test_arabic_non_ai_news_query_keeps_its_original_topic(self):
+        fake_client = FakeClient()
+        with patch.dict(os.environ, {"TAVILY_API_KEY": "test-secret"}):
+            with patch("backend.app.main.httpx.AsyncClient", return_value=fake_client):
+                await main._live_web_search("آخر أخبار الاقتصاد اليوم")
+        self.assertEqual(fake_client.request_body["query"], "آخر أخبار الاقتصاد اليوم")
+        self.assertEqual(fake_client.request_body["topic"], "news")
+
     async def test_news_search_is_fresh_and_filters_social_results(self):
         class NewsResponse:
             status_code = 200
