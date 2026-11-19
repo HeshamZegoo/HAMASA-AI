@@ -38,6 +38,7 @@ logger = logging.getLogger("hamasa.provider")
 
 APP_ENV = os.getenv("APP_ENV", "development").strip().lower()
 API_KEY = os.getenv("AI_API_KEY", "").strip()
+NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY", "").strip()
 BASE_URL = os.getenv("AI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
 MODEL = os.getenv("AI_MODEL", "gpt-4o-mini")
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
@@ -64,7 +65,7 @@ def _runtime_tool_status() -> dict[str, bool]:
         "vision": bool(API_KEY and os.getenv("AI_VISION_MODEL", "").strip()),
         "file_generation": bool(API_KEY),
         "transcription": bool(os.getenv("TTS_GEMINI_API_KEY", "").strip()),
-        "speech": bool(API_KEY),
+        "speech": bool(NVIDIA_API_KEY or API_KEY),
         "memory": bool(has_valid_memory_key and has_database),
         "accounts": bool(len(JWT_SECRET) >= 32 and has_database),
     }
@@ -358,7 +359,7 @@ async def text_to_speech(body: TTSRequest):
 
     # Keep the selected speaker consistent while switching locale per language run.
     speaker = "Jason" if body.gender == "male" else "Sofia"
-    api_key = os.getenv("AI_API_KEY", "").strip()
+    api_key = NVIDIA_API_KEY or API_KEY  # AI_API_KEY remains a legacy fallback.
     if not api_key:
         raise HTTPException(status_code=503, detail="Speech generation is temporarily unavailable.")
 
