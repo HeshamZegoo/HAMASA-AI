@@ -483,8 +483,20 @@ async def text_to_speech(body: TTSRequest):
         logger.exception("Could not combine NVIDIA TTS audio: %s", exc)
         raise HTTPException(status_code=502, detail="NVIDIA TTS returned an invalid audio file.")
 
+    # Also return the original per-language WAVs. The browser plays these
+    # sequentially so iOS/Safari cannot truncate or mishandle a concatenated
+    # multilingual WAV stream at a language boundary.
+    audio_segments = [
+        {
+            "language": language,
+            "audio": base64.b64encode(wav_data).decode("ascii"),
+            "mime_type": "audio/wav",
+        }
+        for wav_data, language in wav_parts
+    ]
     return {
         "audio": base64.b64encode(audio_bytes).decode("ascii"),
+        "audio_segments": audio_segments,
         "mime_type": "audio/wav",
     }
 
