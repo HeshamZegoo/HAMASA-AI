@@ -1070,10 +1070,19 @@ $("#authForm").addEventListener("submit", async e => {
     store.set("hamasa.authUser", authUser);
     $("#authPassword").value = "";
     updateAuthButton();
-    await syncMemoriesFromServer();
-    await syncConversationsFromServer();
     $("#authDlg").close();
-    toast(lang === "ar" ? (authMode === "signup" ? "حسابك اتعمل بنجاح!" : "أهلاً بيك! محادثاتك اتزامنت مع الحساب.") : (authMode === "signup" ? "Your account was created!" : "You’re signed in! Your chats are synced."));
+    try {
+      await syncMemoriesFromServer();
+      await syncConversationsFromServer();
+      toast(lang === "ar"
+        ? (authMode === "signup" ? "حسابك اتعمل بنجاح!" : "أهلاً بيك! محادثاتك اتزامنت.")
+        : (authMode === "signup" ? "Your account was created!" : "You’re signed in and your chats are synced."));
+    } catch (syncError) {
+      console.warn("Signed in, but cloud chat synchronization is temporarily unavailable.", syncError);
+      toast(lang === "ar"
+        ? "تم تسجيل الدخول، لكن تعذرت مزامنة المحادثات مؤقتاً. محادثاتك المحلية لسه موجودة."
+        : "You’re signed in, but chat sync is temporarily unavailable. Your local chats are still here.");
+    }
   } catch (error) {
     toast(error.message || (lang === "ar" ? "حصل خطأ." : "Something went wrong."));
   } finally { submit.disabled = false; }
