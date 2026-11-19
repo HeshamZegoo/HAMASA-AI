@@ -542,22 +542,26 @@ function renderChat() {
   $('#empty').style.display = has ? 'none' : ''; if (has) cur.messages.forEach(m => msgs.append(bubble(m))); scrollEnd();
 }
 function typing() { const r = document.createElement('div'); r.className = 'm bot'; r.id = 'typing'; r.innerHTML = `<div class="bub"><div class="dots" role="status" aria-label="${t('thinking')}"><i></i><i></i><i></i></div></div>`; msgs.append(r); scrollEnd(); }
-function errorRow() {
+function errorRow(error) {
   const r = document.createElement('div'); r.className = 'm bot err';
   r.innerHTML = `<div class="bub" role="alert"><b></b><span></span><div><button class="rt" type="button"></button></div></div>`;
-  r.querySelector('b').textContent = t('errT'); r.querySelector('span').textContent = t('errB'); const rt = r.querySelector('.rt'); rt.textContent = t('retry');
+  r.querySelector('b').textContent = t('errT');
+  const detail = error && error.message ? String(error.message) : t('errB');
+  r.querySelector('span').textContent = detail;
+  const rt = r.querySelector('.rt'); rt.textContent = t('retry');
   rt.onclick = () => { r.remove(); respond(); }; msgs.append(r); scrollEnd();
 }
 function setBusy(v) { busy = v; sendBtn.disabled = v || !inp.value.trim(); }
 function requestedFileFormat(text) {
   const s = String(text || '').toLowerCase().trim();
-  const intent = /(اعمل|اعملي|اعمللي|أنشئ|انشئ|انشأ|جهز|جهزي|جهزلي|حضّر|حضر|حوّل|حول|صدّر|صدر|اكتب|اكتبلي|نزّل|نزل|حمّل|حمل|احفظ|جهّز|generate|create|make|export|download|save)/
-    .test(s) || /(ملف|مستند|تقرير|جدول).{0,45}(للتنزيل|تحميل|جاهز|في ملف)/.test(s);
-  if (!intent) return null;
-  if (/\bpdf\b|\.pdf|بي\s*دي\s*اف/.test(s)) return 'pdf';
-  if (/\b(xlsx|excel)\b|اكسل|إكسل|اكسيل|جدول حساب/.test(s)) return 'xlsx';
+  const format = /\bpdf\b|\.pdf|بي\s*دي\s*اف|بي دي اف|\b(xlsx|excel|spreadsheet)\b|اكسل|إكسل|اكسيل|\b(docx|word)\b|وورد/.test(s);
+  const action = /(اعمل|اعملي|اعمله|اعملهولي|اعمللي|اعمليلي|أنشئ|انشئ|انشأ|جهز|جهزي|جهزلي|حضّر|حضر|حوّل|حول|صدّر|صدر|اكتب|اكتبلي|نزّل|نزل|حمّل|حمل|احفظ|جهّز|generate|create|make|export|download|save|عايز|عاوز|عايزة|عاوزة|محتاج|محتاجة|ممكن|ينفع|لو سمحت|please|can you|could you|i need|i want)/.test(s);
+  const documentIntent = /(ملف|مستند|تقرير|جدول|document|file).{0,55}(للتنزيل|تحميل|جاهز|في ملف|اعمل|اعملي|جهز|create|generate)/.test(s);
+  if (!action && !documentIntent) return null;
+  if (/\bpdf\b|\.pdf|بي\s*دي\s*اف|بي دي اف/.test(s)) return 'pdf';
+  if (/\b(xlsx|excel|spreadsheet)\b|اكسل|إكسل|اكسيل/.test(s)) return 'xlsx';
   if (/\b(docx|word)\b|وورد/.test(s)) return 'docx';
-  if (/(ملف|مستند|تقرير|جدول|document|file)/.test(s)) return 'docx';
+  if (/(ملف|مستند|تقرير|document|file)/.test(s)) return 'docx';
   return null;
 }
 async function generateRequestedFile() {
@@ -611,7 +615,7 @@ async function respond() {
     const r = await chatAdapter(cur.messages);
     $('#typing')?.remove(); const m = { role: 'bot', text: r.text, demo: r.demo }; cur.messages.push(m); msgs.append(bubble(m)); save();
     scrollEnd(); setBusy(false); return r.text;
-  } catch (e) { console.error(e); $('#typing')?.remove(); errorRow(); setBusy(false); return null; }
+  } catch (e) { console.error(e); $('#typing')?.remove(); errorRow(e); setBusy(false); return null; }
 }
 async function send(text) {
   text = (text || '').trim(); if (!text || busy) return;
