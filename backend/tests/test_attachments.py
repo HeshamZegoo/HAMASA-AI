@@ -1,13 +1,14 @@
 import base64
 import unittest
 import io
+import zipfile
 
 from docx import Document
 from openpyxl import Workbook
 from pptx import Presentation
 from reportlab.pdfgen import canvas
 
-from backend.app.attachments import AttachmentInput, prepare_messages
+from backend.app.attachments import AttachmentInput, _extract_text, prepare_messages
 from backend.app.main import Message
 
 
@@ -109,6 +110,28 @@ class AttachmentUnderstandingTests(unittest.TestCase):
             "test-model",
         )
         self.assertIn("PDF evidence", prepared[-1]["content"])
+
+    def test_office_archive_with_too_many_entries_is_rejected(self):
+        output = io.BytesIO()
+        with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
+            for index in range(5001):
+                archive.writestr(f"entry-{index}.xml", "")
+        item = self._attachment(
+            "too-many.docx",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            output.getvalue(),
+        )
+        with self.assertRaisesRegex(ValueError, "عناصر كثيرة"):
+            _extract_text(item, output.getvalue())
+
+    def test_malformed_office_archive_is_rejected(self):
+        item = self._attachment(
+            "broken.docx",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            b"not-a-zip-file",
+        )
+        with self.assertRaisesRegex(ValueError, "تالف"):
+            _extract_text(item, b"not-a-zip-file")
 
     def test_attachments_require_a_user_message(self):
         with self.assertRaises(ValueError):
