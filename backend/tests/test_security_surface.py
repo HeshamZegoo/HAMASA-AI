@@ -47,6 +47,13 @@ class PublicStatusDisclosureTests(unittest.TestCase):
         self.assertTrue(available["memory"])
         self.assertTrue(available["accounts"])
 
+    def test_dedicated_nvidia_key_enables_speech_without_chat_provider_key(self):
+        with patch.object(main, "API_KEY", ""):
+            with patch.object(main, "NVIDIA_API_KEY", "dedicated-nvidia-key"):
+                status = main._runtime_tool_status()
+        self.assertFalse(status["chat"])
+        self.assertTrue(status["speech"])
+
     def test_sqlite_does_not_claim_cloud_persistent_memory_or_accounts(self):
         with patch.object(main, "JWT_SECRET", "j" * 40):
             with patch.object(main, "MEMORY_ENCRYPTION_KEY", "fernet-key"):
