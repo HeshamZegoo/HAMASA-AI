@@ -5,7 +5,6 @@
 HAMASA is an Arabic/English AI assistant built as a web application. It combines a responsive chat interface with a FastAPI backend, configurable AI providers, optional live web research, account-based conversation sync, saved memory, file and image attachments, and text-to-speech.
 
 - **Live app:** https://heshamzegoo.github.io/HAMASA-AI/
-- **Backend API:** https://hamasa-api-production.up.railway.app
 - **Repository:** https://github.com/HeshamZegoo/HAMASA-AI
 
 > HAMASA is an actively developed project. Available features depend on the configured AI provider, model capabilities, and server environment.
