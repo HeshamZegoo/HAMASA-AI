@@ -9,14 +9,16 @@
     "application/pdf",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "text/plain", "text/markdown", "text/csv", "application/json",
-    "application/xml"
+    "application/xml",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "text/html", "text/css", "text/javascript"
   ]);
   const maxBytes = 64 * 1024 * 1024;
   const selected = [];
   const picker = document.createElement("input");
   picker.type = "file";
   picker.multiple = true;
-  picker.accept = "image/*,.pdf,.docx,.txt,.md,.csv,.json,.xml";
+  picker.accept = "image/*,.pdf,.docx,.xlsx,.txt,.md,.csv,.json,.xml,.log,.py,.js,.html,.css";
   picker.hidden = true;
   document.body.appendChild(picker);
 
@@ -69,7 +71,7 @@
     for (const file of files) {
       const mime = file.type || "";
       const ext = file.name.split(".").pop().toLowerCase();
-      const extensionAllowed = ["txt","md","csv","json","xml","pdf","docx"].includes(ext);
+      const extensionAllowed = ["txt","md","csv","json","xml","pdf","docx","xlsx","log","py","js","html","css"].includes(ext);
       if (!(allowed.has(mime) || extensionAllowed)) {
         window.alert("نوع الملف غير مدعوم: " + file.name);
         continue;
