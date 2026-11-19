@@ -493,7 +493,7 @@ def _start_email_verification(email: str, password: str):
 @app.post("/api/auth/signup")
 async def signup(body: AuthRequest):
     email = body.email.strip().lower()
-    if not re.fullmatch(r"[^@\\s]+@[^@\\s]+\\.[^@\\s]+", email):
+    if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
         raise HTTPException(status_code=400, detail="Enter a valid email address.")
     return await asyncio.to_thread(_start_email_verification, email, body.password)
 
@@ -501,7 +501,7 @@ async def signup(body: AuthRequest):
 @app.post("/api/auth/resend-verification")
 async def resend_verification(body: ResendVerificationRequest):
     email = body.email.strip().lower()
-    if not re.fullmatch(r"[^@\\s]+@[^@\\s]+\\.[^@\\s]+", email):
+    if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
         raise HTTPException(status_code=400, detail="Enter a valid email address.")
     placeholder = "%s" if DATABASE_URL.startswith(("postgres://", "postgresql://")) else "?"
     with _auth_db() as db:
@@ -539,11 +539,13 @@ def verify_email(body: EmailVerificationRequest, response: Response):
         now = int(time.time())
         if int(expires_at) <= now:
             db.execute(f"DELETE FROM hamasa_pending_verifications WHERE email = {placeholder}", (email,))
+            db.commit()
             raise HTTPException(status_code=400, detail="The code expired. Request a new one.")
         if int(attempts) >= 5:
             raise HTTPException(status_code=429, detail="Too many incorrect codes. Request a new code.")
         if not hmac.compare_digest(str(expected_hash), _email_code_hash(email, body.code)):
             db.execute(f"UPDATE hamasa_pending_verifications SET attempts = attempts + 1 WHERE email = {placeholder}", (email,))
+            db.commit()
             raise HTTPException(status_code=400, detail="The verification code is incorrect.")
         user_id = str(uuid.uuid4())
         try:
