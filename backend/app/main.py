@@ -241,7 +241,7 @@ class ConversationSaveRequest(BaseModel):
 
 class FileCreateRequest(BaseModel):
     prompt: str = Field(min_length=2, max_length=12000)
-    format: Literal["docx", "pdf", "xlsx"]
+    format: Literal["docx", "pdf", "xlsx", "pptx", "csv", "txt", "md", "json", "html"]
     messages: list[Message] = Field(default_factory=list, max_length=20)
     attachments: list[AttachmentInput] = Field(default_factory=list, max_length=8)
 
@@ -945,7 +945,7 @@ def readiness():
 async def generate_file(body: FileCreateRequest):
     if not API_KEY:
         raise HTTPException(status_code=503, detail="File generation is temporarily unavailable.")
-    format_names = {"docx": "Microsoft Word document", "pdf": "PDF document", "xlsx": "Excel spreadsheet"}
+    format_names = {"docx": "Microsoft Word document", "pdf": "PDF document", "xlsx": "Excel spreadsheet", "pptx": "PowerPoint presentation", "csv": "CSV file", "txt": "text file", "md": "Markdown document", "json": "JSON file", "html": "HTML document"}
     requested_pages_match = re.search(r"(?:(?:exactly|بعدد|من)\\s*)?(\\d+|[٠-٩]+)\\s*(?:pages?|صفحات)", body.prompt, re.IGNORECASE)
     requested_pages = 0
     if requested_pages_match:
@@ -1051,8 +1051,14 @@ async def generate_file(body: FileCreateRequest):
         file_bytes = build_file(body.format, title, str(data.get("content") or ""), data.get("rows") or [], requested_pages if body.format == "pdf" else 0)
         safe_title = "".join(c for c in title if c.isalnum() or c in " _-").strip()[:70] or "hamasa-file"
         filename = safe_title + "." + body.format
-        mime = {"docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                "pdf": "application/pdf", "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}[body.format]
+        mime = {
+            "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "pdf": "application/pdf",
+            "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            "csv": "text/csv", "txt": "text/plain", "md": "text/markdown",
+            "json": "application/json", "html": "text/html",
+        }[body.format]
         return {"message": message, "filename": filename, "mime_type": mime,
                 "data": base64.b64encode(file_bytes).decode("ascii")}
     except HTTPException:
