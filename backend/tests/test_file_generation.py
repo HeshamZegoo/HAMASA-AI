@@ -82,6 +82,12 @@ class FileGenerationTests(unittest.TestCase):
         self.assertTrue(workbook.active.sheet_view.rightToLeft)
         workbook.close()
 
+    def test_docx_renders_markdown_table_as_real_table(self):
+        raw = build_file("docx", "Report", "# Summary\\n| Name | Score |\\n|---|---|\\n| Ada | 99 |", [])
+        document = Document(io.BytesIO(raw))
+        self.assertEqual(len(document.tables), 1)
+        self.assertEqual(document.tables[0].cell(1, 0).text, "Ada")
+
     def test_pptx_creates_slides_from_markdown_headings(self):
         from pptx import Presentation
         raw = build_file("pptx", "Deck", "# Intro\nWelcome\n# Results\nDone", [])
