@@ -824,6 +824,14 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/ready")
+def readiness():
+    # The frontend uses readiness, while Railway keeps /health as a lightweight liveness probe.
+    if not API_KEY:
+        raise HTTPException(status_code=503, detail="Chat service is not configured.")
+    return {"status": "ready"}
+
+
 @app.post("/api/files/generate")
 async def generate_file(body: FileCreateRequest):
     if not API_KEY:
