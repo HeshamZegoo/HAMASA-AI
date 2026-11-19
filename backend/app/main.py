@@ -463,7 +463,7 @@ def _issue_token(user_id: str) -> str:
     if not JWT_SECRET or len(JWT_SECRET) < 32:
         raise HTTPException(status_code=503, detail="Authentication is not configured.")
     now = int(time.time())
-    expires = now + 24 * 3600
+    expires = now + 30 * 24 * 3600
     session_id = str(uuid.uuid4())
     placeholder = "%s" if DATABASE_URL.startswith(("postgres://", "postgresql://")) else "?"
     with _auth_db() as db:
@@ -545,7 +545,7 @@ def login(body: AuthRequest, response: Response):
 
 def _set_session_cookie(response: Response, token: str):
     response.set_cookie(
-        key="hamasa_session", value=token, max_age=24 * 3600,
+        key="hamasa_session", value=token, max_age=30 * 24 * 3600,
         httponly=True, secure=True, samesite="none", path="/",
     )
 
