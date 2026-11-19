@@ -5,6 +5,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
+from cryptography.fernet import Fernet
+import sqlite3
 
 from backend.app import main
 
@@ -15,13 +17,17 @@ class AccountAndConversationFlowTests(unittest.TestCase):
         database_path = Path(self.temp_dir.name) / "hamasa-test.db"
         self.database_patch = patch.object(main, "DATABASE_URL", f"sqlite:///{database_path}")
         self.jwt_patch = patch.object(main, "JWT_SECRET", "test-secret-" + ("x" * 40))
+        self.memory_key = Fernet.generate_key().decode("ascii")
+        self.memory_patch = patch.object(main, "MEMORY_ENCRYPTION_KEY", self.memory_key)
         self.database_patch.start()
         self.jwt_patch.start()
+        self.memory_patch.start()
         main.init_db()
         self.client = TestClient(main.app)
 
     def tearDown(self):
         self.client.close()
+        self.memory_patch.stop()
         self.jwt_patch.stop()
         self.database_patch.stop()
         self.temp_dir.cleanup()
@@ -72,6 +78,32 @@ class AccountAndConversationFlowTests(unittest.TestCase):
         self.assertEqual(listed.status_code, 200)
         self.assertEqual(listed.json()["conversations"][0]["id"], conversation_id)
         self.assertEqual(listed.json()["conversations"][0]["messages"][1]["text"], "Hi")
+
+    def test_saved_memory_is_encrypted_at_rest_and_decrypted_for_owner(self):
+        signup = self.client.post("/api/auth/signup", json={
+            "email": "memory@example.com",
+            "password": "correct-horse-battery",
+        })
+        token = signup.json()["token"]
+        headers = {"Authorization": f"Bearer {token}"}
+        created = self.client.post("/api/memory", headers=headers, json={
+            "category": "preference",
+            "text": "أفضل الرد بالمصري",
+        })
+        self.assertEqual(created.status_code, 200)
+        memory_id = created.json()["id"]
+
+        database_path = Path(self.temp_dir.name) / "hamasa-test.db"
+        with sqlite3.connect(database_path) as db:
+            stored = db.execute(
+                "SELECT content FROM hamasa_memories WHERE id = ?", (memory_id,)
+            ).fetchone()[0]
+        self.assertTrue(stored.startswith("enc:v1:"))
+        self.assertNotIn("أفضل الرد بالمصري", stored)
+
+        listed = self.client.get("/api/memory", headers=headers)
+        self.assertEqual(listed.status_code, 200)
+        self.assertEqual(listed.json()["memories"][0]["text"], "أفضل الرد بالمصري")
 
     def test_invalid_credentials_are_rejected(self):
         response = self.client.post("/api/auth/login", json={
