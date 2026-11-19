@@ -126,7 +126,7 @@
         nextPayload.attachments = await Promise.all(documentFiles.map(readFile));
       }
       if (audioFiles.length) {
-        const apiBase = String(window.HAMASA_CONFIG?.API_URL || "https://hamasa-api-production.up.railway.app").replace(/\\/+$/, "");
+        const apiBase = String(window.HAMASA_CONFIG?.API_URL || "https://hamasa-api-production.up.railway.app").replace(/\/+$/, "");
         const messages = Array.isArray(payload.messages) ? payload.messages.map(message => ({ ...message })) : [];
         const last = messages[messages.length - 1];
         if (!last || last.role !== "user" || typeof last.content !== "string") {
@@ -148,7 +148,7 @@
             ? "[تفريغ الملف الصوتي " + file.name + "]: " + transcript
             : "[لم يتم التعرف على كلام واضح في الملف الصوتي " + file.name + "]");
         }
-        last.content += "\\n\\n" + transcripts.join("\\n\\n");
+        last.content += "\n\n" + transcripts.join("\n\n");
         nextPayload.messages = messages;
       }
       return nextPayload;
