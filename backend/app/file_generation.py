@@ -256,7 +256,7 @@ def build_file(fmt: str, title: str, content: str, rows: list, page_count: int =
         return output.getvalue()
     if fmt in ("txt", "md"):
         prefix = "# " if fmt == "md" else ""
-        return (prefix + title + "\\n\\n" + content).encode("utf-8")
+        return (prefix + title + "\n\n" + content).encode("utf-8")
     if fmt == "csv":
         import csv
         output = io.StringIO(newline="")
