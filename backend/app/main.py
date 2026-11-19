@@ -52,11 +52,12 @@ HAMASA_SYSTEM_PROMPT = os.getenv("HAMASA_SYSTEM_PROMPT", "").strip()
 
 def _nvidia_speech_key() -> str:
     """Use a dedicated NVIDIA key; allow legacy reuse only for an NVIDIA chat provider."""
-    if NVIDIA_API_KEY:
-        return NVIDIA_API_KEY
+    dedicated_key = os.getenv("NVIDIA_API_KEY", "").strip() or NVIDIA_API_KEY
+    if dedicated_key:
+        return dedicated_key
     provider_host = (urlparse(BASE_URL).hostname or "").lower()
     if provider_host == "integrate.api.nvidia.com" or provider_host.endswith(".nvidia.com"):
-        return API_KEY
+        return os.getenv("AI_API_KEY", "").strip() or API_KEY
     return ""
 
 
