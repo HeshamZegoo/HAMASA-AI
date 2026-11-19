@@ -68,5 +68,31 @@ class LiveWebSearchTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(fake_client.request_body["query"]), 400)
 
 
+    async def test_news_search_is_fresh_and_filters_social_results(self):
+        class NewsResponse:
+            status_code = 200
+            def json(self):
+                return {"results": [
+                    {"title": "Social post", "url": "https://www.facebook.com/groups/1/posts/2", "content": "not an article"},
+                    {"title": "AI report", "url": "https://www.reuters.com/technology/ai/", "content": "AI industry news"},
+                ]}
+        class NewsClient(FakeClient):
+            async def post(self, url, json):
+                self.request_url = url
+                self.request_body = json
+                return NewsResponse()
+        fake_client = NewsClient()
+        with patch.dict(os.environ, {"TAVILY_API_KEY": "test-secret"}):
+            with patch("backend.app.main.httpx.AsyncClient", return_value=fake_client):
+                results = await main._live_web_search("أحدث أخبار الذكاء الاصطناعي اليوم")
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["title"], "AI report")
+        self.assertEqual(fake_client.request_body["topic"], "news")
+        self.assertEqual(fake_client.request_body["days"], 1)
+        self.assertGreaterEqual(fake_client.request_body["max_results"], 5)
+        self.assertIn("artificial intelligence", fake_client.request_body["query"])
+        self.assertIn("facebook.com", fake_client.request_body["exclude_domains"])
+
+
 if __name__ == "__main__":
     unittest.main()
