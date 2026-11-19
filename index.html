@@ -448,7 +448,11 @@ async function chatAdapter(messages) {
   }
   const data = await response.json();
   window.HAMASA_ATTACHMENTS?.clear();
-  return { text: parseChatResponse(data), demo: false };
+  return {
+    text: parseChatResponse(data),
+    demo: false,
+    sources: Array.isArray(data.sources) ? data.sources.slice(0, 10) : []
+  };
 }
 
 /* =====================================================================
@@ -887,6 +891,39 @@ function bubble(m) {
   const content = document.createElement('div'); content.className = 'msg-content';
   const b = document.createElement('div'); b.className = 'bub'; b.textContent = m.text; content.append(b);
   if (m.demo) { const g = document.createElement('div'); g.className = 'tag'; g.dataset.demo = ''; g.textContent = t('demoTag'); b.append(document.createElement('br'), g); }
+  if (m.role !== 'user' && Array.isArray(m.sources) && m.sources.length) {
+    const details = document.createElement('details');
+    details.className = 'source-list';
+    details.style.cssText = 'margin-top:10px;padding:9px 11px;border:1px solid var(--line);border-radius:12px;background:var(--glass);font-size:12px';
+    const summary = document.createElement('summary');
+    summary.textContent = lang === 'ar' ? 'المصادر (' + m.sources.length + ')' : 'Sources (' + m.sources.length + ')';
+    summary.style.cssText = 'cursor:pointer;font-weight:650;color:var(--mut)';
+    const list = document.createElement('ul');
+    list.style.cssText = 'display:grid;gap:7px;margin:9px 0 0;padding-inline-start:18px';
+    m.sources.slice(0, 10).forEach(source => {
+      try {
+        const url = new URL(String(source.url || ''));
+        if (!['http:', 'https:'].includes(url.protocol)) return;
+        const item = document.createElement('li');
+        const link = document.createElement('a');
+        link.href = url.href;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = String(source.title || url.hostname).slice(0, 180);
+        link.style.cssText = 'color:var(--acc);text-decoration:underline;overflow-wrap:anywhere';
+        item.append(link);
+        if (source.published_date) {
+          const date = document.createElement('small');
+          date.textContent = ' · ' + String(source.published_date).slice(0, 40);
+          date.style.cssText = 'color:var(--mut);margin-inline-start:5px';
+          item.append(date);
+        }
+        list.append(item);
+      } catch {}
+    });
+    details.append(summary, list);
+    content.append(details);
+  }
   if (m.role !== 'user' && m.text) {
     const tools = document.createElement('div'); tools.className = 'msg-tools';
     const copy = document.createElement('button'); copy.type = 'button'; copy.className = 'msg-tool';
@@ -984,7 +1021,7 @@ async function respond() {
       msgs.append(row); save(); scrollEnd(); setBusy(false); return m.text;
     }
     const r = await chatAdapter(cur.messages);
-    $('#typing')?.remove(); const m = { role: 'bot', text: r.text, demo: r.demo }; cur.messages.push(m); msgs.append(bubble(m)); save();
+    $('#typing')?.remove(); const m = { role: 'bot', text: r.text, demo: r.demo, sources: r.sources || [] }; cur.messages.push(m); msgs.append(bubble(m)); save();
     scrollEnd(); setBusy(false); return r.text;
   } catch (e) { console.error(e); $('#typing')?.remove(); errorRow(e); setBusy(false); return null; }
 }
