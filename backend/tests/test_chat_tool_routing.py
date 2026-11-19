@@ -64,9 +64,11 @@ class ChatToolRoutingTests(unittest.IsolatedAsyncioTestCase):
             attachments=[attachment],
         )
         with patch.object(main, "API_KEY", "test-api-key"):
-            with patch.dict(os.environ, {"AI_VISION_MODEL": ""}):
-                with self.assertRaises(HTTPException) as caught:
-                    await main.chat(body)
+            with patch.object(main, "BASE_URL", "https://provider.example/v1"):
+                with patch.object(main, "MODEL", "meta/llama-text-only"):
+                    with patch.dict(os.environ, {"AI_VISION_MODEL": ""}):
+                        with self.assertRaises(HTTPException) as caught:
+                            await main.chat(body)
         self.assertEqual(caught.exception.status_code, 503)
 
     async def test_search_context_is_attached_and_sources_are_returned(self):
