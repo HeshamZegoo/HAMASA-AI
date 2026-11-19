@@ -35,6 +35,13 @@ class FileGenerationTests(unittest.TestCase):
         self.assertIn("HAMASA Report", extracted)
         self.assertIn("Important result", extracted)
 
+    def test_arabic_pdf_generates_valid_pages_with_embedded_font(self):
+        raw = build_file("pdf", "تقرير حماصة", "ملخص بالعربية\nالنتيجة النهائية", [])
+        reader = PdfReader(io.BytesIO(raw))
+        self.assertGreaterEqual(len(reader.pages), 1)
+        resources = reader.pages[0]["/Resources"]
+        self.assertIn("/Font", resources)
+
     def test_xlsx_contains_title_description_and_rows(self):
         raw = build_file("xlsx", "Sales", "Monthly totals", [["Month", "Total"], ["January", 10], ["Formula", "=1+1"]],)
         workbook = load_workbook(io.BytesIO(raw), data_only=True)
