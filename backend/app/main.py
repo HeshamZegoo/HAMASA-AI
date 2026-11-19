@@ -191,7 +191,7 @@ def _tts_segments(text: str) -> list[tuple[str, str]]:
     segments: list[tuple[str, str]] = []
     prefix = ""
     for token in tokens:
-        if re.search(r"[\\u0600-\\u06FF\\u0750-\\u077F]", token):
+        if re.search(r"[\u0600-\u06FF\u0750-\u077F]", token):
             language = "ar-XA"
         elif re.search(r"[A-Za-z]", token):
             language = "en-US"
