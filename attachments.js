@@ -4,32 +4,40 @@
   if (!button || window.__HAMASA_ATTACHMENTS_READY__) return;
   window.__HAMASA_ATTACHMENTS_READY__ = true;
 
-  const allowed = new Set([
-    "image/jpeg", "image/png", "image/webp", "image/gif",
-    "application/pdf",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "text/plain", "text/markdown", "text/csv", "application/json",
-    "application/xml",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    "text/html", "text/css", "text/javascript"
+  const MAX_FILES = 8;
+  const MAX_BYTES = 64 * 1024 * 1024;
+  const allowedExtensions = new Set([
+    "jpg","jpeg","png","webp","pdf","docx","xlsx","pptx",
+    "txt","md","csv","json","xml","log","py","js","ts","jsx","tsx",
+    "html","htm","css","scss","yaml","yml","toml","ini","cfg","conf",
+    "sql","sh","bash","java","c","h","cpp","hpp","cs","go","rs",
+    "php","rb","swift","kt","dart","vue","svelte","ipynb"
   ]);
-  const maxBytes = 64 * 1024 * 1024;
+  const mimeByExtension = {
+    jpg:"image/jpeg", jpeg:"image/jpeg", png:"image/png", webp:"image/webp",
+    pdf:"application/pdf",
+    docx:"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    xlsx:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    pptx:"application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    txt:"text/plain", md:"text/markdown", csv:"text/csv", json:"application/json",
+    xml:"application/xml", html:"text/html", htm:"text/html", css:"text/css"
+  };
   const selected = [];
   const picker = document.createElement("input");
   picker.type = "file";
   picker.multiple = true;
-  picker.accept = "image/*,.pdf,.docx,.xlsx,.txt,.md,.csv,.json,.xml,.log,.py,.js,.html,.css";
+  picker.accept = "image/jpeg,image/png,image/webp,.pdf,.docx,.xlsx,.pptx,.txt,.md,.csv,.json,.xml,.log,.py,.js,.ts,.jsx,.tsx,.html,.htm,.css,.scss,.yaml,.yml,.toml,.ini,.cfg,.conf,.sql,.sh,.bash,.java,.c,.h,.cpp,.hpp,.cs,.go,.rs,.php,.rb,.swift,.kt,.dart,.vue,.svelte,.ipynb";
   picker.hidden = true;
   document.body.appendChild(picker);
 
   const tray = document.createElement("div");
   tray.id = "hamasaAttachmentTray";
-  tray.style.cssText = "display:none;max-width:760px;margin:0 auto 8px;padding:0 8px;display:flex;flex-wrap:wrap;gap:7px";
+  tray.style.cssText = "display:none;max-width:760px;margin:0 auto 8px;padding:0 8px;flex-wrap:wrap;gap:7px";
   const composer = document.querySelector(".comp");
-  composer.insertBefore(tray, composer.firstChild);
+  if (composer) composer.insertBefore(tray, composer.firstChild);
 
   function render() {
-    tray.innerHTML = "";
+    tray.replaceChildren();
     tray.style.display = selected.length ? "flex" : "none";
     selected.forEach((file, index) => {
       const chip = document.createElement("span");
@@ -55,8 +63,13 @@
       reader.onload = () => {
         const value = String(reader.result || "");
         const comma = value.indexOf(",");
-        if (comma < 0) return reject(new Error("صيغة الملف غير صالحة."));
-        resolve({ name: file.name, mime_type: file.type || "application/octet-stream", data: value.slice(comma + 1) });
+        if (comma < 0) return reject(new Error("صيغة الملف غير صالحة: " + file.name));
+        const ext = file.name.split(".").pop().toLowerCase();
+        resolve({
+          name: file.name,
+          mime_type: file.type || mimeByExtension[ext] || "application/octet-stream",
+          data: value.slice(comma + 1)
+        });
       };
       reader.readAsDataURL(file);
     });
@@ -66,41 +79,41 @@
     event.preventDefault();
     picker.click();
   });
+
   picker.addEventListener("change", () => {
     const files = Array.from(picker.files || []);
+    let total = selected.reduce((sum, item) => sum + item.size, 0);
     for (const file of files) {
-      const mime = file.type || "";
-      const ext = file.name.split(".").pop().toLowerCase();
-      const extensionAllowed = ["txt","md","csv","json","xml","pdf","docx","xlsx","log","py","js","html","css"].includes(ext);
-      if (!(allowed.has(mime) || extensionAllowed)) {
-        window.alert("نوع الملف غير مدعوم: " + file.name);
+      const ext = file.name.includes(".") ? file.name.split(".").pop().toLowerCase() : "";
+      if (!allowedExtensions.has(ext)) {
+        window.alert("نوع الملف غير مدعوم حالياً: " + file.name);
         continue;
       }
-      if (file.size > maxBytes) {
-        window.alert("حجم الملف أكبر من الحد التقني (64 ميجابايت): " + file.name);
+      if (file.size > MAX_BYTES || total + file.size > MAX_BYTES) {
+        window.alert("إجمالي حجم المرفقات لا يمكن أن يتجاوز 64 ميجابايت.");
         continue;
       }
-      if (!selected.some(item => item.file === file || item.file.name === file.name && item.file.size === file.size)) selected.push({ file });
+      if (selected.length >= MAX_FILES) {
+        window.alert("تقدر ترفق 8 ملفات كحد أقصى في الرسالة الواحدة.");
+        break;
+      }
+      if (selected.some(item => item.name === file.name && item.size === file.size)) continue;
+      selected.push(file);
+      total += file.size;
     }
     picker.value = "";
     render();
   });
 
-  const originalFetch = window.fetch.bind(window);
-  window.fetch = async (input, init = {}) => {
-    const url = typeof input === "string" ? input : input && input.url;
-    if (!url || !url.endsWith("/api/chat") || !selected.length || !init.body) {
-      return originalFetch(input, init);
-    }
-    let payload;
-    try { payload = JSON.parse(init.body); }
-    catch { return originalFetch(input, init); }
-    payload.attachments = await Promise.all(selected.map(item => readFile(item.file)));
-    const response = await originalFetch(input, { ...init, body: JSON.stringify(payload) });
-    if (response.ok) {
+  window.HAMASA_ATTACHMENTS = {
+    async addToPayload(payload) {
+      if (!selected.length) return payload;
+      return { ...payload, attachments: await Promise.all(selected.map(readFile)) };
+    },
+    clear() {
       selected.splice(0, selected.length);
       render();
-    }
-    return response;
+    },
+    count() { return selected.length; }
   };
 })();
