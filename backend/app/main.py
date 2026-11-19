@@ -101,6 +101,10 @@ def _prune_rate_events(now: float) -> None:
             events.popleft()
         if not events:
             _rate_events.pop(old_key, None)
+        else:
+            # Rotate active buckets so later cleanup passes can reach older entries.
+            _rate_events.pop(old_key, None)
+            _rate_events[old_key] = events
     # Under a high-cardinality flood, cap memory even if every bucket is recent.
     if len(_rate_events) > 25000:
         for old_key in list(_rate_events.keys())[:5000]:
