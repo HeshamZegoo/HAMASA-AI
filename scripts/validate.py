@@ -108,8 +108,8 @@ def main() -> None:
             fail(f"frontend/backend route contract is incomplete: {route}")
 
     for extension in ("mp3", "wav", "m4a", "aac", "ogg", "webm"):
-        if f'"{extension}"' not in attachments:
-            fail(f"audio attachment type is missing: {extension}")
+        if f'"{extension}"' not in attachments or f".{extension}" not in attachments:
+            fail(f"audio attachment type is missing from the picker: {extension}")
     if "MAX_AUDIO_BYTES" not in attachments or "transcript" not in attachments:
         fail("audio attachments must pass through the transcription endpoint")
 
