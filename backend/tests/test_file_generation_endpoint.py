@@ -115,7 +115,7 @@ class FileGenerationEndpointTests(unittest.IsolatedAsyncioTestCase):
                         result = await main.generate_file(body)
         self.assertEqual(len(FakeVisionThenGenerationClient.payloads), 2)
         vision_payload, generation_payload = FakeVisionThenGenerationClient.payloads
-        self.assertEqual(vision_payload["model"], "nvidia/nemotron-nano-12b-v2-vl")
+        self.assertEqual(vision_payload["model"], "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning")
         self.assertNotIn("response_format", vision_payload)
         self.assertTrue(any(
             part.get("type") == "image_url"
