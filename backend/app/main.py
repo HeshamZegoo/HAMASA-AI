@@ -425,7 +425,7 @@ def _verified_user(authorization: str = Header(default=""), hamasa_session: str 
 @app.post("/api/auth/signup")
 def signup(body: AuthRequest, response: Response):
     email = body.email.strip().lower()
-    if not re.fullmatch(r"[^@\\s]+@[^@\\s]+\\.[^@\\s]+", email):
+    if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
         raise HTTPException(status_code=400, detail="Enter a valid email address.")
     if not JWT_SECRET or len(JWT_SECRET) < 32:
         raise HTTPException(status_code=503, detail="Authentication is not configured.")
