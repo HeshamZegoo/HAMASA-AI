@@ -20,7 +20,7 @@ class ToolCapabilityPolicyTests(unittest.TestCase):
         self.assertIn("DOCX, PDF, and XLSX", TOOL_CAPABILITIES_PROMPT)
 
     def test_unavailable_actions_are_not_claimed(self):
-        self.assertIn("no general-purpose shell", TOOL_CAPABILITIES_PROMPT)
+        self.assertIn("You do not have a general-purpose shell", TOOL_CAPABILITIES_PROMPT)
         self.assertIn("Do not claim to execute code", TOOL_CAPABILITIES_PROMPT)
         self.assertIn("Never claim audio was recorded", TOOL_CAPABILITIES_PROMPT)
 
