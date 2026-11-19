@@ -9,6 +9,9 @@ import re
 import secrets
 import time
 import uuid
+from datetime import datetime
+from zoneinfo import ZoneInfo
+from urllib.parse import urlparse
 from pathlib import Path
 from typing import Literal
 from collections import defaultdict, deque
@@ -899,54 +902,86 @@ async def generate_file(body: FileCreateRequest):
         raise HTTPException(status_code=502, detail="تعذر الاتصال بخدمة إنشاء الملفات.")
 
 async def _live_web_search(query: str) -> list[dict]:
-    """Fetch a small set of current sources from Tavily without exposing its key."""
+    """Fetch fresh, relevant sources from Tavily without exposing its key."""
     search_key = os.getenv("TAVILY_API_KEY", "").strip()
     if not search_key:
         return []
     query = query.strip()[:400]
     if not query:
         return []
-    topic = "news" if re.search(r"(news|اخبار|أخبار|خبر|آخر الأخبار)", query, re.IGNORECASE) else "general"
+
+    is_news = bool(re.search(r"(news|اخبار|أخبار|خبر|آخر الأخبار|أحدث الأخبار)", query, re.IGNORECASE))
+    topic = "news" if is_news else "general"
+    if is_news:
+        today = datetime.now(ZoneInfo("Africa/Cairo")).date().isoformat()
+        # Tavily performs better on English-language technical news queries too.
+        if re.search(r"[\u0600-\u06FF]", query):
+            query = f"{query} artificial intelligence AI latest developments {today}"[:400]
+
     payload = {
         "api_key": search_key,
         "query": query,
         "topic": topic,
         "search_depth": "basic",
-        "max_results": 5,
+        "max_results": 10 if is_news else 5,
         "include_answer": False,
         "include_raw_content": False,
     }
+    if is_news:
+        payload["days"] = 1
+        payload["exclude_domains"] = [
+            "facebook.com", "linkedin.com", "x.com", "twitter.com",
+            "instagram.com", "tiktok.com", "reddit.com",
+        ]
+
+    def valid_results(data):
+        raw = data.get("results", []) if isinstance(data, dict) else []
+        valid = []
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            parsed = urlparse(str(item.get("url") or "").strip())
+            if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+                continue
+            domain = parsed.netloc.lower().split("@")[-1].split(":")[0]
+            if is_news and any(domain == blocked or domain.endswith("." + blocked)
+                               for blocked in payload.get("exclude_domains", [])):
+                continue
+            valid.append(item)
+        return valid
+
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(18.0, connect=6.0)) as client:
             response = await client.post("https://api.tavily.com/search", json=payload)
         if response.status_code >= 400:
             logger.warning("Web search provider returned status=%s", response.status_code)
             return []
-        data = response.json()
-        results = data.get("results", []) if isinstance(data, dict) else []
-        results = [item for item in results if isinstance(item, dict)]
-        # News search can occasionally return an empty set for colloquial/non-English queries.
-        # Retry once with the general index before reporting that live research is unavailable.
-        if not results and topic == "news":
-            fallback_payload = {**payload, "topic": "general",
-                                "query": (query + " artificial intelligence AI latest news today")[:400]}
+        results = valid_results(response.json())
+
+        # Retry news once through the general index if the news index returns no usable articles.
+        if not results and is_news:
+            fallback_payload = {
+                **payload,
+                "topic": "general",
+                "query": (query + " latest AI news reporting")[:400],
+            }
+            fallback_payload.pop("days", None)
+            fallback_payload.pop("exclude_domains", None)
             async with httpx.AsyncClient(timeout=httpx.Timeout(18.0, connect=6.0)) as client:
                 fallback_response = await client.post(
                     "https://api.tavily.com/search", json=fallback_payload
                 )
             if fallback_response.status_code < 400:
-                fallback_data = fallback_response.json()
-                fallback_results = fallback_data.get("results", []) if isinstance(fallback_data, dict) else []
-                results = [item for item in fallback_results if isinstance(item, dict)]
+                results = valid_results(fallback_response.json())
                 logger.info("Live web search fallback completed: results=%d", len(results))
             else:
                 logger.warning("Web search fallback returned status=%s", fallback_response.status_code)
+
         logger.info("Live web search completed: topic=%s results=%d", topic, len(results))
-        return results[:5]
+        return results[:10 if is_news else 5]
     except (httpx.TimeoutException, httpx.RequestError, ValueError, TypeError):
         logger.warning("Live web search failed; continuing without external results.")
         return []
-
 
 @app.post("/api/chat")
 async def chat(body: ChatRequest):
