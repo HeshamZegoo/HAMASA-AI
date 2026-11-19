@@ -22,6 +22,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
 from pptx import Presentation
 from pptx.util import Inches, Pt
+from pptx.enum.text import PP_ALIGN
 from pptx.dml.color import RGBColor as PptRGBColor
 
 _ARABIC_FONT = "HamasaArabic"
@@ -282,7 +283,7 @@ def build_file(fmt: str, title: str, content: str, rows: list, page_count: int =
             paragraph.font.size = Pt(28)
             paragraph.font.bold = True
             paragraph.font.color.rgb = PptRGBColor(23, 50, 77)
-            paragraph.alignment = 2 if _ARABIC_RE.search(section["title"]) else 0
+            paragraph.alignment = PP_ALIGN.RIGHT if _ARABIC_RE.search(section["title"]) else PP_ALIGN.LEFT
             body_box = slide.shapes.add_textbox(Inches(.8), Inches(1.55), Inches(11.7), Inches(5.3))
             frame = body_box.text_frame
             frame.word_wrap = True
@@ -291,7 +292,7 @@ def build_file(fmt: str, title: str, content: str, rows: list, page_count: int =
                 paragraph.text = text[2:] if text.startswith(("- ", "* ", "• ")) else text
                 paragraph.font.size = Pt(17)
                 paragraph.space_after = Pt(12)
-                paragraph.alignment = 2 if _ARABIC_RE.search(text) else 0
+                paragraph.alignment = PP_ALIGN.RIGHT if _ARABIC_RE.search(text) else PP_ALIGN.LEFT
         output = BytesIO()
         presentation.save(output)
         return output.getvalue()
