@@ -6,8 +6,9 @@
 
   const MAX_FILES = 8;
   const MAX_BYTES = 64 * 1024 * 1024;
+  const MAX_AUDIO_BYTES = 11 * 1024 * 1024;
   const allowedExtensions = new Set([
-    "jpg","jpeg","png","webp","pdf","docx","xlsx","pptx",
+    "jpg","jpeg","png","webp","pdf","docx","xlsx","pptx","mp3","wav","m4a","aac","ogg","webm",
     "txt","md","csv","json","xml","log","py","js","ts","jsx","tsx",
     "html","htm","css","scss","yaml","yml","toml","ini","cfg","conf",
     "sql","sh","bash","java","c","h","cpp","hpp","cs","go","rs",
@@ -19,6 +20,7 @@
     docx:"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     xlsx:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     pptx:"application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    mp3:"audio/mpeg", wav:"audio/wav", m4a:"audio/mp4", aac:"audio/aac", ogg:"audio/ogg", webm:"audio/webm",
     txt:"text/plain", md:"text/markdown", csv:"text/csv", json:"application/json",
     xml:"application/xml", html:"text/html", htm:"text/html", css:"text/css"
   };
@@ -26,7 +28,7 @@
   const picker = document.createElement("input");
   picker.type = "file";
   picker.multiple = true;
-  picker.accept = "image/jpeg,image/png,image/webp,.pdf,.docx,.xlsx,.pptx,.txt,.md,.csv,.json,.xml,.log,.py,.js,.ts,.jsx,.tsx,.html,.htm,.css,.scss,.yaml,.yml,.toml,.ini,.cfg,.conf,.sql,.sh,.bash,.java,.c,.h,.cpp,.hpp,.cs,.go,.rs,.php,.rb,.swift,.kt,.dart,.vue,.svelte,.ipynb";
+  picker.accept = "image/jpeg,image/png,image/webp,.pdf,.docx,.xlsx,.pptx,.mp3,.wav,.m4a,.aac,.ogg,.webm,.txt,.md,.csv,.json,.xml,.log,.py,.js,.ts,.jsx,.tsx,.html,.htm,.css,.scss,.yaml,.yml,.toml,.ini,.cfg,.conf,.sql,.sh,.bash,.java,.c,.h,.cpp,.hpp,.cs,.go,.rs,.php,.rb,.swift,.kt,.dart,.vue,.svelte,.ipynb";
   picker.hidden = true;
   document.body.appendChild(picker);
 
@@ -54,6 +56,11 @@
       chip.append(name, remove);
       tray.append(chip);
     });
+  }
+
+  function isAudioFile(file) {
+    const ext = file.name.includes(".") ? file.name.split(".").pop().toLowerCase() : "";
+    return ["mp3","wav","m4a","aac","ogg","webm"].includes(ext) || String(file.type || "").startsWith("audio/");
   }
 
   function readFile(file) {
@@ -89,6 +96,10 @@
         window.alert("نوع الملف غير مدعوم حالياً: " + file.name);
         continue;
       }
+      if (isAudioFile(file) && file.size > MAX_AUDIO_BYTES) {
+        window.alert("حجم الملف الصوتي كبير. الحد الأقصى 11 ميجابايت لكل تسجيل.");
+        continue;
+      }
       if (file.size > MAX_BYTES || total + file.size > MAX_BYTES) {
         window.alert("إجمالي حجم المرفقات لا يمكن أن يتجاوز 64 ميجابايت.");
         continue;
@@ -108,7 +119,39 @@
   window.HAMASA_ATTACHMENTS = {
     async addToPayload(payload) {
       if (!selected.length) return payload;
-      return { ...payload, attachments: await Promise.all(selected.map(readFile)) };
+      const audioFiles = selected.filter(isAudioFile);
+      const documentFiles = selected.filter(file => !isAudioFile(file));
+      const nextPayload = { ...payload };
+      if (documentFiles.length) {
+        nextPayload.attachments = await Promise.all(documentFiles.map(readFile));
+      }
+      if (audioFiles.length) {
+        const apiBase = String(window.HAMASA_CONFIG?.API_URL || "https://hamasa-api-production.up.railway.app").replace(/\\/+$/, "");
+        const messages = Array.isArray(payload.messages) ? payload.messages.map(message => ({ ...message })) : [];
+        const last = messages[messages.length - 1];
+        if (!last || last.role !== "user" || typeof last.content !== "string") {
+          throw new Error("ابعت رسالة مع الملف الصوتي عشان حماصة يعرف المطلوب.");
+        }
+        const transcripts = [];
+        for (const file of audioFiles) {
+          const encoded = await readFile(file);
+          const response = await fetch(apiBase + "/api/transcribe", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ audio: encoded.data, mime_type: encoded.mime_type })
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(result.detail || "تعذر تحويل الملف الصوتي إلى نص.");
+          const transcript = String(result.transcript || "").trim();
+          transcripts.push(transcript
+            ? "[تفريغ الملف الصوتي " + file.name + "]: " + transcript
+            : "[لم يتم التعرف على كلام واضح في الملف الصوتي " + file.name + "]");
+        }
+        last.content += "\\n\\n" + transcripts.join("\\n\\n");
+        nextPayload.messages = messages;
+      }
+      return nextPayload;
     },
     clear() {
       selected.splice(0, selected.length);
