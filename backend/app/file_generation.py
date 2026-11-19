@@ -15,9 +15,15 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.shared import RGBColor
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment
+from pptx import Presentation
+from pptx.util import Inches, Pt
+from pptx.enum.text import PP_ALIGN
+from pptx.dml.color import RGBColor as PptRGBColor
 
 _ARABIC_FONT = "HamasaArabic"
 _ARABIC_FONT_PATH = Path(__file__).with_name("fonts") / "Amiri-Regular.ttf.b64"
@@ -165,9 +171,36 @@ def build_file(fmt: str, title: str, content: str, rows: list, page_count: int =
         doc = Document()
         title_paragraph = doc.add_heading(title, 0)
         _apply_docx_direction(title_paragraph, title)
-        for line in content.splitlines():
-            line = line.strip()
+        lines = content.splitlines()
+        index = 0
+        while index < len(lines):
+            line = lines[index].strip()
             if not line:
+                index += 1
+                continue
+            if "|" in line and index + 1 < len(lines) and _TABLE_RULE.match(lines[index + 1]):
+                table_rows = [_table_cells(line)]
+                index += 2
+                while index < len(lines) and "|" in lines[index] and lines[index].strip():
+                    table_rows.append(_table_cells(lines[index]))
+                    index += 1
+                width = max(len(row) for row in table_rows)
+                table = doc.add_table(rows=len(table_rows), cols=width)
+                table.style = "Table Grid"
+                for row_index, values in enumerate(table_rows):
+                    for col_index, value in enumerate(values):
+                        cell = table.cell(row_index, col_index)
+                        cell.text = value
+                        for cell_paragraph in cell.paragraphs:
+                            _apply_docx_direction(cell_paragraph, value)
+                            for run in cell_paragraph.runs:
+                                if row_index == 0:
+                                    run.bold = True
+                                    run.font.color.rgb = RGBColor(255, 255, 255)
+                        if row_index == 0:
+                            shading = OxmlElement("w:shd")
+                            shading.set(qn("w:fill"), "176B87")
+                            cell._tc.get_or_add_tcPr().append(shading)
                 continue
             if line.startswith("# "):
                 heading = doc.add_heading(line[2:], level=1)
@@ -178,6 +211,7 @@ def build_file(fmt: str, title: str, content: str, rows: list, page_count: int =
             else:
                 paragraph = doc.add_paragraph(line)
                 _apply_docx_direction(paragraph, line)
+            index += 1
         output = BytesIO()
         doc.save(output)
         return output.getvalue()
@@ -194,7 +228,8 @@ def build_file(fmt: str, title: str, content: str, rows: list, page_count: int =
         sheet.sheet_view.rightToLeft = bool(_ARABIC_RE.search(spreadsheet_text))
         sheet.append([title])
         if content:
-            sheet.append([content])
+            sheet.append([content[:32000]])
+        header_row = sheet.max_row + 1
         for row in rows[:5000]:
             if isinstance(row, list):
                 values = [cell if isinstance(cell, (int, float, bool)) else str(cell)[:32000] if cell is not None else "" for cell in row[:100]]
@@ -202,6 +237,17 @@ def build_file(fmt: str, title: str, content: str, rows: list, page_count: int =
                 for cell in sheet[sheet.max_row]:
                     if isinstance(cell.value, str):
                         cell.data_type = "s"
+        sheet["A1"].font = Font(bold=True, size=16, color="FFFFFF")
+        sheet["A1"].fill = PatternFill("solid", fgColor="17324D")
+        if sheet.max_row >= header_row and rows:
+            for cell in sheet[header_row]:
+                cell.font = Font(bold=True, color="FFFFFF")
+                cell.fill = PatternFill("solid", fgColor="176B87")
+            sheet.freeze_panes = f"A{header_row + 1}"
+            sheet.auto_filter.ref = f"A{header_row}:{sheet.cell(sheet.max_row, sheet.max_column).coordinate}"
+        for row in sheet.iter_rows():
+            for cell in row:
+                cell.alignment = Alignment(vertical="center", wrap_text=True, horizontal="right" if sheet.sheet_view.rightToLeft else "left")
         for column in sheet.columns:
             letter = column[0].column_letter
             max_len = min(48, max((len(str(cell.value or "")) for cell in column), default=10))
@@ -209,4 +255,63 @@ def build_file(fmt: str, title: str, content: str, rows: list, page_count: int =
         output = BytesIO()
         workbook.save(output)
         return output.getvalue()
+
+    if fmt == "pptx":
+        presentation = Presentation()
+        presentation.slide_width = Inches(13.333)
+        presentation.slide_height = Inches(7.5)
+        sections = []
+        current = {"title": title, "body": []}
+        for line in content.replace("\r", "").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            if line.startswith("# "):
+                if current["body"] or current["title"] != title:
+                    sections.append(current)
+                current = {"title": line[2:].strip(), "body": []}
+            else:
+                current["body"].append(line)
+        if current["body"] or not sections:
+            sections.append(current)
+        for section in sections:
+            slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+            slide.background.fill.solid()
+            slide.background.fill.fore_color.rgb = PptRGBColor(247, 249, 251)
+            title_box = slide.shapes.add_textbox(Inches(.65), Inches(.45), Inches(12), Inches(.8))
+            paragraph = title_box.text_frame.paragraphs[0]
+            paragraph.text = section["title"]
+            paragraph.font.size = Pt(28)
+            paragraph.font.bold = True
+            paragraph.font.color.rgb = PptRGBColor(23, 50, 77)
+            paragraph.alignment = PP_ALIGN.RIGHT if _ARABIC_RE.search(section["title"]) else PP_ALIGN.LEFT
+            body_box = slide.shapes.add_textbox(Inches(.8), Inches(1.55), Inches(11.7), Inches(5.3))
+            frame = body_box.text_frame
+            frame.word_wrap = True
+            for index, text in enumerate(section["body"][:18]):
+                paragraph = frame.paragraphs[0] if index == 0 else frame.add_paragraph()
+                paragraph.text = text[2:] if text.startswith(("- ", "* ", "• ")) else text
+                paragraph.font.size = Pt(17)
+                paragraph.space_after = Pt(12)
+                paragraph.alignment = PP_ALIGN.RIGHT if _ARABIC_RE.search(text) else PP_ALIGN.LEFT
+        output = BytesIO()
+        presentation.save(output)
+        return output.getvalue()
+    if fmt in ("txt", "md"):
+        prefix = "# " if fmt == "md" else ""
+        return (prefix + title + "\n\n" + content).encode("utf-8")
+    if fmt == "csv":
+        import csv
+        output = io.StringIO(newline="")
+        writer = csv.writer(output)
+        for row in rows:
+            if isinstance(row, list):
+                writer.writerow(row[:100])
+        return ("\ufeff" + output.getvalue()).encode("utf-8")
+    if fmt == "json":
+        import json
+        return json.dumps({"title": title, "content": content, "rows": rows}, ensure_ascii=False, indent=2).encode("utf-8")
+    if fmt == "html":
+        from html import escape as html_escape
+        return ("<!doctype html><html lang='ar'><meta charset='utf-8'><title>" + html_escape(title) + "</title><main dir='auto'><h1>" + html_escape(title) + "</h1><pre>" + html_escape(content) + "</pre></main></html>").encode("utf-8")
     raise ValueError("Unsupported file format")

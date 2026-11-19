@@ -82,9 +82,38 @@ class FileGenerationTests(unittest.TestCase):
         self.assertTrue(workbook.active.sheet_view.rightToLeft)
         workbook.close()
 
+    def test_docx_renders_markdown_table_as_real_table(self):
+        raw = build_file("docx", "Report", "# Summary\n| Name | Score |\n|---|---|\n| Ada | 99 |", [])
+        document = Document(io.BytesIO(raw))
+        self.assertEqual(len(document.tables), 1)
+        self.assertEqual(document.tables[0].cell(1, 0).text, "Ada")
+
+    def test_pptx_creates_slides_from_markdown_headings(self):
+        from pptx import Presentation
+        raw = build_file("pptx", "Deck", "# Intro\nWelcome\n# Results\nDone", [])
+        deck = Presentation(io.BytesIO(raw))
+        self.assertEqual(len(deck.slides), 2)
+        self.assertIn("Intro", deck.slides[0].shapes[0].text)
+        self.assertIn("Results", deck.slides[1].shapes[0].text)
+        raw_crlf = build_file("pptx", "Deck", "# One\r\nLine one\r\n# Two\r\nLine two", [])
+        self.assertEqual(len(Presentation(io.BytesIO(raw_crlf)).slides), 2)
+
+    def test_csv_json_markdown_and_html_outputs(self):
+        import json
+        csv_raw = build_file("csv", "Data", "", [["Name", "Value"], ["A", 2]])
+        self.assertTrue(csv_raw.startswith(b"\xef\xbb\xbf"))
+        self.assertIn("Name,Value", csv_raw.decode("utf-8-sig"))
+        json_raw = build_file("json", "تقرير", "محتوى", [["أ", 1]])
+        self.assertEqual(json.loads(json_raw)["title"], "تقرير")
+        md_raw = build_file("md", "Guide", "## Intro", [])
+        self.assertIn("# Guide", md_raw.decode("utf-8"))
+        html_raw = build_file("html", "<script>", "<b>hello</b>", [])
+        self.assertIn("&lt;script&gt;", html_raw.decode("utf-8"))
+        self.assertNotIn("<script>", html_raw.decode("utf-8"))
+
     def test_unsupported_format_is_rejected(self):
         with self.assertRaises(ValueError):
-            build_file("csv", "Title", "Body", [])
+            build_file("exe", "Title", "Body", [])
 
 
 if __name__ == "__main__":
