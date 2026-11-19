@@ -42,11 +42,11 @@ class AssistantBehaviorGuidanceTests(unittest.TestCase):
         self.assertIn("real training job", RELIABILITY_AND_TASK_EXECUTION_GUIDANCE)
 
     def test_guidance_requires_verified_actions_and_test_results(self):
-        self.assertIn("Claim success only after receiving a successful result", RELIABILITY_AND_TASK_EXECUTION_GUIDANCE)
+        self.assertIn("Claim success only after receiving a successful result", RELIABILITY_AND_TASK_EXECUTION_GUIDANCE.replace("\\n", " "))
         self.assertIn("do not claim tests passed unless they ran", RELIABILITY_AND_TASK_EXECUTION_GUIDANCE)
 
     def test_guidance_preserves_current_task_context_and_language(self):
-        self.assertIn("Do not make the user repeat information", RELIABILITY_AND_TASK_EXECUTION_GUIDANCE)
+        self.assertIn("Do not make the user repeat information", RELIABILITY_AND_TASK_EXECUTION_GUIDANCE.replace("\\n", " "))
         self.assertIn("latest user's language and dialect", RELIABILITY_AND_TASK_EXECUTION_GUIDANCE)
 
 
