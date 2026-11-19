@@ -305,24 +305,30 @@ async def text_to_speech(body: TTSRequest):
             key = os.getenv("TTS_GEMINI_API_KEY", "").strip()
             if not key:
                 raise HTTPException(status_code=503, detail="Gemini TTS is not configured. Add TTS_GEMINI_API_KEY.")
-            # Gemini-only TTS. The style direction prioritizes Egyptian Arabic (Cairene/Masri), not generic MSA.
+            # Gemini 3.8 TTS expects delivery direction in speechMetadata.style,
+            # separate from the verbatim transcript. Putting instructions in text can
+            # make the model read them aloud or produce a presenter-like delivery.
             voice = "Puck" if body.gender == "male" else "Kore"
-            speech_direction = (
-                "Use a natural, direct Egyptian Arabic speaking voice (Cairo dialect), like a person talking normally to a friend. "
-                "This is plain spoken conversation, NOT a podcast, radio show, documentary, audiobook, news bulletin, or dramatic narration. "
-                "Do not add background music, intro or outro, sound effects, humming, singing, or theatrical pauses. "
-                "Do not sound soothing, whispery, overly calm, sentimental, or like a presenter. "
-                "Use a clear, lively but not exaggerated everyday conversational tone and natural Egyptian rhythm. "
-                "Read only the actual answer text. Ignore any remaining headings, labels, stage directions, or production notes. "
-                "Do not announce a title, duration, voice style, or speaker label. "
-                "Do not translate, summarize, paraphrase, or add any words. Speak the supplied answer exactly as written."
+            natural_style = (
+                "Natural, spontaneous everyday Egyptian Arabic conversation, Cairo dialect. "
+                "Warm, present, expressive and human, like a real Egyptian friend speaking directly to someone. "
+                "Use natural pitch movement, varied intonation, subtle emphasis, connected phrasing, and conversational rhythm. "
+                "Sound engaged and responsive, not flat, robotic, sleepy, soothing, theatrical, or like a podcast presenter. "
+                "Keep a comfortable normal speaking pace; let questions sound like real questions and important words carry gentle emphasis. "
+                "No music, singing, sound effects, or announcer delivery."
             )
             response = await client.post(
                 "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash-tts:generateContent",
                 params={"key": key},
                 headers={"Content-Type": "application/json"},
                 json={
-                    "contents": [{"parts": [{"text": f"{speech_direction}\\n\\nالنص المطلوب نطقه بالمصري فقط:\\n{text}"}]}],
+                    "contents": [{
+                        "role": "user",
+                        "parts": [{
+                            "text": text,
+                            "speechMetadata": {"style": natural_style}
+                        }]
+                    }],
                     "generationConfig": {"responseModalities": ["AUDIO"], "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": voice}}}},
                 },
             )
