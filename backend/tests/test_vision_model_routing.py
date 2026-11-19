@@ -11,7 +11,7 @@ class VisionModelRoutingTests(unittest.TestCase):
                 with patch.dict("os.environ", {"AI_VISION_MODEL": ""}):
                     self.assertEqual(
                         main._vision_model_name(),
-                        "nvidia/nemotron-nano-12b-v2-vl",
+                        "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
                     )
 
     def test_explicit_vision_model_overrides_provider_default(self):
