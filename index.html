@@ -361,7 +361,7 @@ dialog{background:var(--bg2)}
 /* =====================================================================
    1. API ADAPTERS — the only place that talks to a backend.
    The chat uses the configured OpenAI-compatible provider. Speech synthesis uses
-   NVIDIA, while uploaded-audio transcription uses Gemini, all behind your server.
+   NVIDIA, while uploaded-audio transcription uses NVIDIA, all behind your server.
    Never put API keys in this file; keep them server-side.
    ===================================================================== */
 const API_BASE = (window.HAMASA_CONFIG?.API_URL || "https://hamasa-api-production.up.railway.app").replace(/\/+$/, "");
