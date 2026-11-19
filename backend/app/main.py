@@ -359,7 +359,7 @@ async def text_to_speech(body: TTSRequest):
 
     # Keep the selected speaker consistent while switching locale per language run.
     speaker = "Jason" if body.gender == "male" else "Sofia"
-    api_key = NVIDIA_API_KEY or API_KEY  # AI_API_KEY remains a legacy fallback.
+    api_key = os.getenv("NVIDIA_API_KEY", "").strip() or os.getenv("AI_API_KEY", "").strip()  # Legacy fallback.
     if not api_key:
         raise HTTPException(status_code=503, detail="Speech generation is temporarily unavailable.")
 
