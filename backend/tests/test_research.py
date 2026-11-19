@@ -13,6 +13,9 @@ class ResearchIntentTests(unittest.TestCase):
     def test_normal_question_does_not_trigger_search(self):
         self.assertFalse(should_search_web([{"role": "user", "content": "Explain what a Python list is"}]))
 
+    def test_colloquial_arabic_whats_new_triggers_search(self):
+        self.assertTrue(should_search_web([{"role": "user", "content": "إيه الجديد في تحديثات الذكاء الاصطناعي؟"}]))
+
     def test_only_latest_user_turn_is_considered(self):
         messages = [
             {"role": "user", "content": "Search the web for recent AI news"},
