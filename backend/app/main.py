@@ -164,6 +164,37 @@ def _tts_language(text: str) -> str:
     return "ar-XA" if arabic_letters > latin_letters else "en-US"
 
 
+def _tts_segments(text: str) -> list[tuple[str, str]]:
+    """Keep Arabic and Latin speech in order, assigning each run its own locale."""
+    import re
+
+    tokens = re.findall(
+        r"[\u0600-\u06FF\u0750-\u077F]+|[A-Za-z]+(?:['’-][A-Za-z]+)*|[^A-Za-z\u0600-\u06FF\u0750-\u077F]+",
+        text,
+    )
+    segments: list[tuple[str, str]] = []
+    for token in tokens:
+        if re.search(r"[\u0600-\u06FF\u0750-\u077F]", token):
+            language = "ar-XA"
+        elif re.search(r"[A-Za-z]", token):
+            language = "en-US"
+        elif segments:
+            previous_text, previous_language = segments[-1]
+            segments[-1] = (previous_text + token, previous_language)
+            continue
+        else:
+            # Leading whitespace/punctuation belongs with the first spoken run.
+            continue
+
+        if segments and segments[-1][1] == language:
+            previous_text, _ = segments[-1]
+            segments[-1] = (previous_text + token, language)
+        else:
+            segments.append((token, language))
+
+    return [(part.strip(), language) for part, language in segments if part.strip()]
+
+
 def _tts_clean(text: str) -> str:
     import re
     # Remove non-spoken markup while preserving conversational punctuation and pauses.
@@ -242,11 +273,8 @@ async def text_to_speech(body: TTSRequest):
     if not text:
         raise HTTPException(status_code=400, detail="No speakable text.")
 
-    # NVIDIA Magpie TTS Multilingual supports separate Arabic and English locales.
-    # Use the matching locale so English is not synthesized with an Arabic voice.
-    language = _tts_language(text)
+    # Keep the selected speaker consistent while switching locale per language run.
     speaker = "Jason" if body.gender == "male" else "Sofia"
-    voice = f"Magpie-Multilingual.{language.upper()}.{speaker}"
     api_key = os.getenv("AI_API_KEY", "").strip()
     if not api_key:
         raise HTTPException(status_code=503, detail="Speech generation is temporarily unavailable.")
@@ -255,30 +283,32 @@ async def text_to_speech(body: TTSRequest):
         "https://877104f7-e885-42b9-8de8-f6e4c6303969."
         "invocation.api.nvcf.nvidia.com/v1/audio/synthesize"
     )
-    # NVIDIA's synthesis endpoint accepts up to 2,000 normalized characters.
-    # Split longer answers at natural boundaries and join the returned WAV frames.
-    chunks = []
-    remaining = text.strip()
-    while remaining:
-        if len(remaining) <= 1800:
-            chunks.append(remaining)
-            break
-        cut = max(
-            remaining.rfind("\n", 0, 1800),
-            remaining.rfind("؟", 0, 1800),
-            remaining.rfind(".", 0, 1800),
-            remaining.rfind("!", 0, 1800),
-            remaining.rfind("،", 0, 1800),
-            remaining.rfind(" ", 0, 1800),
-        )
-        if cut < 900:
-            cut = 1800
-        chunks.append(remaining[:cut].strip())
-        remaining = remaining[cut:].strip()
+    # Synthesize each Arabic/English run with its matching Magpie locale.
+    # Split long runs at natural boundaries to stay below NVIDIA's input limit.
+    chunks: list[tuple[str, str]] = []
+    for segment, segment_language in _tts_segments(text):
+        remaining = segment
+        while remaining:
+            if len(remaining) <= 1800:
+                chunks.append((remaining, segment_language))
+                break
+            cut = max(
+                remaining.rfind("\n", 0, 1800),
+                remaining.rfind("؟", 0, 1800),
+                remaining.rfind(".", 0, 1800),
+                remaining.rfind("!", 0, 1800),
+                remaining.rfind("،", 0, 1800),
+                remaining.rfind(" ", 0, 1800),
+            )
+            if cut < 900:
+                cut = 1800
+            chunks.append((remaining[:cut].strip(), segment_language))
+            remaining = remaining[cut:].strip()
 
     wav_parts = []
     async with httpx.AsyncClient(timeout=httpx.Timeout(90.0, connect=20.0)) as client:
-        for chunk in chunks:
+        for chunk, chunk_language in chunks:
+            chunk_voice = f"Magpie-Multilingual.{chunk_language.upper()}.{speaker}"
             try:
                 response = await client.post(
                     endpoint,
@@ -288,8 +318,8 @@ async def text_to_speech(body: TTSRequest):
                     },
                     data={
                         "text": chunk,
-                        "language": language,
-                        "voice": voice,
+                        "language": chunk_language,
+                        "voice": chunk_voice,
                         "encoding": "LINEAR_PCM",
                         "sample_rate_hz": "22050",
                     },
