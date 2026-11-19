@@ -297,68 +297,127 @@ def tts_status():
 
 @app.post("/api/tts")
 async def text_to_speech(body: TTSRequest):
+    import base64
+    import io
+    import wave
+
     text = _tts_clean(body.text)
     if not text:
         raise HTTPException(status_code=400, detail="No speakable text.")
-    try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(60.0, connect=15.0)) as client:
-            key = os.getenv("TTS_GEMINI_API_KEY", "").strip()
-            if not key:
-                raise HTTPException(status_code=503, detail="Gemini TTS is not configured. Add TTS_GEMINI_API_KEY.")
-            # Gemini 3.8 TTS expects delivery direction in speechMetadata.style,
-            # separate from the verbatim transcript. Putting instructions in text can
-            # make the model read them aloud or produce a presenter-like delivery.
-            voice = "Puck" if body.gender == "male" else "Kore"
-            natural_style = (
-                "Natural, spontaneous everyday Egyptian Arabic conversation, Cairo dialect. "
-                "Warm, present, expressive and human, like a real Egyptian friend speaking directly to someone. "
-                "Use natural pitch movement, varied intonation, subtle emphasis, connected phrasing, and conversational rhythm. "
-                "Sound engaged and responsive, not flat, robotic, sleepy, soothing, theatrical, or like a podcast presenter. "
-                "Keep a comfortable normal speaking pace; let questions sound like real questions and important words carry gentle emphasis. "
-                "No music, singing, sound effects, or announcer delivery."
-            )
-            response = await client.post(
-                "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash-tts:generateContent",
-                params={"key": key},
-                headers={"Content-Type": "application/json"},
-                json={
-                    "contents": [{
-                        "role": "user",
-                        "parts": [{
-                            "text": text,
-                            "speechMetadata": {"style": natural_style}
-                        }]
-                    }],
-                    "generationConfig": {"responseModalities": ["AUDIO"], "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": voice}}}},
-                },
-            )
+
+    # NVIDIA Nemotron Speech / Magpie TTS Multilingual hosted NIM.
+    # Arabic voices currently listed by NVIDIA: Sofia, Ray, Jason.
+    # Jason is selected for the male read-aloud voice.
+    api_key = os.getenv("AI_API_KEY", "").strip()
+    if not api_key:
+        raise HTTPException(status_code=503, detail="NVIDIA API is not configured. Add AI_API_KEY.")
+
+    endpoint = (
+        "https://877104f7-e885-42b9-8de8-f6e4c6303969."
+        "invocation.api.nvcf.nvidia.com/v1/audio/synthesize"
+    )
+    voice = "Magpie-Multilingual.AR-XA.Jason"
+    language = "ar-XA"
+
+    # NVIDIA's synthesis endpoint accepts up to 2,000 normalized characters.
+    # Split longer answers at natural boundaries and join the returned WAV frames.
+    chunks = []
+    remaining = text.strip()
+    while remaining:
+        if len(remaining) <= 1800:
+            chunks.append(remaining)
+            break
+        cut = max(
+            remaining.rfind("\\n", 0, 1800),
+            remaining.rfind("؟", 0, 1800),
+            remaining.rfind(".", 0, 1800),
+            remaining.rfind("!", 0, 1800),
+            remaining.rfind("،", 0, 1800),
+            remaining.rfind(" ", 0, 1800),
+        )
+        if cut < 900:
+            cut = 1800
+        chunks.append(remaining[:cut].strip())
+        remaining = remaining[cut:].strip()
+
+    wav_parts = []
+    async with httpx.AsyncClient(timeout=httpx.Timeout(90.0, connect=20.0)) as client:
+        for chunk in chunks:
+            try:
+                response = await client.post(
+                    endpoint,
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Accept": "audio/wav",
+                    },
+                    data={
+                        "text": chunk,
+                        "language": language,
+                        "voice": voice,
+                        "encoding": "LINEAR_PCM",
+                        "sample_rate_hz": "22050",
+                    },
+                )
+            except httpx.TimeoutException:
+                raise HTTPException(status_code=504, detail="NVIDIA TTS timed out.")
+            except httpx.RequestError:
+                raise HTTPException(status_code=502, detail="Could not connect to NVIDIA TTS.")
+
             if response.status_code >= 400:
-                logger.error("Gemini TTS failed: status=%s body=%s", response.status_code, response.text[:500])
+                logger.error(
+                    "NVIDIA TTS failed: status=%s body=%s",
+                    response.status_code,
+                    response.text[:500] if response.text else "<empty>",
+                )
                 if response.status_code == 429:
                     raise HTTPException(
                         status_code=429,
-                        detail="Gemini TTS quota/rate limit reached. Check the Google AI Studio Rate Limits and Billing pages, then retry when the quota resets.",
+                        detail="NVIDIA TTS rate limit reached. Please wait briefly and try again.",
                     )
-                raise HTTPException(status_code=502, detail=f"Gemini TTS error ({response.status_code}).")
-            data = response.json()
-            parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
-            audio_part = next((p.get("inlineData") for p in parts if p.get("inlineData", {}).get("data")), None)
-            if not audio_part:
-                raise HTTPException(status_code=502, detail="Gemini TTS returned no audio.")
-            import base64
-            import struct
-            audio_bytes = base64.b64decode(audio_part["data"])
-            mime_type = audio_part.get("mimeType", "audio/pcm")
-            if "wav" not in mime_type.lower():
-                sample_rate = 24000
-                data_size = len(audio_bytes)
-                wav_header = b"RIFF" + struct.pack("<I", 36 + data_size) + b"WAVEfmt " + struct.pack("<IHHIIHH", 16, 1, 1, sample_rate, sample_rate * 2, 2, 16) + b"data" + struct.pack("<I", data_size)
-                audio_bytes = wav_header + audio_bytes
-            return {"audio": base64.b64encode(audio_bytes).decode("ascii"), "mime_type": "audio/wav", "provider": "gemini", "voice": voice}
-    except httpx.TimeoutException:
-        raise HTTPException(status_code=504, detail="TTS provider timed out.")
-    except httpx.RequestError:
-        raise HTTPException(status_code=502, detail="Could not connect to TTS provider.")
+                if response.status_code in (401, 403):
+                    raise HTTPException(
+                        status_code=502,
+                        detail="NVIDIA rejected the API key or this TTS endpoint is not enabled for it.",
+                    )
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"NVIDIA TTS error ({response.status_code}).",
+                )
+            wav_parts.append(response.content)
+
+    try:
+        combined_frames = []
+        params = None
+        for wav_data in wav_parts:
+            with wave.open(io.BytesIO(wav_data), "rb") as audio:
+                current_params = audio.getparams()
+                if params is None:
+                    params = current_params
+                elif (
+                    current_params.nchannels != params.nchannels
+                    or current_params.sampwidth != params.sampwidth
+                    or current_params.framerate != params.framerate
+                    or current_params.comptype != params.comptype
+                ):
+                    raise ValueError("NVIDIA TTS returned inconsistent audio formats.")
+                combined_frames.append(audio.readframes(audio.getnframes()))
+
+        output = io.BytesIO()
+        with wave.open(output, "wb") as merged:
+            merged.setparams(params)
+            for frames in combined_frames:
+                merged.writeframes(frames)
+        audio_bytes = output.getvalue()
+    except (wave.Error, EOFError, ValueError) as exc:
+        logger.exception("Could not combine NVIDIA TTS audio: %s", exc)
+        raise HTTPException(status_code=502, detail="NVIDIA TTS returned an invalid audio file.")
+
+    return {
+        "audio": base64.b64encode(audio_bytes).decode("ascii"),
+        "mime_type": "audio/wav",
+        "provider": "nvidia",
+        "voice": voice,
+    }
 
 
 def _auth_db():
