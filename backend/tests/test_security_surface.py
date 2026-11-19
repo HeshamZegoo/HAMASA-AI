@@ -31,6 +31,14 @@ class PublicStatusDisclosureTests(unittest.TestCase):
         self.assertFalse(status["memory"])
         self.assertFalse(status["accounts"])
 
+    def test_sqlite_does_not_claim_cloud_persistent_memory_or_accounts(self):
+        with patch.object(main, "JWT_SECRET", "j" * 40):
+            with patch.object(main, "MEMORY_ENCRYPTION_KEY", "fernet-key"):
+                with patch.object(main, "DATABASE_URL", "sqlite:////tmp/hamasa.db"):
+                    status = main._runtime_tool_status()
+        self.assertFalse(status["memory"])
+        self.assertFalse(status["accounts"])
+
     def test_api_rejects_untrusted_origins(self):
         response = self.client.get(
             "/api/tts/status",
