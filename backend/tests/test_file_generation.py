@@ -83,7 +83,7 @@ class FileGenerationTests(unittest.TestCase):
         workbook.close()
 
     def test_docx_renders_markdown_table_as_real_table(self):
-        raw = build_file("docx", "Report", "# Summary\\n| Name | Score |\\n|---|---|\\n| Ada | 99 |", [])
+        raw = build_file("docx", "Report", "# Summary\n| Name | Score |\n|---|---|\n| Ada | 99 |", [])
         document = Document(io.BytesIO(raw))
         self.assertEqual(len(document.tables), 1)
         self.assertEqual(document.tables[0].cell(1, 0).text, "Ada")
@@ -109,7 +109,7 @@ class FileGenerationTests(unittest.TestCase):
 
     def test_unsupported_format_is_rejected(self):
         with self.assertRaises(ValueError):
-            build_file("csv", "Title", "Body", [])
+            build_file("exe", "Title", "Body", [])
 
 
 if __name__ == "__main__":
