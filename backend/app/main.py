@@ -437,29 +437,59 @@ def _email_code_hash(email: str, code: str) -> str:
 
 
 def _send_verification_email(email: str, code: str):
-    sender = os.getenv("GMAIL_ADDRESS", "").strip()
-    app_password = os.getenv("GMAIL_APP_PASSWORD", "").replace(" ", "")
-    if not sender or not app_password:
-        raise RuntimeError("Email delivery is not configured.")
-    message = EmailMessage()
-    message["Subject"] = "كود تأكيد حساب حماصة | HAMASA verification code"
-    message["From"] = f"HAMASA AI <{sender}>"
-    message["To"] = email
-    message.set_content(
+    api_key = os.getenv("BREVO_API_KEY", "").strip()
+    sender = os.getenv("BREVO_SENDER_EMAIL", "").strip()
+    sender_name = os.getenv("BREVO_SENDER_NAME", "HAMASA AI").strip() or "HAMASA AI"
+    if not api_key or not sender:
+        raise RuntimeError("Brevo email delivery is not configured.")
+    text_content = (
         f"أهلاً بيك في حماصة!\n\nكود تأكيد حسابك هو: {code}\n"
         "الكود صالح لمدة 10 دقائق، ولا تشاركه مع أي شخص.\n\n"
         f"Welcome to HAMASA AI. Your verification code is: {code}\nThis code expires in 10 minutes."
     )
-    context = ssl.create_default_context()
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=20, context=context) as smtp:
-        smtp.login(sender, app_password)
-        smtp.send_message(message)
+    html_content = (
+        "<!doctype html><html lang='ar' dir='rtl'><body "
+        "style='font-family:Arial,sans-serif;background:#f6f7fb;padding:32px'>"
+        "<div style='max-width:520px;margin:auto;background:#fff;border-radius:16px;padding:28px'>"
+        "<h2 style='color:#6d4aff'>أهلاً بيك في حماصة 👋</h2>"
+        "<p>استخدم الكود ده لتأكيد حسابك:</p>"
+        f"<div style='font-size:34px;font-weight:bold;letter-spacing:8px;text-align:center;"
+        f"padding:18px;background:#f1efff;border-radius:12px;color:#38218c'>{code}</div>"
+        "<p>الكود صالح لمدة <b>10 دقائق</b>، وماتشاركوش مع أي حد.</p>"
+        "<hr><p dir='ltr'>Your HAMASA AI verification code expires in 10 minutes.</p>"
+        "</div></body></html>"
+    )
+    payload = {
+        "sender": {"name": sender_name, "email": sender},
+        "to": [{"email": email}],
+        "subject": "كود تأكيد حساب حماصة | HAMASA verification code",
+        "htmlContent": html_content,
+        "textContent": text_content,
+    }
+    try:
+        with httpx.Client(timeout=httpx.Timeout(20.0, connect=8.0)) as client:
+            response = client.post(
+                "https://api.brevo.com/v3/smtp/email",
+                headers={
+                    "accept": "application/json",
+                    "api-key": api_key,
+                    "content-type": "application/json",
+                },
+                json=payload,
+            )
+        if response.status_code >= 400:
+            logger.error("Brevo email delivery failed: status=%s", response.status_code)
+            raise RuntimeError("Brevo rejected the verification email.")
+    except httpx.TimeoutException as exc:
+        raise RuntimeError("Brevo email delivery timed out.") from exc
+    except httpx.RequestError as exc:
+        raise RuntimeError("Could not connect to Brevo.") from exc
 
 
 def _start_email_verification(email: str, password: str):
     if not JWT_SECRET or len(JWT_SECRET) < 32:
         raise HTTPException(status_code=503, detail="Authentication is not configured.")
-    if not os.getenv("GMAIL_ADDRESS", "").strip() or not os.getenv("GMAIL_APP_PASSWORD", "").strip():
+    if not os.getenv("BREVO_API_KEY", "").strip() or not os.getenv("BREVO_SENDER_EMAIL", "").strip():
         raise HTTPException(status_code=503, detail="Email verification is not configured yet.")
     placeholder = "%s" if DATABASE_URL.startswith(("postgres://", "postgresql://")) else "?"
     with _auth_db() as db:
