@@ -1,4 +1,5 @@
 import tempfile
+import hashlib
 import unittest
 import uuid
 from pathlib import Path
@@ -24,6 +25,8 @@ class AccountAndConversationFlowTests(unittest.TestCase):
         self.memory_patch.start()
         main.init_db()
         self.client = TestClient(main.app)
+        test_ip = int(hashlib.sha256(self.id().encode()).hexdigest()[:2], 16) % 254 + 1
+        self.client.headers.update({"X-Forwarded-For": f"192.0.2.{test_ip}"})
 
     def tearDown(self):
         self.client.close()
