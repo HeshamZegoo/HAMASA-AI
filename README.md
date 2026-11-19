@@ -7,9 +7,10 @@ A web-first Arabic/English AI companion with a premium dark interface, animated 
 ## Current architecture
 - **Frontend:** static HTML/CSS/JavaScript, deployable to GitHub Pages.
 - **Backend:** FastAPI, deployable to Railway.
-- **AI:** OpenAI-compatible Chat Completions API. Configure a provider and model through server environment variables; Ollama can be used by setting `AI_BASE_URL` to an Ollama-compatible endpoint reachable by the backend.
-- **Conversation history:** stored in browser local storage, so conversations remain available in the same browser/device. The API receives the latest 40 messages for continuity; server-side account sync is not enabled.
-- **Attachments:** supports images (through an image-capable provider model), PDF, DOCX, TXT, Markdown, CSV, JSON and XML. Files are limited to 8 MB each and five per message. PDF and DOCX text extraction runs on the backend.
+- **AI:** OpenAI-compatible Chat Completions API. Configure a provider and model through server environment variables; Ollama can be used by setting `AI_BASE_URL` to an Ollama-compatible endpoint reachable by the backend. Optional live web research uses Tavily when `TAVILY_API_KEY` is configured; HAMASA searches only when the latest user request asks for current information or external sources, then grounds the answer with source links.
+- **Conversation history:** stored locally in the browser and synchronized to the account for signed-in users through the authenticated `/api/chats` endpoints. The API receives the latest 40 messages for response continuity.
+- **Memory:** user-managed memories are stored per account, encrypted at rest when `MEMORY_ENCRYPTION_KEY` is configured, and included as relevant context by the frontend.
+- **Attachments:** supports images (through an image-capable provider model), PDF, DOCX, TXT, Markdown, CSV, JSON and XML. See `backend/app/attachments.py` for current size and count limits.
 
 ## Quick start — frontend only
 Open `index.html` through HTTPS (for example GitHub Pages).
@@ -30,7 +31,10 @@ Set `HAMASA_API_URL=http://localhost:8000` in the frontend configuration in `con
 - `AI_BASE_URL` — OpenAI-compatible base URL, e.g. `https://api.openai.com/v1`.
 - `AI_MODEL` — text model identifier supported by your provider.
 - `AI_VISION_MODEL` — optional image-capable model identifier supported by the same OpenAI-compatible provider; required for image analysis.
-- `DATABASE_URL` — reserved for future database integration; PostgreSQL conversation persistence is not implemented in this starter.
+- `DATABASE_URL` — PostgreSQL connection string for persistent accounts, sessions, conversations, and memories. SQLite is used only as a local-development fallback.
+- `TAVILY_API_KEY` — optional Tavily key enabling live web research and source-grounded answers. Keep it server-side.
+- `MEMORY_ENCRYPTION_KEY` — Fernet key required in production to encrypt saved memory.
+- `JWT_SECRET` — signing secret (at least 32 characters) required for account authentication.
 - `CORS_ORIGINS` — comma-separated allowed frontend origins.
 - `APP_ENV` — `development` or `production`.
 
