@@ -425,7 +425,7 @@ async function checkBackend() {
   try {
     const response = await apiFetch(API_BASE + "/health", { cache: "no-store" });
     const data = await response.json();
-    backendOnline = response.ok && data.status === "ok" && data.provider_configured === true;
+    backendOnline = response.ok && data.status === "ok";
   } catch {
     backendOnline = false;
   }
@@ -487,7 +487,14 @@ let voiceGender = store.get('hamasa.voiceGender', 'male') === 'female' ? 'female
 let theme = store.get('hamasa.themeVersion', 0) >= 2 ? (store.get('hamasa.theme', 'light') === 'dark' ? 'dark' : 'light') : 'light';
 store.set('hamasa.themeVersion', 2); store.set('hamasa.theme', theme);
 let convs = store.get('hamasa.convs', []); if (!Array.isArray(convs)) convs = [];
-convs.forEach(c => { if (c && !c.id) c.id = crypto.randomUUID(); if (c && !c.updated_at) c.updated_at = Date.now(); });
+// Recover safely from stale or partially written browser storage instead of letting one bad row hide all history.
+convs = convs.filter(c => c && typeof c === 'object' && Array.isArray(c.messages));
+convs.forEach(c => {
+  if (!c.id) c.id = crypto.randomUUID();
+  if (!c.updated_at) c.updated_at = Date.now();
+  if (typeof c.title !== 'string' || !c.title.trim()) c.title = 'محادثة';
+  c.messages = c.messages.filter(m => m && typeof m === 'object' && typeof m.text === 'string' && ['user','bot'].includes(m.role));
+});
 let cloudHistoryReady = false, cloudSaveTimer = null, cloudSaveQueue = Promise.resolve();
 let memories = store.get('hamasa.memory', []);
 if (!Array.isArray(memories)) memories = [];
@@ -497,7 +504,7 @@ if (!/^[0-9a-f-]{36}$/i.test(memoryClientId)) {
   store.set("hamasa.memoryClientId", memoryClientId);
 }
 memories = memories.filter(x => x && typeof x.text === 'string' && typeof x.category === 'string').slice(0, 40);
-let cur = null, busy = false;
+let cur = convs[0] || null, busy = false;
 const t = k => I18N[lang][k];
 
 function orbSVG() {
