@@ -26,13 +26,17 @@ class FileGenerationTests(unittest.TestCase):
         self.assertIn("Important result", extracted)
 
     def test_xlsx_contains_title_description_and_rows(self):
-        raw = build_file("xlsx", "Sales", "Monthly totals", [["Month", "Total"], ["January", 10]],)
+        raw = build_file("xlsx", "Sales", "Monthly totals", [["Month", "Total"], ["January", 10], ["Formula", "=1+1"]],)
         workbook = load_workbook(io.BytesIO(raw), data_only=True)
         sheet = workbook.active
         self.assertEqual(sheet["A1"].value, "Sales")
         self.assertEqual(sheet["A2"].value, "Monthly totals")
         self.assertEqual(sheet["A3"].value, "Month")
         self.assertEqual(sheet["B4"].value, 10)
+        self.assertEqual(sheet["B4"].data_type, "n")
+        self.assertEqual(sheet["A5"].value, "Formula")
+        self.assertEqual(sheet["B5"].value, "=1+1")
+        self.assertEqual(sheet["B5"].data_type, "s")
         workbook.close()
 
     def test_unsupported_format_is_rejected(self):
