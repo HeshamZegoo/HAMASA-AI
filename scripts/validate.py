@@ -16,6 +16,7 @@ BACKEND = ROOT / "backend"
 
 class LocalAssetParser(HTMLParser):
     def __init__(self) -> None:
+        super().__init__()
         self.assets: list[str] = []
 
     def handle_starttag(self, tag, attrs):
