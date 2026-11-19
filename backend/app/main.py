@@ -948,6 +948,11 @@ async def chat(body: ChatRequest):
                 "ويحللها، لا مثل أداة توليد أوصاف."
             ),
         })
+    coding_context = [message.model_dump() for message in body.messages]
+    coding_guidance = coding_instructions_for(coding_context)
+    if coding_guidance:
+        context_messages.append({"role": "system", "content": coding_guidance})
+
     context_messages.extend(prepared_messages)
     if has_images and not vision_model:
         raise HTTPException(status_code=503, detail="Image understanding is not configured. Set AI_VISION_MODEL to an image-capable model.")
