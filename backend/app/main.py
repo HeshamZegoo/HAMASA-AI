@@ -60,7 +60,7 @@ def _vision_model_name() -> str:
         return configured
     provider_host = urlparse(BASE_URL).netloc.lower()
     if provider_host.endswith("nvidia.com") or provider_host.endswith(".nvidia.com"):
-        return "nvidia/nemotron-nano-12b-v2-vl"
+        return "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
     model = MODEL.lower()
     if model.startswith(("gpt-4o", "gpt-4.1")):
         return MODEL
@@ -989,6 +989,7 @@ async def generate_file(body: FileCreateRequest):
                     ],
                     "temperature": 0.2,
                     "max_tokens": 4096,
+                    "chat_template_kwargs": {"enable_thinking": False},
                 }
                 vision_response = await client.post(
                     f"{BASE_URL}/chat/completions",
@@ -1268,6 +1269,9 @@ async def chat(body: ChatRequest):
         "messages": context_messages,
         "temperature": 0.7,
     }
+    if has_images:
+        payload["max_tokens"] = 4096
+        payload["chat_template_kwargs"] = {"enable_thinking": False}
 
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(90.0, connect=15.0)) as client:
