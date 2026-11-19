@@ -86,6 +86,12 @@ _RATE_WINDOWS = {
     "/api/tts": (10, 60),
     "/api/memory": (30, 60),
 }
+_REQUEST_BODY_LIMITS = {
+    "/api/chat": 90 * 1024 * 1024,
+    "/api/files/generate": 90 * 1024 * 1024,
+    "/api/transcribe": 17 * 1024 * 1024,
+    "/api/tts": 1 * 1024 * 1024,
+}
 _rate_events = defaultdict(deque)
 _rate_lock = Lock()
 
@@ -115,6 +121,15 @@ def _prune_rate_events(now: float) -> None:
 async def security_and_rate_limit(request: Request, call_next):
     path = request.url.path
     if path.startswith("/api/"):
+        body_limit = _REQUEST_BODY_LIMITS.get(path)
+        content_length = request.headers.get("content-length")
+        if body_limit is not None and content_length:
+            try:
+                declared_length = int(content_length)
+            except ValueError:
+                return JSONResponse(status_code=400, content={"detail": "Invalid request size."})
+            if declared_length < 0 or declared_length > body_limit:
+                return JSONResponse(status_code=413, content={"detail": "Request body is too large."})
         origin = request.headers.get("origin")
         if origin and origin not in ORIGINS:
             return JSONResponse(status_code=403, content={"detail": "Origin is not allowed."})
