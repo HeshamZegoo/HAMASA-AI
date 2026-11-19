@@ -168,9 +168,36 @@ def build_file(fmt: str, title: str, content: str, rows: list, page_count: int =
         doc = Document()
         title_paragraph = doc.add_heading(title, 0)
         _apply_docx_direction(title_paragraph, title)
-        for line in content.splitlines():
-            line = line.strip()
+        lines = content.splitlines()
+        index = 0
+        while index < len(lines):
+            line = lines[index].strip()
             if not line:
+                index += 1
+                continue
+            if "|" in line and index + 1 < len(lines) and _TABLE_RULE.match(lines[index + 1]):
+                table_rows = [_table_cells(line)]
+                index += 2
+                while index < len(lines) and "|" in lines[index] and lines[index].strip():
+                    table_rows.append(_table_cells(lines[index]))
+                    index += 1
+                width = max(len(row) for row in table_rows)
+                table = doc.add_table(rows=len(table_rows), cols=width)
+                table.style = "Table Grid"
+                for row_index, values in enumerate(table_rows):
+                    for col_index, value in enumerate(values):
+                        cell = table.cell(row_index, col_index)
+                        cell.text = value
+                        for cell_paragraph in cell.paragraphs:
+                            _apply_docx_direction(cell_paragraph, value)
+                            for run in cell_paragraph.runs:
+                                if row_index == 0:
+                                    run.bold = True
+                                    run.font.color.rgb = __import__("docx").shared.RGBColor(255, 255, 255)
+                        if row_index == 0:
+                            shading = OxmlElement("w:shd")
+                            shading.set(qn("w:fill"), "176B87")
+                            cell._tc.get_or_add_tcPr().append(shading)
                 continue
             if line.startswith("# "):
                 heading = doc.add_heading(line[2:], level=1)
@@ -181,6 +208,7 @@ def build_file(fmt: str, title: str, content: str, rows: list, page_count: int =
             else:
                 paragraph = doc.add_paragraph(line)
                 _apply_docx_direction(paragraph, line)
+            index += 1
         output = BytesIO()
         doc.save(output)
         return output.getvalue()
