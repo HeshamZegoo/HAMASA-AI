@@ -11,6 +11,26 @@ class PublicStatusDisclosureTests(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(main.app)
 
+    def test_runtime_capabilities_require_real_backing_configuration(self):
+        with patch.object(main, "API_KEY", "provider-key"):
+            with patch.object(main, "JWT_SECRET", "j" * 40):
+                with patch.object(main, "MEMORY_ENCRYPTION_KEY", "fernet-key"):
+                    with patch.object(main, "DATABASE_URL", ""):
+                        with patch.dict(os.environ, {
+                            "TAVILY_API_KEY": "search-key",
+                            "TTS_GEMINI_API_KEY": "transcription-key",
+                            "AI_VISION_MODEL": "vision-model",
+                        }):
+                            status = main._runtime_tool_status()
+        self.assertTrue(status["chat"])
+        self.assertTrue(status["web_search"])
+        self.assertTrue(status["vision"])
+        self.assertTrue(status["file_generation"])
+        self.assertTrue(status["transcription"])
+        self.assertTrue(status["speech"])
+        self.assertFalse(status["memory"])
+        self.assertFalse(status["accounts"])
+
     def test_root_exposes_only_liveness(self):
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
