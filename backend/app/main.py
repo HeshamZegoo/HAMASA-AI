@@ -1000,12 +1000,6 @@ async def _live_web_search(query: str) -> list[dict]:
 
     is_news = bool(re.search(r"(news|اخبار|أخبار|خبر|آخر الأخبار|أحدث الأخبار)", query, re.IGNORECASE))
     topic = "news" if is_news else "general"
-    if is_news:
-        today = datetime.now(ZoneInfo("Africa/Cairo")).date().isoformat()
-        # Tavily performs better on English-language technical news queries too.
-        if re.search(r"[\u0600-\u06FF]", query):
-            query = f"{query} artificial intelligence AI latest developments {today}"[:400]
-
     payload = {
         "api_key": search_key,
         "query": query,
