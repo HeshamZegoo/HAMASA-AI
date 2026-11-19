@@ -11,9 +11,12 @@ import time
 import uuid
 from pathlib import Path
 from typing import Literal
+from collections import defaultdict, deque
+from threading import Lock
 
 import httpx
-from fastapi import FastAPI, HTTPException, Header
+from fastapi import FastAPI, HTTPException, Header, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from .attachments import prepare_messages, AttachmentInput
@@ -22,13 +25,14 @@ from .file_generation import build_file
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper())
 logger = logging.getLogger("hamasa.provider")
 
-APP_ENV = os.getenv("APP_ENV", "development")
+APP_ENV = os.getenv("APP_ENV", "development").strip().lower()
 API_KEY = os.getenv("AI_API_KEY", "").strip()
 BASE_URL = os.getenv("AI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
 MODEL = os.getenv("AI_MODEL", "gpt-4o-mini")
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 JWT_SECRET = os.getenv("JWT_SECRET", "").strip()
-ORIGINS = [x.strip() for x in os.getenv("CORS_ORIGINS", "http://localhost:8000,https://heshamzegoo.github.io").split(",") if x.strip()]
+DEFAULT_ORIGINS = "https://heshamzegoo.github.io" if APP_ENV == "production" else "http://localhost:8000,https://heshamzegoo.github.io"
+ORIGINS = [x.strip() for x in os.getenv("CORS_ORIGINS", DEFAULT_ORIGINS).split(",") if x.strip()]
 
 HAMASA_SYSTEM_PROMPT = """أنت حماصة (HAMASA)، مساعد ذكاء اصطناعي مرن وذكي، عندك شخصية مصرية ودودة، وبتتكيف مع الشخص والموقف بدل ما تمشي على قالب واحد.
 
@@ -128,7 +132,59 @@ HAMASA_SYSTEM_PROMPT = """أنت حماصة (HAMASA)، مساعد ذكاء اص�
 - لا تكرر الإجابة نفسها عند اعتراض المستخدم. افهم سبب اعتراضه، غيّر طريقة الحل، واذكر ما الذي تغيّر فعلاً.
 """
 
-app = FastAPI(title="HAMASA AI API", version="0.1.1")
+app = FastAPI(
+    title="HAMASA AI API",
+    version="0.1.2",
+    docs_url=None if APP_ENV == "production" else "/docs",
+    redoc_url=None if APP_ENV == "production" else "/redoc",
+    openapi_url=None if APP_ENV == "production" else "/openapi.json",
+)
+# Lightweight per-instance abuse controls. For multi-replica deployments, use an edge/WAF or shared rate-limit store.
+_RATE_WINDOWS = {
+    "/api/auth/signup": (5, 3600),
+    "/api/auth/login": (10, 900),
+    "/api/chat": (20, 60),
+    "/api/files/generate": (4, 600),
+    "/api/transcribe": (8, 60),
+    "/api/tts": (10, 60),
+    "/api/memory": (30, 60),
+}
+_rate_events = defaultdict(deque)
+_rate_lock = Lock()
+
+@app.middleware("http")
+async def security_and_rate_limit(request: Request, call_next):
+    path = request.url.path
+    if path.startswith("/api/"):
+        client_ip = request.client.host if request.client else "unknown"
+        limit, window = _RATE_WINDOWS.get(path, (120, 60))
+        now = time.monotonic()
+        key = (client_ip, path, request.method)
+        with _rate_lock:
+            events = _rate_events[key]
+            while events and now - events[0] >= window:
+                events.popleft()
+            if len(events) >= limit:
+                retry_after = max(1, int(window - (now - events[0])))
+                return JSONResponse(
+                    status_code=429,
+                    content={"detail": "Too many requests. Please wait and try again."},
+                    headers={"Retry-After": str(retry_after)},
+                )
+            events.append(now)
+            if len(_rate_events) > 20000:
+                for old_key in list(_rate_events.keys())[:5000]:
+                    if not _rate_events[old_key]:
+                        _rate_events.pop(old_key, None)
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(self), geolocation=()"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["Cache-Control"] = "no-store" if path.startswith("/api/") else "public, max-age=300"
+    return response
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ORIGINS,
@@ -138,7 +194,7 @@ app.add_middleware(
 )
 
 class Message(BaseModel):
-    role: Literal["user", "assistant", "system"]
+    role: Literal["user", "assistant"]
     content: str = Field(min_length=1, max_length=12000)
 
 class ChatRequest(BaseModel):
@@ -428,6 +484,8 @@ def init_db():
 
 @app.on_event("startup")
 def startup():
+    if APP_ENV == "production" and len(JWT_SECRET) < 32:
+        raise RuntimeError("JWT_SECRET must contain at least 32 characters in production.")
     init_db()
 
 @app.get("/api/memory")
@@ -624,9 +682,8 @@ async def chat(body: ChatRequest):
                 pass
 
             # Log only provider status and its error message; never log API keys or chat prompts.
-            logger.error("Provider request failed: status=%s model=%s message=%s",
-                         response.status_code, MODEL, provider_message[:500])
-            raise HTTPException(status_code=502, detail=f"AI provider error ({response.status_code}): {provider_message[:500]}")
+            logger.error("Provider request failed: status=%s model=%s", response.status_code, MODEL)
+            raise HTTPException(status_code=502, detail="AI provider could not process the request. Please try again.")
 
         try:
             data = response.json()
