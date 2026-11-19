@@ -464,7 +464,6 @@ def _send_verification_email(email: str, code: str):
         "to": [{"email": email}],
         "subject": "كود تأكيد حساب حماصة | HAMASA verification code",
         "htmlContent": html_content,
-        "textContent": text_content,
     }
     try:
         with httpx.Client(timeout=httpx.Timeout(20.0, connect=8.0)) as client:
