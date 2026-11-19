@@ -15,10 +15,11 @@ from collections import defaultdict, deque
 from threading import Lock
 
 import httpx
-from fastapi import FastAPI, HTTPException, Header, Request
+from fastapi import FastAPI, HTTPException, Header, Request, Cookie, Response, Depends
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+from cryptography.fernet import Fernet, InvalidToken
 from .attachments import prepare_messages, AttachmentInput
 from .file_generation import build_file
 
@@ -31,6 +32,7 @@ BASE_URL = os.getenv("AI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
 MODEL = os.getenv("AI_MODEL", "gpt-4o-mini")
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 JWT_SECRET = os.getenv("JWT_SECRET", "").strip()
+MEMORY_ENCRYPTION_KEY = os.getenv("MEMORY_ENCRYPTION_KEY", "").strip()
 DEFAULT_ORIGINS = "https://heshamzegoo.github.io" if APP_ENV == "production" else "http://localhost:8000,https://heshamzegoo.github.io"
 ORIGINS = [x.strip() for x in os.getenv("CORS_ORIGINS", DEFAULT_ORIGINS).split(",") if x.strip()]
 
@@ -192,9 +194,9 @@ async def security_and_rate_limit(request: Request, call_next):
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ORIGINS,
-    allow_credentials=False,
+    allow_credentials=True,
     allow_methods=["GET", "POST", "DELETE"],
-    allow_headers=["Content-Type", "X-Hamasa-Client", "Authorization"],
+    allow_headers=["Content-Type", "X-Hamasa-Client", "Authorization", "X-Hamasa-Request"],
 )
 
 class Message(BaseModel):
@@ -361,18 +363,30 @@ def _password_verify(password: str, encoded: str) -> bool:
 def _issue_token(user_id: str) -> str:
     if not JWT_SECRET or len(JWT_SECRET) < 32:
         raise HTTPException(status_code=503, detail="Authentication is not configured.")
+    now = int(time.time())
+    expires = now + 24 * 3600
+    session_id = str(uuid.uuid4())
+    placeholder = "%s" if DATABASE_URL.startswith(("postgres://", "postgresql://")) else "?"
+    with _auth_db() as db:
+        db.execute(
+            f"INSERT INTO hamasa_sessions (id, user_id, expires_at, revoked_at) VALUES ({placeholder}, {placeholder}, {placeholder}, NULL)",
+            (session_id, uuid.UUID(user_id) if DATABASE_URL.startswith(("postgres://", "postgresql://")) else user_id, expires),
+        )
     header = base64.urlsafe_b64encode(b'{"alg":"HS256","typ":"JWT"}').decode().rstrip("=")
-    payload = base64.urlsafe_b64encode(json.dumps({"sub": user_id, "exp": int(time.time()) + 30 * 86400}, separators=(",", ":")).encode()).decode().rstrip("=")
+    payload = base64.urlsafe_b64encode(json.dumps({"sub": user_id, "jti": session_id, "iat": now, "exp": expires}, separators=(",", ":")).encode()).decode().rstrip("=")
     signing = header + "." + payload
     signature = base64.urlsafe_b64encode(hmac.new(JWT_SECRET.encode(), signing.encode(), hashlib.sha256).digest()).decode().rstrip("=")
     return signing + "." + signature
 
-def _verified_user(authorization: str = Header(default="")):
-    if not authorization.startswith("Bearer ") or not JWT_SECRET or len(JWT_SECRET) < 32:
+def _verified_user(authorization: str = Header(default=""), hamasa_session: str = Cookie(default="")):
+    token = authorization[7:].strip() if authorization.startswith("Bearer ") else hamasa_session
+    if not token or not JWT_SECRET or len(JWT_SECRET) < 32:
         raise HTTPException(status_code=401, detail="Please sign in.")
-    token = authorization[7:].strip()
     try:
         header, payload, signature = token.split(".")
+        decoded_header = json.loads(base64.urlsafe_b64decode(header + "=" * (-len(header) % 4)))
+        if decoded_header.get("alg") != "HS256" or decoded_header.get("typ") != "JWT":
+            raise ValueError("algorithm")
         signing = header + "." + payload
         expected = base64.urlsafe_b64encode(hmac.new(JWT_SECRET.encode(), signing.encode(), hashlib.sha256).digest()).decode().rstrip("=")
         if not hmac.compare_digest(signature, expected):
@@ -381,16 +395,21 @@ def _verified_user(authorization: str = Header(default="")):
         if int(claims.get("exp", 0)) <= int(time.time()):
             raise ValueError("expired")
         user_id = str(uuid.UUID(claims["sub"]))
+        session_id = str(uuid.UUID(claims["jti"]))
     except (ValueError, KeyError, TypeError, json.JSONDecodeError):
         raise HTTPException(status_code=401, detail="Session expired. Please sign in again.")
+    placeholder = "%s" if DATABASE_URL.startswith(("postgres://", "postgresql://")) else "?"
     with _auth_db() as db:
-        row = db.execute("SELECT id, email FROM hamasa_users WHERE id = " + ("%s" if DATABASE_URL.startswith(("postgres://", "postgresql://")) else "?"), (uuid.UUID(user_id) if DATABASE_URL.startswith(("postgres://", "postgresql://")) else user_id,)).fetchone()
-    if not row:
-        raise HTTPException(status_code=401, detail="Account not found. Please sign in again.")
-    return {"id": str(row[0]), "email": row[1]}
+        row = db.execute(
+            f"SELECT u.id, u.email, s.revoked_at, s.expires_at FROM hamasa_users u JOIN hamasa_sessions s ON s.user_id = u.id WHERE u.id = {placeholder} AND s.id = {placeholder}",
+            (uuid.UUID(user_id) if DATABASE_URL.startswith(("postgres://", "postgresql://")) else user_id, session_id),
+        ).fetchone()
+    if not row or row[2] is not None or int(row[3]) <= int(time.time()):
+        raise HTTPException(status_code=401, detail="Session expired. Please sign in again.")
+    return {"id": str(row[0]), "email": row[1], "_session_id": session_id}
 
 @app.post("/api/auth/signup")
-def signup(body: AuthRequest):
+def signup(body: AuthRequest, response: Response):
     email = body.email.strip().lower()
     if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
         raise HTTPException(status_code=400, detail="Enter a valid email address.")
@@ -408,10 +427,12 @@ def signup(body: AuthRequest):
         logger.error("Account creation failed: %s", type(exc).__name__)
         raise HTTPException(status_code=503, detail="Could not create account right now.")
     user = {"id": user_id, "email": email}
-    return {"token": _issue_token(user_id), "user": user}
+    token = _issue_token(user_id)
+    _set_session_cookie(response, token)
+    return {"token": token, "user": user}
 
 @app.post("/api/auth/login")
-def login(body: AuthRequest):
+def login(body: AuthRequest, response: Response):
     email = body.email.strip().lower()
     placeholder = "%s" if DATABASE_URL.startswith(("postgres://", "postgresql://")) else "?"
     with _auth_db() as db:
@@ -419,18 +440,69 @@ def login(body: AuthRequest):
     if not row or not _password_verify(body.password, row[2]):
         raise HTTPException(status_code=401, detail="Email or password is incorrect.")
     user = {"id": str(row[0]), "email": row[1]}
-    return {"token": _issue_token(user["id"]), "user": user}
+    token = _issue_token(user["id"])
+    _set_session_cookie(response, token)
+    return {"token": token, "user": user}
+
+def _set_session_cookie(response: Response, token: str):
+    response.set_cookie(
+        key="hamasa_session", value=token, max_age=24 * 3600,
+        httponly=True, secure=True, samesite="none", path="/",
+    )
 
 @app.get("/api/auth/me")
-def me(authorization: str = Header(default="")):
-    return {"user": _verified_user(authorization)}
+def me(user: dict = Depends(_verified_user)):
+    return {"user": {"id": user["id"], "email": user["email"]}}
 
-def _memory_owner(authorization: str, client_id: str) -> str:
-    if authorization.startswith("Bearer "):
-        user = _verified_user(authorization)
+@app.post("/api/auth/logout")
+def logout(response: Response, user: dict = Depends(_verified_user)):
+    placeholder = "%s" if DATABASE_URL.startswith(("postgres://", "postgresql://")) else "?"
+    with _auth_db() as db:
+        db.execute(
+            f"UPDATE hamasa_sessions SET revoked_at = {placeholder} WHERE id = {placeholder} AND user_id = {placeholder}",
+            (int(time.time()), user["_session_id"], uuid.UUID(user["id"]) if DATABASE_URL.startswith(("postgres://", "postgresql://")) else user["id"]),
+        )
+    response.delete_cookie("hamasa_session", path="/", secure=True, httponly=True, samesite="none")
+    return {"logged_out": True}
+
+def _memory_owner(authorization: str, client_id: str, hamasa_session: str = "") -> str:
+    if authorization.startswith("Bearer ") or hamasa_session:
+        user = _verified_user(authorization, hamasa_session)
         return hashlib.sha256(uuid.UUID(user["id"]).bytes).hexdigest()
     return _client_hash(client_id)
 
+
+def _memory_cipher():
+    if not MEMORY_ENCRYPTION_KEY:
+        raise HTTPException(status_code=503, detail="Memory encryption is not configured.")
+    try:
+        return Fernet(MEMORY_ENCRYPTION_KEY.encode("ascii"))
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=503, detail="Memory encryption is not configured correctly.")
+
+def _encrypt_memory(value: str) -> str:
+    if value.startswith("enc:v1:"):
+        return value
+    encrypted = _memory_cipher().encrypt(value.encode("utf-8")).decode("ascii")
+    return "enc:v1:" + encrypted
+
+def _decrypt_memory(value: str) -> str:
+    if not value.startswith("enc:v1:"):
+        return value
+    try:
+        return _memory_cipher().decrypt(value[7:].encode("ascii")).decode("utf-8")
+    except (InvalidToken, UnicodeDecodeError, ValueError):
+        logger.error("Memory decryption failed; refusing to return unreadable memory.")
+        raise HTTPException(status_code=503, detail="Saved memory is temporarily unreadable.")
+
+def _migrate_memory_encryption(db, placeholder: str):
+    if not MEMORY_ENCRYPTION_KEY:
+        return
+    rows = db.execute("SELECT id, content FROM hamasa_memories").fetchall()
+    for memory_id, content in rows:
+        if not str(content).startswith("enc:v1:"):
+            encrypted = _encrypt_memory(str(content))
+            db.execute(f"UPDATE hamasa_memories SET content = {placeholder} WHERE id = {placeholder}", (encrypted, memory_id))
 
 def _client_hash(client_id: str) -> str:
     try:
@@ -476,25 +548,41 @@ def init_db():
                 )
             """)
             db.execute("CREATE INDEX IF NOT EXISTS idx_hamasa_memories_owner ON hamasa_memories(owner_hash, updated_at DESC)")
+            db.execute("""
+                CREATE TABLE IF NOT EXISTS hamasa_sessions (
+                    id TEXT PRIMARY KEY,
+                    user_id UUID NOT NULL REFERENCES hamasa_users(id) ON DELETE CASCADE,
+                    expires_at BIGINT NOT NULL,
+                    revoked_at BIGINT NULL
+                )
+            """)
+            db.execute("CREATE INDEX IF NOT EXISTS idx_hamasa_sessions_user ON hamasa_sessions(user_id)")
+            db.execute("ALTER TABLE hamasa_memories ALTER COLUMN content TYPE TEXT")
+            _migrate_memory_encryption(db, "%s")
         return
     if DATABASE_URL.startswith("sqlite:///") or not DATABASE_URL:
         with _memory_db() as db:
             db.execute("CREATE TABLE IF NOT EXISTS conversations (id INTEGER PRIMARY KEY, created_at TEXT DEFAULT CURRENT_TIMESTAMP, title TEXT NOT NULL)")
             db.execute("CREATE TABLE IF NOT EXISTS hamasa_users (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP)")
+            db.execute("CREATE TABLE IF NOT EXISTS hamasa_sessions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES hamasa_users(id) ON DELETE CASCADE, expires_at INTEGER NOT NULL, revoked_at INTEGER NULL)")
+            db.execute("CREATE INDEX IF NOT EXISTS idx_hamasa_sessions_user ON hamasa_sessions(user_id)")
             db.execute("""CREATE TABLE IF NOT EXISTS hamasa_memories (
                 id TEXT PRIMARY KEY, owner_hash TEXT NOT NULL, category TEXT NOT NULL,
                 content TEXT NOT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT DEFAULT CURRENT_TIMESTAMP)""")
+            _migrate_memory_encryption(db, "?")
 
 @app.on_event("startup")
 def startup():
     if APP_ENV == "production" and len(JWT_SECRET) < 32:
         raise RuntimeError("JWT_SECRET must contain at least 32 characters in production.")
+    if APP_ENV == "production" and not MEMORY_ENCRYPTION_KEY:
+        raise RuntimeError("MEMORY_ENCRYPTION_KEY is required in production.")
     init_db()
 
 @app.get("/api/memory")
-def list_memories(x_hamasa_client: str = Header(default=""), authorization: str = Header(default="")):
-    owner = _memory_owner(authorization, x_hamasa_client)
+def list_memories(x_hamasa_client: str = Header(default=""), authorization: str = Header(default=""), hamasa_session: str = Cookie(default="")):
+    owner = _memory_owner(authorization, x_hamasa_client, hamasa_session)
     with _memory_db() as db:
         rows = db.execute(
             "SELECT id, category, content, updated_at FROM hamasa_memories WHERE owner_hash = %s ORDER BY updated_at DESC LIMIT 40"
@@ -503,14 +591,14 @@ def list_memories(x_hamasa_client: str = Header(default=""), authorization: str 
             (owner,)
         ).fetchall()
     return {"memories": [
-        {"id": row[0], "category": row[1], "text": row[2],
+        {"id": row[0], "category": row[1], "text": _decrypt_memory(row[2]),
          "updatedAt": row[3].isoformat() if hasattr(row[3], "isoformat") else str(row[3])}
         for row in rows
     ]}
 
 @app.post("/api/memory")
-def create_memory(body: MemoryCreateRequest, x_hamasa_client: str = Header(default=""), authorization: str = Header(default="")):
-    owner = _memory_owner(authorization, x_hamasa_client)
+def create_memory(body: MemoryCreateRequest, x_hamasa_client: str = Header(default=""), authorization: str = Header(default=""), hamasa_session: str = Cookie(default="")):
+    owner = _memory_owner(authorization, x_hamasa_client, hamasa_session)
     memory_id = str(uuid.uuid4())
     with _memory_db() as db:
         count = db.execute(
@@ -521,15 +609,15 @@ def create_memory(body: MemoryCreateRequest, x_hamasa_client: str = Header(defau
             raise HTTPException(status_code=409, detail="Memory limit reached.")
         if DATABASE_URL.startswith(("postgres://", "postgresql://")):
             db.execute("INSERT INTO hamasa_memories (id, owner_hash, category, content) VALUES (%s, %s, %s, %s)",
-                       (memory_id, owner, body.category, body.text))
+                       (memory_id, owner, body.category, _encrypt_memory(body.text)))
         else:
             db.execute("INSERT INTO hamasa_memories (id, owner_hash, category, content) VALUES (?, ?, ?, ?)",
                        (memory_id, owner, body.category, body.text))
     return {"id": memory_id, "category": body.category, "text": body.text}
 
 @app.delete("/api/memory/{memory_id}")
-def delete_memory(memory_id: str, x_hamasa_client: str = Header(default=""), authorization: str = Header(default="")):
-    owner = _memory_owner(authorization, x_hamasa_client)
+def delete_memory(memory_id: str, x_hamasa_client: str = Header(default=""), authorization: str = Header(default=""), hamasa_session: str = Cookie(default="")):
+    owner = _memory_owner(authorization, x_hamasa_client, hamasa_session)
     try:
         uuid.UUID(memory_id)
     except ValueError:
@@ -546,7 +634,7 @@ def delete_memory(memory_id: str, x_hamasa_client: str = Header(default=""), aut
 
 @app.get("/")
 def root():
-    return {"name": "HAMASA AI API", "status": "online", "docs": "/docs"}
+    return {"name": "HAMASA AI API", "status": "online"}
 
 @app.get("/health")
 def health():
