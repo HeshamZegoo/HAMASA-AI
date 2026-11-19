@@ -274,8 +274,8 @@ async def transcribe_audio(body: TranscriptionRequest):
         async with httpx.AsyncClient(timeout=httpx.Timeout(75.0, connect=15.0)) as client:
             response = await client.post(
                 "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
-                params={"key": key},
-                headers={"Content-Type": "application/json"},
+                # Send the API key in a header, never in the URL where proxies/logs may record it.
+                headers={"Content-Type": "application/json", "x-goog-api-key": key},
                 json=payload,
             )
         if response.status_code >= 400:
@@ -333,7 +333,12 @@ async def text_to_speech(body: TTSRequest):
                 },
             )
             if response.status_code >= 400:
-                logger.error("Gemini TTS failed: status=%s body=%s", response.status_code, response.text[:300])
+                logger.error("Gemini TTS failed: status=%s body=%s", response.status_code, response.text[:500])
+                if response.status_code == 429:
+                    raise HTTPException(
+                        status_code=429,
+                        detail="Gemini TTS quota/rate limit reached. Check the Google AI Studio Rate Limits and Billing pages, then retry when the quota resets.",
+                    )
                 raise HTTPException(status_code=502, detail=f"Gemini TTS error ({response.status_code}).")
             data = response.json()
             parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
