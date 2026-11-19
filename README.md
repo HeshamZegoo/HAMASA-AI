@@ -116,7 +116,7 @@ The repository includes `railway.json` for Railway build/start configuration and
 
 ## Security notes
 
-- Keep `AI_API_KEY`, `TAVILY_API_KEY`, `JWT_SECRET`, database credentials, and encryption keys on the backend only.
+- Keep `AI_API_KEY`, `NVIDIA_API_KEY`, `TTS_GEMINI_API_KEY`, `TAVILY_API_KEY`, `JWT_SECRET`, database credentials, and encryption keys on the backend only.
 - Use HTTPS for deployed frontend and backend services.
 - Configure CORS with trusted origins rather than a wildcard in production.
 - Use a strong, unique `JWT_SECRET` and a valid Fernet `MEMORY_ENCRYPTION_KEY` when memory encryption is enabled.
