@@ -84,7 +84,7 @@ class FileGenerationTests(unittest.TestCase):
 
     def test_pptx_creates_slides_from_markdown_headings(self):
         from pptx import Presentation
-        raw = build_file("pptx", "Deck", "# Intro\\nWelcome\\n# Results\\nDone", [])
+        raw = build_file("pptx", "Deck", "# Intro\nWelcome\n# Results\nDone", [])
         deck = Presentation(io.BytesIO(raw))
         self.assertEqual(len(deck.slides), 2)
         self.assertIn("Intro", deck.slides[0].shapes[0].text)
