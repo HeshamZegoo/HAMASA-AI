@@ -997,6 +997,12 @@ function requestedFileFormat(text) {
   if ((!action && !documentIntent) || (!formatMention && !documentIntent)) return null;
   if (/\bpdf\b|\.pdf|بي\s*دي\s*اف|بي دي اف/.test(s)) return 'pdf';
   if (/\b(xlsx|excel|spreadsheet)\b|اكسل|إكسل|اكسيل/.test(s)) return 'xlsx';
+  if (/\b(pptx|powerpoint|slides|presentation)\b|باوربوينت|عرض تقديمي|شرائح/.test(s)) return 'pptx';
+  if (/\b(csv)\b/.test(s)) return 'csv';
+  if (/\b(json)\b/.test(s)) return 'json';
+  if (/\b(html)\b/.test(s)) return 'html';
+  if (/\b(markdown|md)\b/.test(s)) return 'md';
+  if (/\b(txt|text file)\b|ملف نصي/.test(s)) return 'txt';
   if (/\b(docx|word)\b|وورد/.test(s)) return 'docx';
   if (/(ملف|مستند|تقرير|document|file)/.test(s)) return 'docx';
   return null;
