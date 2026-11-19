@@ -62,10 +62,10 @@ class FileGenerationEndpointTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main, "API_KEY", "test-provider-key"):
             with patch("backend.app.main.httpx.AsyncClient", FakeGenerationClient):
                 result = await main.generate_file(body)
-        workbook = load_workbook(io.BytesIO(base64.b64decode(result["data"]), validate=False), data_only=True)
+        workbook = load_workbook(io.BytesIO(base64.b64decode(result["data"])), data_only=True)
         sheet = workbook.active
-        self.assertEqual(sheet["B3"].value, 12)
-        self.assertEqual(sheet["B3"].data_type, "n")
+        self.assertEqual(sheet["B4"].value, 12)
+        self.assertEqual(sheet["B4"].data_type, "n")
         workbook.close()
 
 
