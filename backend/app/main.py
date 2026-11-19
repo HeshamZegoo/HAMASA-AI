@@ -156,7 +156,11 @@ _rate_lock = Lock()
 async def security_and_rate_limit(request: Request, call_next):
     path = request.url.path
     if path.startswith("/api/"):
-        client_ip = request.client.host if request.client else "unknown"
+        # Railway forwards the original client address in X-Forwarded-For.
+        # Use the right-most address (the one appended by the trusted edge proxy).
+        forwarded_for = request.headers.get("x-forwarded-for", "")
+        forwarded_ips = [part.strip() for part in forwarded_for.split(",") if part.strip()]
+        client_ip = forwarded_ips[-1] if forwarded_ips else (request.client.host if request.client else "unknown")
         limit, window = _RATE_WINDOWS.get(path, (120, 60))
         now = time.monotonic()
         key = (client_ip, path, request.method)
