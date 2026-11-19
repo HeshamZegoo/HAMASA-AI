@@ -550,12 +550,14 @@ function errorRow() {
 }
 function setBusy(v) { busy = v; sendBtn.disabled = v || !inp.value.trim(); }
 function requestedFileFormat(text) {
-  const s = String(text || '').toLowerCase();
-  if (/\bpdf\b|\.pdf|بي دي اف/.test(s)) return 'pdf';
+  const s = String(text || '').toLowerCase().trim();
+  const intent = /(اعمل|اعملي|اعمللي|أنشئ|انشئ|انشأ|جهز|جهزي|جهزلي|حضّر|حضر|حوّل|حول|صدّر|صدر|اكتب|اكتبلي|نزّل|نزل|حمّل|حمل|احفظ|جهّز|generate|create|make|export|download|save)/
+    .test(s) || /(ملف|مستند|تقرير|جدول).{0,45}(للتنزيل|تحميل|جاهز|في ملف)/.test(s);
+  if (!intent) return null;
+  if (/\bpdf\b|\.pdf|بي\s*دي\s*اف/.test(s)) return 'pdf';
   if (/\b(xlsx|excel)\b|اكسل|إكسل|اكسيل|جدول حساب/.test(s)) return 'xlsx';
   if (/\b(docx|word)\b|وورد/.test(s)) return 'docx';
-  if (/(اعمل|اعملي|أنشئ|انشئ|جهز|جهزي|حضّر|حضر|حوّل|حول|صدّر|صدر).{0,35}(ملف|مستند|تقرير|جدول)/i.test(s) ||
-      /(ملف|مستند|تقرير|جدول).{0,35}(للتنزيل|تحميل|جاهز)/i.test(s)) return 'docx';
+  if (/(ملف|مستند|تقرير|جدول|document|file)/.test(s)) return 'docx';
   return null;
 }
 async function generateRequestedFile() {
@@ -622,7 +624,7 @@ function grow() { inp.style.height = '42px'; inp.style.height = Math.min(inp.scr
 inp.addEventListener('input', grow);
 inp.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(inp.value); } });
 sendBtn.onclick = () => { send(inp.value); inp.focus({ preventScroll: true }); };
-$('#attach').onclick = () => toast(t('attachSoon'));   // TODO: attachment upload
+// File picker and upload are initialized by attachments.js.
 inp.addEventListener('focus', () => setTimeout(() => { fit(); scrollEnd(); }, 300));
 
 
