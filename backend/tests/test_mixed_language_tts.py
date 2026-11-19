@@ -22,7 +22,7 @@ class MixedLanguageTTSTests(unittest.TestCase):
             wav.setnchannels(1)
             wav.setsampwidth(2)
             wav.setframerate(22050)
-            wav.writeframes(b"\\x01\\x00" * 100)
+            wav.writeframes(bytes([1, 0]) * 100)
         return output.getvalue()
 
     def test_tts_endpoint_synthesizes_each_language_in_order_and_merges_wav(self):
