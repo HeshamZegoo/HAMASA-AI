@@ -53,6 +53,17 @@ class PublicStatusDisclosureTests(unittest.TestCase):
         self.assertFalse(status["memory"])
         self.assertFalse(status["accounts"])
 
+    def test_rate_limit_state_prunes_expired_client_buckets(self):
+        main._rate_events.clear()
+        expired = ("192.0.2.10", "/api/chat", "POST")
+        active = ("192.0.2.11", "/api/chat", "POST")
+        main._rate_events[expired].append(0.0)
+        main._rate_events[active].append(999.0)
+        main._prune_rate_events(1000.0)
+        self.assertNotIn(expired, main._rate_events)
+        self.assertIn(active, main._rate_events)
+        main._rate_events.clear()
+
     def test_api_rejects_untrusted_origins(self):
         response = self.client.get(
             "/api/tts/status",
