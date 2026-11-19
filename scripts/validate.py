@@ -72,6 +72,8 @@ def main() -> None:
         fail("microphone/live voice code or UI is still present in index.html")
     if "voiceUrl" in config or "/api/live" in config:
         fail("live voice endpoint is still present in config.js")
+    if "response.status === 401" not in html or "keeping it for the next retry" not in html:
+        fail("saved account sessions must survive temporary backend failures")
 
     api_match = re.search(r'API_URL:\s*"([^"]+)"', config)
     if not api_match:
