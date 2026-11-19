@@ -81,7 +81,8 @@ Set these in `backend/.env` for local development or in the Railway service's Va
 
 | Variable | Purpose |
 |---|---|
-| `AI_API_KEY` | Secret API key for the selected AI provider |\n| `NVIDIA_API_KEY` | Optional dedicated NVIDIA NIM key for speech synthesis; falls back to `AI_API_KEY` for legacy setups |
+| `AI_API_KEY` | Secret API key for the selected AI provider |
+| `NVIDIA_API_KEY` | Optional dedicated NVIDIA NIM key for speech synthesis; falls back to `AI_API_KEY` for legacy setups |
 | `AI_BASE_URL` | OpenAI-compatible API base URL; defaults to OpenAI's API |
 | `AI_MODEL` | Chat model identifier supported by the provider |
 | `AI_VISION_MODEL` | Optional vision-capable model for image understanding |
