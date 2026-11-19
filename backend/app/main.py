@@ -911,7 +911,7 @@ async def _live_web_search(query: str) -> list[dict]:
         "api_key": search_key,
         "query": query,
         "topic": topic,
-        "search_depth": "advanced",
+        "search_depth": "basic",
         "max_results": 5,
         "include_answer": False,
         "include_raw_content": False,
