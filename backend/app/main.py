@@ -192,7 +192,7 @@ def _tts_segments(text: str) -> list[tuple[str, str]]:
         else:
             segments.append((token, language))
 
-    return [(part.strip(), language) for part, language in segments if part.strip()]
+    return [(part, language) for part, language in segments if part.strip()]
 
 
 def _tts_clean(text: str) -> str:
@@ -349,12 +349,13 @@ async def text_to_speech(body: TTSRequest):
                     status_code=502,
                     detail="Speech generation failed. Please try again.",
                 )
-            wav_parts.append(response.content)
+            wav_parts.append((response.content, chunk_language))
 
     try:
         combined_frames = []
         params = None
-        for wav_data in wav_parts:
+        previous_language = None
+        for wav_data, chunk_language in wav_parts:
             with wave.open(io.BytesIO(wav_data), "rb") as audio:
                 current_params = audio.getparams()
                 if params is None:
@@ -366,7 +367,12 @@ async def text_to_speech(body: TTSRequest):
                     or current_params.comptype != params.comptype
                 ):
                     raise ValueError("NVIDIA TTS returned inconsistent audio formats.")
+                if previous_language and previous_language != chunk_language:
+                    silence_samples = int(params.framerate * 0.12)
+                    silence_bytes = silence_samples * params.nchannels * params.sampwidth
+                    combined_frames.append(b"\\x00" * silence_bytes)
                 combined_frames.append(audio.readframes(audio.getnframes()))
+                previous_language = chunk_language
 
         output = io.BytesIO()
         with wave.open(output, "wb") as merged:
