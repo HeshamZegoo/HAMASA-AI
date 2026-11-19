@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" dir="ltr" data-theme="dark">
+<html lang="en" dir="ltr" data-theme="light">
 <head>
 <meta charset="utf-8">
 <title>HAMASA AI — حماصة</title>
@@ -139,6 +139,130 @@ dialog h2{font-size:20px;margin-bottom:16px;display:flex;justify-content:space-b
 @media (max-width:420px){.chips{grid-template-columns:1fr}.stat{display:none}.logo b{font-size:14px}header{gap:6px}.ib{width:40px;height:40px}.lang{padding:0 10px}}
 @media (max-height:520px){.empty .orb{display:none}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+/* HAMASA MONOCHROME / 3D ROBOT EXPERIENCE */
+:root{
+  --bg:#f7f7f7;--bg2:#fff;--fg:#101010;--mut:rgba(16,16,16,.58);
+  --glass:rgba(255,255,255,.78);--glass2:rgba(0,0,0,.055);--line:rgba(0,0,0,.11);
+  --acc:#111;--cy:#555;--sh:0 24px 70px rgba(0,0,0,.09);
+}
+[data-theme=light]{
+  --bg:#f7f7f7;--bg2:#fff;--fg:#101010;--mut:rgba(16,16,16,.58);
+  --glass:rgba(255,255,255,.78);--glass2:rgba(0,0,0,.055);--line:rgba(0,0,0,.11);
+  --sh:0 24px 70px rgba(0,0,0,.09);
+}
+[data-theme=dark]{
+  --bg:#080808;--bg2:#111;--fg:#f7f7f7;--mut:rgba(255,255,255,.58);
+  --glass:rgba(255,255,255,.055);--glass2:rgba(255,255,255,.09);--line:rgba(255,255,255,.12);
+  --sh:0 24px 70px rgba(0,0,0,.42);
+}
+.app{
+  background:
+    radial-gradient(ellipse at 50% 36%,rgba(0,0,0,.045),transparent 42%),
+    linear-gradient(135deg,rgba(0,0,0,.018) 0 1px,transparent 1px 50%),
+    var(--bg);
+  background-size:auto,34px 34px,auto;
+}
+[data-theme=dark] .app{background:radial-gradient(ellipse at 50% 36%,rgba(255,255,255,.055),transparent 42%),var(--bg)}
+header{border-bottom:1px solid var(--line);background:var(--glass);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px)}
+.logo b,.brand{letter-spacing:.2em}
+.logo svg,.brand svg{filter:grayscale(1)}
+.ib{background:var(--glass);border-color:var(--line);transition:transform .22s,background .22s,border-color .22s}
+.ib:hover{transform:translateY(-2px);background:var(--glass2);border-color:var(--fg)}
+.btn-new,.send,.user .bub,.seg button[aria-pressed=true),.memory-add{
+  background:#111!important;color:#fff!important;box-shadow:0 9px 24px rgba(0,0,0,.16)!important
+}
+[data-theme=dark] .btn-new,[data-theme=dark] .send,[data-theme=dark] .user .bub,[data-theme=dark] .seg button[aria-pressed=true],[data-theme=dark] .memory-add{background:#f4f4f4!important;color:#080808!important}
+.chip{background:var(--glass);border-color:var(--line);box-shadow:0 8px 26px rgba(0,0,0,.035);transition:transform .28s cubic-bezier(.2,.8,.2,1),box-shadow .28s,border-color .28s}
+.chip:hover{border-color:var(--fg);box-shadow:0 14px 34px rgba(0,0,0,.09);transform:translateY(-4px)}
+.box{border-color:var(--line);background:var(--glass);box-shadow:0 18px 55px rgba(0,0,0,.09)}
+.box:focus-within{border-color:var(--fg);box-shadow:0 18px 55px rgba(0,0,0,.1),0 0 0 4px rgba(0,0,0,.045)}
+.bot .bub{background:var(--glass);border-color:var(--line)}
+.user .bub{background:#111;color:#fff;box-shadow:0 10px 26px rgba(0,0,0,.12)}
+[data-theme=dark] .user .bub{background:#f2f2f2;color:#111}
+.dots i{background:var(--fg)}
+.stat i{background:#555;box-shadow:0 0 9px rgba(0,0,0,.22)}
+[data-theme=dark] .stat i{background:#eee;box-shadow:0 0 9px rgba(255,255,255,.4)}
+.sb{background:var(--glass);border-color:var(--line)}
+dialog{background:var(--bg2)}
+/* Animated layered robot: CSS 3D, no external model or dependency */
+.robot-stage{
+  position:relative;width:min(58vw,270px,calc(var(--vh)*.34));aspect-ratio:1;
+  display:grid;place-items:center;perspective:900px;isolation:isolate;margin:0 auto 4px;
+  filter:drop-shadow(0 22px 24px rgba(0,0,0,.12));
+}
+.robot-aura{position:absolute;inset:10%;border-radius:50%;background:radial-gradient(circle,rgba(0,0,0,.10),transparent 68%);filter:blur(14px);animation:auraPulse 4s ease-in-out infinite}
+.robot-orbit{position:absolute;width:96%;height:34%;border:1px solid rgba(0,0,0,.16);border-radius:50%;transform:rotateX(68deg) rotateZ(-18deg);animation:orbitFloat 12s linear infinite}
+[data-theme=dark] .robot-orbit{border-color:rgba(255,255,255,.24)}
+.robot-orbit:before,.robot-orbit:after{content:"";position:absolute;width:7px;height:7px;border-radius:50%;background:var(--fg);box-shadow:0 0 12px var(--fg)}
+.robot-orbit:before{top:10%;left:15%}.robot-orbit:after{right:12%;bottom:12%;width:4px;height:4px}
+.robot-shadow{position:absolute;bottom:5%;width:48%;height:10%;border-radius:50%;background:rgba(0,0,0,.18);filter:blur(11px);animation:shadowPulse 4s ease-in-out infinite}
+.robot-3d{
+  position:relative;width:76%;height:82%;transform-style:preserve-3d;
+  animation:robotFloat 4s ease-in-out infinite;transform:rotateY(-13deg) rotateX(5deg);
+}
+.robot-head{
+  position:absolute;z-index:4;top:10%;left:17%;width:66%;height:48%;
+  border-radius:34% 34% 29% 29%;border:1px solid #d9d9d9;
+  background:linear-gradient(145deg,#fff 0%,#f5f5f5 27%,#bdbdbd 55%,#fafafa 73%,#777 100%);
+  box-shadow:inset 5px 5px 12px rgba(255,255,255,.95),inset -8px -9px 15px rgba(0,0,0,.24),8px 12px 18px rgba(0,0,0,.18);
+  transform:translateZ(18px);animation:headTilt 7s ease-in-out infinite;
+}
+[data-theme=dark] .robot-head{background:linear-gradient(145deg,#555,#202020 45%,#090909 70%,#444);border-color:#555;box-shadow:inset 5px 5px 12px rgba(255,255,255,.18),inset -8px -9px 15px rgba(0,0,0,.8),8px 12px 18px rgba(0,0,0,.5)}
+.robot-highlight{position:absolute;top:5%;left:14%;width:38%;height:19%;border-radius:50%;background:rgba(255,255,255,.72);filter:blur(7px);transform:rotate(-28deg)}
+.robot-antenna{position:absolute;top:0;left:48%;height:13%;width:4px;border-radius:9px;background:linear-gradient(#777,#eee);transform:translateZ(12px)}
+.robot-antenna i{position:absolute;top:-7px;left:-4px;width:12px;height:12px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff,#777 70%);box-shadow:0 0 12px rgba(0,0,0,.3);animation:antennaBlink 2.8s infinite}
+.robot-ear{position:absolute;top:35%;width:12%;height:30%;border-radius:9px;background:linear-gradient(90deg,#777,#eee,#888);box-shadow:0 3px 6px rgba(0,0,0,.2)}
+.robot-ear-left{left:-8%}.robot-ear-right{right:-8%}
+.robot-face{
+  position:absolute;inset:27% 11% 22%;border-radius:24px;
+  background:linear-gradient(145deg,#111,#292929 55%,#050505);
+  box-shadow:inset 0 3px 9px rgba(0,0,0,.8),0 1px 0 rgba(255,255,255,.7);
+  display:flex;align-items:center;justify-content:center;gap:19%;overflow:hidden;
+}
+.robot-eye{width:10%;height:24%;border-radius:99px;background:#fff;box-shadow:0 0 9px rgba(255,255,255,.8),0 0 18px rgba(255,255,255,.35);animation:robotBlink 5.2s infinite}
+.robot-eye:nth-child(2){animation-delay:.08s}
+.robot-mouth{position:absolute;bottom:17%;width:18%;height:3px;border-radius:9px;background:#aaa;box-shadow:0 0 5px #fff}
+.robot-neck{position:absolute;z-index:2;top:54%;left:42%;width:16%;height:12%;background:linear-gradient(90deg,#555,#eee 45%,#777);border-radius:5px;transform:translateZ(5px)}
+.robot-body{
+  position:absolute;z-index:3;left:23%;top:61%;width:54%;height:31%;
+  border-radius:24% 24% 34% 34%;background:linear-gradient(120deg,#777,#fafafa 28%,#c7c7c7 58%,#555);
+  border:1px solid #aaa;box-shadow:inset 4px 4px 9px rgba(255,255,255,.9),inset -5px -7px 12px rgba(0,0,0,.25),5px 9px 14px rgba(0,0,0,.16);transform:translateZ(12px)
+}
+[data-theme=dark] .robot-body{background:linear-gradient(120deg,#222,#777 28%,#333 58%,#090909);border-color:#555}
+.robot-chest{position:absolute;inset:22% 26%;border:1px solid rgba(0,0,0,.18);border-radius:10px;background:linear-gradient(145deg,rgba(255,255,255,.7),rgba(0,0,0,.08));display:grid;place-items:center}
+.robot-chest span{font-size:clamp(14px,4vw,22px);font-weight:900;color:#222;letter-spacing:-.08em;text-shadow:0 1px 0 #fff}
+.robot-chest i{position:absolute;bottom:5px;width:18%;height:2px;border-radius:5px;background:#555;box-shadow:0 0 5px #fff}
+.robot-shoulder{position:absolute;top:12%;width:22%;height:32%;border-radius:40%;background:linear-gradient(90deg,#777,#eee,#888);box-shadow:0 3px 7px rgba(0,0,0,.2)}
+.robot-shoulder-left{left:-14%}.robot-shoulder-right{right:-14%}
+.robot-arm{position:absolute;top:66%;width:13%;height:25%;border-radius:99px;background:linear-gradient(90deg,#666,#eee,#777);transform-origin:top center;box-shadow:0 5px 8px rgba(0,0,0,.15)}
+.robot-arm-left{left:15%;transform:rotate(17deg);animation:armWave 5s ease-in-out infinite}
+.robot-arm-right{right:15%;transform:rotate(-17deg)}
+[data-theme=dark] .robot-arm,[data-theme=dark] .robot-shoulder{background:linear-gradient(90deg,#111,#777,#222)}
+.robot-floor{position:absolute;bottom:0;width:58%;height:5%;border-radius:50%;background:rgba(0,0,0,.11);filter:blur(6px)}
+@keyframes robotFloat{0%,100%{transform:translateY(0) rotateY(-13deg) rotateX(5deg)}50%{transform:translateY(-10px) rotateY(10deg) rotateX(2deg)}}
+@keyframes headTilt{0%,100%{transform:translateZ(18px) rotateZ(0)}50%{transform:translateZ(18px) rotateZ(2deg)}}
+@keyframes robotBlink{0%,44%,48%,100%{transform:scaleY(1)}46%{transform:scaleY(.08)}}
+@keyframes antennaBlink{0%,100%{opacity:.7;transform:scale(.85)}50%{opacity:1;transform:scale(1.18)}}
+@keyframes orbitFloat{to{transform:rotateX(68deg) rotateZ(342deg)}}
+@keyframes auraPulse{50%{transform:scale(1.12);opacity:.65}}
+@keyframes shadowPulse{50%{transform:scaleX(.82);opacity:.6}}
+@keyframes armWave{0%,100%{transform:rotate(17deg)}50%{transform:rotate(8deg)}}
+.empty{gap:12px;animation:heroEnter .75s cubic-bezier(.2,.8,.2,1) both}
+.empty h1{letter-spacing:-.045em}
+.empty p{max-width:460px}
+.m{animation:messageEnter .34s cubic-bezier(.2,.8,.2,1) both}
+@keyframes heroEnter{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes messageEnter{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:600px){
+  .robot-stage{width:min(54vw,210px,calc(var(--vh)*.27))}
+  .empty{padding:18px 0}
+  .chips{gap:8px}.chip{padding:12px;font-size:13px}
+}
+@media(prefers-reduced-motion:reduce){
+  .robot-3d,.robot-head,.robot-orbit,.robot-eye,.robot-aura,.robot-shadow,.robot-antenna i,.robot-arm-left,.empty,.m{animation:none!important}
+}
+
 </style>
 </head>
 <body>
@@ -347,7 +471,7 @@ const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAl
 const store = { get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
                 set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
 let lang = store.get('hamasa.lang', 'en') === 'ar' ? 'ar' : 'en';
-let theme = store.get('hamasa.theme', 'dark') === 'light' ? 'light' : 'dark';
+let theme = store.get('hamasa.theme', 'light') === 'dark' ? 'dark' : 'light';
 let convs = store.get('hamasa.convs', []); if (!Array.isArray(convs)) convs = [];
 let memories = store.get('hamasa.memory', []);
 if (!Array.isArray(memories)) memories = [];
@@ -361,12 +485,28 @@ let cur = null, busy = false;
 const t = k => I18N[lang][k];
 
 function orbSVG() {
-  return `<svg class="orb" viewBox="0 0 200 200" aria-hidden="true" focusable="false">
-  <circle class="halo" cx="100" cy="100" r="94" fill="none" stroke="url(#gH)" stroke-width="2" stroke-dasharray="46 16" stroke-linecap="round"/>
-  <g class="body"><circle cx="100" cy="100" r="78" fill="url(#gO)"/>
-  <ellipse cx="76" cy="58" rx="40" ry="20" fill="url(#gS)" transform="rotate(-24 76 58)"/>
-  <g class="face"><rect class="eye" x="67" y="88" width="12" height="25" rx="6" fill="#fff"/><rect class="eye" x="121" y="88" width="12" height="25" rx="6" fill="#fff"/>
-  <path class="mouth" d="M82 130 Q100 143 118 130" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round"/></g></g></svg>`;
+  return `<div class="robot-stage" aria-hidden="true">
+    <div class="robot-aura"></div><div class="robot-orbit"></div>
+    <div class="robot-shadow"></div>
+    <div class="robot-3d">
+      <div class="robot-antenna"><i></i></div>
+      <div class="robot-head">
+        <div class="robot-ear robot-ear-left"></div><div class="robot-ear robot-ear-right"></div>
+        <div class="robot-face">
+          <span class="robot-eye"></span><span class="robot-eye"></span>
+          <span class="robot-mouth"></span>
+        </div>
+        <div class="robot-highlight"></div>
+      </div>
+      <div class="robot-neck"></div>
+      <div class="robot-body">
+        <div class="robot-shoulder robot-shoulder-left"></div><div class="robot-shoulder robot-shoulder-right"></div>
+        <div class="robot-chest"><span>H</span><i></i></div>
+      </div>
+      <div class="robot-arm robot-arm-left"></div><div class="robot-arm robot-arm-right"></div>
+    </div>
+    <div class="robot-floor"></div>
+  </div>`;
 }
 function mountOrbs() { $$('[data-orb]').forEach(e => { e.innerHTML = orbSVG(); const s = e.firstChild; if (!e.classList.contains('orb-s') && e.dataset.orb !== 'big') {} }); }
 let toastT; function toast(m) { const e = $('#toast'); e.textContent = m; e.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => e.classList.remove('on'), 2600); }
