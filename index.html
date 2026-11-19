@@ -346,10 +346,9 @@ dialog{background:var(--bg2)}
  <form id="authForm" autocomplete="on">
   <div class="row"><span id="authEmailLabel">Email</span><input id="authEmail" type="email" autocomplete="email" required maxlength="254" placeholder="name@example.com" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--glass2);color:var(--fg)"></div>
   <div class="row" id="authPasswordRow"><span id="authPasswordLabel">Password</span><input id="authPassword" type="password" autocomplete="current-password" required minlength="10" maxlength="128" placeholder="At least 10 characters" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--glass2);color:var(--fg)"></div>
-  <div class="row" id="authCodeRow" hidden><span id="authCodeLabel">Email verification code</span><input id="authCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="000000" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--glass2);color:var(--fg);letter-spacing:.35em;text-align:center"></div>
   <p class="memory-help" id="authHint">Your account keeps your saved memories available when you sign in.</p>
   <button class="memory-add" id="authSubmit" type="submit">Sign in</button>
-  <button class="link" id="authResend" type="button" hidden style="justify-content:center;margin-top:10px">Resend verification code</button>
+
  </form>
  <button class="link" id="authSwitch" type="button" style="justify-content:center;margin-top:10px">Create an account</button>
  <button class="danger" id="authSignout" type="button" hidden>Sign out</button>
@@ -1022,8 +1021,6 @@ function saveAuthToken(value) {
 }
 let authUser = store.get("hamasa.authUser", null);
 let authMode = "login";
-let verificationStep = false;
-let pendingVerificationEmail = "";
 function updateAuthButton() {
   const b = $("#authOpen");
   if (!b) return;
@@ -1039,8 +1036,6 @@ function updateAuthButton() {
 }
 function setAuthMode(mode) {
   authMode = mode;
-  verificationStep = false;
-  pendingVerificationEmail = "";
   const ar = lang === "ar";
   $("#authTitle").textContent = mode === "signup" ? (ar ? "إنشاء حساب" : "Create account") : (ar ? "تسجيل الدخول" : "Sign in");
   $("#authSubmit").textContent = mode === "signup" ? (ar ? "إنشاء الحساب" : "Create account") : (ar ? "دخول" : "Sign in");
@@ -1050,9 +1045,6 @@ function setAuthMode(mode) {
   $("#authPassword").required = true;
   $("#authEmail").disabled = false;
   $("#authPasswordRow").hidden = false;
-  $("#authCodeRow").hidden = true;
-  $("#authCode").required = false;
-  $("#authResend").hidden = true;
 }
 $("#authOpen").onclick = () => { updateAuthButton(); setAuthMode(authUser ? "login" : "login"); $("#authDlg").showModal(); };
 $("#authClose").onclick = () => $("#authDlg").close();
@@ -1065,62 +1057,27 @@ $("#authSignout").onclick = () => {
 $("#authForm").addEventListener("submit", async e => {
   e.preventDefault();
   const submit = $("#authSubmit"); submit.disabled = true;
-  const email = verificationStep ? pendingVerificationEmail : $("#authEmail").value.trim();
+  const email = $("#authEmail").value.trim();
   try {
-    const endpoint = authMode === "signup"
-      ? (verificationStep ? "/api/auth/verify" : "/api/auth/signup")
-      : "/api/auth/login";
-    const payload = verificationStep
-      ? { email, code: $("#authCode").value.trim() }
-      : { email, password: $("#authPassword").value };
+    const endpoint = authMode === "signup" ? "/api/auth/signup" : "/api/auth/login";
     const response = await apiFetch(API_BASE + endpoint, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({ email, password: $("#authPassword").value })
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.detail || (lang === "ar" ? "تعذر تسجيل الدخول." : "Authentication failed."));
-    if (authMode === "signup" && !verificationStep && data.verification_required) {
-      verificationStep = true;
-      pendingVerificationEmail = data.email || email;
-      $("#authEmail").value = pendingVerificationEmail;
-      $("#authEmail").disabled = true;
-      $("#authPasswordRow").hidden = true;
-      $("#authPassword").required = false;
-      $("#authCodeRow").hidden = false;
-      $("#authCode").required = true;
-      $("#authResend").hidden = false;
-      $("#authTitle").textContent = lang === "ar" ? "تأكيد البريد الإلكتروني" : "Verify your email";
-      $("#authSubmit").textContent = lang === "ar" ? "تأكيد الكود" : "Verify code";
-      $("#authSwitch").hidden = true;
-      $("#authCode").focus();
-      toast(lang === "ar" ? "بعتنالك كود تأكيد على بريدك الإلكتروني." : "A verification code was sent to your email.");
-      return;
-    }
     saveAuthToken(data.token); authUser = data.user;
     store.set("hamasa.authUser", authUser);
-    $("#authPassword").value = ""; $("#authCode").value = "";
+    $("#authPassword").value = "";
     updateAuthButton();
     await syncMemoriesFromServer();
     await syncConversationsFromServer();
     $("#authDlg").close();
-    toast(lang === "ar" ? "أهلاً بيك! محادثاتك اتزامنت مع الحساب." : "You’re signed in! Your chats are synced.");
+    toast(lang === "ar" ? (authMode === "signup" ? "حسابك اتعمل بنجاح!" : "أهلاً بيك! محادثاتك اتزامنت مع الحساب.") : (authMode === "signup" ? "Your account was created!" : "You’re signed in! Your chats are synced."));
   } catch (error) {
     toast(error.message || (lang === "ar" ? "حصل خطأ." : "Something went wrong."));
   } finally { submit.disabled = false; }
 });
-$("#authResend").onclick = async () => {
-  const button = $("#authResend"); button.disabled = true;
-  try {
-    const response = await apiFetch(API_BASE + "/api/auth/resend-verification", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: pendingVerificationEmail })
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.detail || "Could not resend the code.");
-    toast(lang === "ar" ? "بعتنا كود جديد على بريدك." : "A new code was sent.");
-  } catch (error) { toast(error.message); }
-  finally { button.disabled = false; }
-};
 async function validateSavedSession() {
   try {
     const response = await apiFetch(API_BASE + "/api/auth/me", { cache: "no-store" });
