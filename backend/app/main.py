@@ -223,6 +223,16 @@ class MemoryCreateRequest(BaseModel):
     category: Literal["preference", "project", "decision", "temporary"]
     text: str = Field(min_length=1, max_length=500)
 
+class ConversationMessage(BaseModel):
+    role: Literal["user", "bot"]
+    text: str = Field(min_length=1, max_length=12000)
+    demo: bool = False
+
+class ConversationSaveRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=120)
+    messages: list[ConversationMessage] = Field(min_length=1, max_length=500)
+    updated_at: int = Field(default_factory=lambda: int(time.time()))
+
 class FileCreateRequest(BaseModel):
     prompt: str = Field(min_length=2, max_length=12000)
     format: Literal["docx", "pdf", "xlsx"]
@@ -646,6 +656,17 @@ def init_db():
                 )
             """)
             db.execute("CREATE INDEX IF NOT EXISTS idx_hamasa_sessions_user ON hamasa_sessions(user_id)")
+            db.execute("""
+                CREATE TABLE IF NOT EXISTS hamasa_conversations (
+                    id TEXT PRIMARY KEY,
+                    user_id UUID NOT NULL REFERENCES hamasa_users(id) ON DELETE CASCADE,
+                    title VARCHAR(120) NOT NULL,
+                    messages TEXT NOT NULL,
+                    updated_at BIGINT NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+            """)
+            db.execute("CREATE INDEX IF NOT EXISTS idx_hamasa_conversations_owner ON hamasa_conversations(user_id, updated_at DESC)")
             db.execute("ALTER TABLE hamasa_memories ALTER COLUMN content TYPE TEXT")
             _migrate_memory_encryption(db, "%s")
         return
@@ -655,6 +676,17 @@ def init_db():
             db.execute("CREATE TABLE IF NOT EXISTS hamasa_users (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP)")
             db.execute("CREATE TABLE IF NOT EXISTS hamasa_sessions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES hamasa_users(id) ON DELETE CASCADE, expires_at INTEGER NOT NULL, revoked_at INTEGER NULL)")
             db.execute("CREATE INDEX IF NOT EXISTS idx_hamasa_sessions_user ON hamasa_sessions(user_id)")
+            db.execute("""
+                CREATE TABLE IF NOT EXISTS hamasa_conversations (
+                    id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL REFERENCES hamasa_users(id) ON DELETE CASCADE,
+                    title TEXT NOT NULL,
+                    messages TEXT NOT NULL,
+                    updated_at INTEGER NOT NULL,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            db.execute("CREATE INDEX IF NOT EXISTS idx_hamasa_conversations_owner ON hamasa_conversations(user_id, updated_at DESC)")
             db.execute("""CREATE TABLE IF NOT EXISTS hamasa_memories (
                 id TEXT PRIMARY KEY, owner_hash TEXT NOT NULL, category TEXT NOT NULL,
                 content TEXT NOT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -719,6 +751,72 @@ def delete_memory(memory_id: str, x_hamasa_client: str = Header(default=""), aut
         deleted = cur.rowcount
     if not deleted:
         raise HTTPException(status_code=404, detail="Memory not found.")
+    return {"deleted": True}
+
+@app.get("/api/chats")
+def list_conversations(user: dict = Depends(_verified_user)):
+    placeholder = "%s" if DATABASE_URL.startswith(("postgres://", "postgresql://")) else "?"
+    with _memory_db() as db:
+        rows = db.execute(
+            f"SELECT id, title, messages, updated_at FROM hamasa_conversations WHERE user_id = {placeholder} ORDER BY updated_at DESC LIMIT 40",
+            (uuid.UUID(user["id"]) if DATABASE_URL.startswith(("postgres://", "postgresql://")) else user["id"],),
+        ).fetchall()
+    conversations = []
+    for row in rows:
+        try:
+            messages = json.loads(row[2])
+            if not isinstance(messages, list):
+                continue
+        except (ValueError, TypeError):
+            continue
+        conversations.append({"id": str(row[0]), "title": row[1], "messages": messages, "updated_at": int(row[3])})
+    return {"conversations": conversations}
+
+@app.put("/api/chats/{conversation_id}")
+def save_conversation(conversation_id: str, body: ConversationSaveRequest, user: dict = Depends(_verified_user)):
+    try:
+        conversation_id = str(uuid.UUID(conversation_id))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid conversation identifier.")
+    user_id = uuid.UUID(user["id"]) if DATABASE_URL.startswith(("postgres://", "postgresql://")) else user["id"]
+    placeholder = "%s" if DATABASE_URL.startswith(("postgres://", "postgresql://")) else "?"
+    messages = json.dumps([item.model_dump() for item in body.messages], ensure_ascii=False)
+    with _memory_db() as db:
+        cur = db.execute(
+            f"""INSERT INTO hamasa_conversations (id, user_id, title, messages, updated_at)
+                VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
+                ON CONFLICT (id) DO UPDATE SET
+                    title = excluded.title, messages = excluded.messages, updated_at = excluded.updated_at
+                WHERE hamasa_conversations.user_id = excluded.user_id""",
+            (conversation_id, user_id, body.title.strip()[:120], messages, body.updated_at),
+        )
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Conversation not found.")
+    return {"saved": True, "id": conversation_id}
+
+@app.delete("/api/chats/{conversation_id}")
+def delete_conversation(conversation_id: str, user: dict = Depends(_verified_user)):
+    try:
+        conversation_id = str(uuid.UUID(conversation_id))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid conversation identifier.")
+    placeholder = "%s" if DATABASE_URL.startswith(("postgres://", "postgresql://")) else "?"
+    user_id = uuid.UUID(user["id"]) if DATABASE_URL.startswith(("postgres://", "postgresql://")) else user["id"]
+    with _memory_db() as db:
+        cur = db.execute(
+            f"DELETE FROM hamasa_conversations WHERE id = {placeholder} AND user_id = {placeholder}",
+            (conversation_id, user_id),
+        )
+    if not cur.rowcount:
+        raise HTTPException(status_code=404, detail="Conversation not found.")
+    return {"deleted": True}
+
+@app.delete("/api/chats")
+def delete_all_conversations(user: dict = Depends(_verified_user)):
+    placeholder = "%s" if DATABASE_URL.startswith(("postgres://", "postgresql://")) else "?"
+    user_id = uuid.UUID(user["id"]) if DATABASE_URL.startswith(("postgres://", "postgresql://")) else user["id"]
+    with _memory_db() as db:
+        db.execute(f"DELETE FROM hamasa_conversations WHERE user_id = {placeholder}", (user_id,))
     return {"deleted": True}
 
 @app.get("/")
