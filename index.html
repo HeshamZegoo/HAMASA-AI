@@ -422,9 +422,9 @@ function parseChatResponse(json) {
 }
 async function checkBackend() {
   try {
-    const response = await apiFetch(API_BASE + "/health", { cache: "no-store" });
+    const response = await apiFetch(API_BASE + "/ready", { cache: "no-store" });
     const data = await response.json();
-    backendOnline = response.ok && data.status === "ok";
+    backendOnline = response.ok && data.status === "ready";
   } catch {
     backendOnline = false;
   }
