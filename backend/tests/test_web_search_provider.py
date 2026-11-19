@@ -49,9 +49,11 @@ class LiveWebSearchTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(results), 1)
         self.assertEqual(fake_client.request_url, "https://api.tavily.com/search")
         self.assertEqual(fake_client.request_body["api_key"], "test-secret")
-        self.assertEqual(fake_client.request_body["search_depth"], "basic")
-        self.assertEqual(fake_client.request_body["max_results"], 5)
+        self.assertEqual(fake_client.request_body["search_depth"], "advanced")
+        self.assertEqual(fake_client.request_body["max_results"], 8)
         self.assertFalse(fake_client.request_body["include_answer"])
+        self.assertEqual(fake_client.request_body["include_raw_content"], "markdown")
+        self.assertEqual(fake_client.request_body["chunks_per_source"], 3)
 
     async def test_search_is_disabled_without_server_key(self):
         with patch.dict(os.environ, {"TAVILY_API_KEY": ""}):
