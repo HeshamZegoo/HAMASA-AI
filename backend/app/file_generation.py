@@ -18,6 +18,9 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from openpyxl import Workbook
+from pptx import Presentation
+from pptx.util import Inches, Pt
+from pptx.dml.color import RGBColor as PptRGBColor
 
 _ARABIC_FONT = "HamasaArabic"
 _ARABIC_FONT_PATH = Path(__file__).with_name("fonts") / "Amiri-Regular.ttf.b64"
@@ -209,4 +212,63 @@ def build_file(fmt: str, title: str, content: str, rows: list, page_count: int =
         output = BytesIO()
         workbook.save(output)
         return output.getvalue()
+
+    if fmt == "pptx":
+        presentation = Presentation()
+        presentation.slide_width = Inches(13.333)
+        presentation.slide_height = Inches(7.5)
+        sections = []
+        current = {"title": title, "body": []}
+        for line in content.replace("\\r", "").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            if line.startswith("# "):
+                if current["body"] or current["title"] != title:
+                    sections.append(current)
+                current = {"title": line[2:].strip(), "body": []}
+            else:
+                current["body"].append(line)
+        if current["body"] or not sections:
+            sections.append(current)
+        for section in sections:
+            slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+            slide.background.fill.solid()
+            slide.background.fill.fore_color.rgb = PptRGBColor(247, 249, 251)
+            title_box = slide.shapes.add_textbox(Inches(.65), Inches(.45), Inches(12), Inches(.8))
+            paragraph = title_box.text_frame.paragraphs[0]
+            paragraph.text = section["title"]
+            paragraph.font.size = Pt(28)
+            paragraph.font.bold = True
+            paragraph.font.color.rgb = PptRGBColor(23, 50, 77)
+            paragraph.alignment = 2 if _ARABIC_RE.search(section["title"]) else 0
+            body_box = slide.shapes.add_textbox(Inches(.8), Inches(1.55), Inches(11.7), Inches(5.3))
+            frame = body_box.text_frame
+            frame.word_wrap = True
+            for index, text in enumerate(section["body"][:18]):
+                paragraph = frame.paragraphs[0] if index == 0 else frame.add_paragraph()
+                paragraph.text = text[2:] if text.startswith(("- ", "* ", "• ")) else text
+                paragraph.font.size = Pt(17)
+                paragraph.space_after = Pt(12)
+                paragraph.alignment = 2 if _ARABIC_RE.search(text) else 0
+        output = BytesIO()
+        presentation.save(output)
+        return output.getvalue()
+    if fmt in ("txt", "md"):
+        prefix = "# " if fmt == "md" else ""
+        return (prefix + title + "\\n\\n" + content).encode("utf-8")
+    if fmt == "csv":
+        import csv
+        output = io.StringIO(newline="")
+        writer = csv.writer(output)
+        for row in rows:
+            if isinstance(row, list):
+                writer.writerow(row[:100])
+        return ("\\ufeff" + output.getvalue()).encode("utf-8")
+    if fmt == "json":
+        import json
+        return json.dumps({"title": title, "content": content, "rows": rows}, ensure_ascii=False, indent=2).encode("utf-8")
+    if fmt == "html":
+        from html import escape as html_escape
+        return ("<!doctype html><html lang='ar'><meta charset='utf-8'><title>" + html_escape(title) + "</title><main dir='auto'><h1>" + html_escape(title) + "</h1><pre>" + html_escape(content) + "</pre></main></html>").encode("utf-8")
     raise ValueError("Unsupported file format")
