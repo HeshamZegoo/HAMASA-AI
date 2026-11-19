@@ -45,10 +45,30 @@ def _extract_text(item: AttachmentInput, raw: bytes) -> str:
         try:
             from docx import Document
             doc = Document(io.BytesIO(raw))
-            return "\n".join(p.text for p in doc.paragraphs)
+            parts = [p.text for p in doc.paragraphs if p.text.strip()]
+            for table in doc.tables:
+                for row in table.rows:
+                    parts.append(" | ".join(cell.text.replace("\\n", " ").strip() for cell in row.cells))
+            return "\\n".join(parts)
         except Exception as exc:
             logger.info("DOCX extraction failed for %s: %s", item.name, type(exc).__name__)
             raise ValueError(f"مقدرتش أقرأ ملف Word: {item.name}.") from exc
+    if mime == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" or suffix == "xlsx":
+        try:
+            from openpyxl import load_workbook
+            workbook = load_workbook(io.BytesIO(raw), read_only=True, data_only=True)
+            parts = []
+            for sheet in workbook.worksheets[:20]:
+                parts.append(f"\\n[ورقة العمل: {sheet.title}]")
+                for row in sheet.iter_rows(max_row=5000, max_col=100, values_only=True):
+                    values = [str(value) if value is not None else "" for value in row]
+                    if any(values):
+                        parts.append(" | ".join(values))
+            workbook.close()
+            return "\\n".join(parts)
+        except Exception as exc:
+            logger.info("XLSX extraction failed for %s: %s", item.name, type(exc).__name__)
+            raise ValueError(f"مقدرتش أقرأ ملف Excel: {item.name}.") from exc
     raise ValueError(f"نوع الملف {item.name} غير مدعوم حالياً.")
 
 def prepare_messages(messages, attachments, model):
