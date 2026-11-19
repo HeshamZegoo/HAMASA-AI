@@ -91,3 +91,32 @@ GENERAL TOOL DISCIPLINE
 - Follow the language and dialect of the latest user message. For mixed-language
   replies, preserve the user's technical terms naturally.
 """.strip()
+
+
+
+def build_tool_capabilities_prompt(status: dict[str, bool]) -> str:
+    """Append non-secret runtime availability so the model never assumes a disabled integration."""
+    labels = {
+        "chat": "AI chat and reasoning",
+        "web_search": "Live web search",
+        "vision": "Image understanding",
+        "file_generation": "DOCX/PDF/XLSX file generation",
+        "transcription": "Audio transcription",
+        "speech": "Text-to-speech",
+        "memory": "Encrypted saved memory",
+        "accounts": "Account login and cloud conversations",
+    }
+    lines = [
+        "RUNTIME TOOL AVAILABILITY (authoritative for this request; never infer secrets):"
+    ]
+    for key, label in labels.items():
+        available = bool(status.get(key, False))
+        lines.append(f"- {label}: {'AVAILABLE' if available else 'UNAVAILABLE'}")
+    lines.append(
+        "If a capability is UNAVAILABLE, do not promise it, claim it ran, or invent a result. "
+        "Offer the best text-only alternative and state the limitation briefly. "
+        "If AVAILABLE, use the application's corresponding integration when its endpoint "
+        "or attachment context is actually provided; availability alone is not proof that "
+        "a particular request succeeded."
+    )
+    return TOOL_CAPABILITIES_PROMPT + "\n\n" + "\n".join(lines)
