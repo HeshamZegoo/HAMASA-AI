@@ -158,6 +158,9 @@ _rate_lock = Lock()
 async def security_and_rate_limit(request: Request, call_next):
     path = request.url.path
     if path.startswith("/api/"):
+        origin = request.headers.get("origin")
+        if origin and origin not in ORIGINS:
+            return JSONResponse(status_code=403, content={"detail": "Origin is not allowed."})
         # Railway forwards the original client address in X-Forwarded-For.
         # Use the right-most address (the one appended by the trusted edge proxy).
         forwarded_for = request.headers.get("x-forwarded-for", "")
@@ -612,7 +615,7 @@ def create_memory(body: MemoryCreateRequest, x_hamasa_client: str = Header(defau
                        (memory_id, owner, body.category, _encrypt_memory(body.text)))
         else:
             db.execute("INSERT INTO hamasa_memories (id, owner_hash, category, content) VALUES (?, ?, ?, ?)",
-                       (memory_id, owner, body.category, body.text))
+                       (memory_id, owner, body.category, _encrypt_memory(body.text)))
     return {"id": memory_id, "category": body.category, "text": body.text}
 
 @app.delete("/api/memory/{memory_id}")
