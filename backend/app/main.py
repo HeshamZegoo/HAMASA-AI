@@ -48,6 +48,21 @@ ORIGINS = [x.strip() for x in os.getenv("CORS_ORIGINS", DEFAULT_ORIGINS).split("
 
 HAMASA_SYSTEM_PROMPT = os.getenv("HAMASA_SYSTEM_PROMPT", "").strip()
 
+
+def _runtime_tool_status() -> dict[str, bool]:
+    """Report only capabilities backed by the required runtime configuration."""
+    has_database = bool(DATABASE_URL)
+    return {
+        "chat": bool(API_KEY),
+        "web_search": bool(os.getenv("TAVILY_API_KEY", "").strip()),
+        "vision": bool(API_KEY and os.getenv("AI_VISION_MODEL", "").strip()),
+        "file_generation": bool(API_KEY),
+        "transcription": bool(os.getenv("TTS_GEMINI_API_KEY", "").strip()),
+        "speech": bool(API_KEY),
+        "memory": bool(MEMORY_ENCRYPTION_KEY and has_database),
+        "accounts": bool(JWT_SECRET and has_database),
+    }
+
 app = FastAPI(
     title="HAMASA AI API",
     version="0.1.2",
@@ -968,16 +983,7 @@ async def chat(body: ChatRequest):
     context_messages = [{"role": "system", "content": HAMASA_SYSTEM_PROMPT}]
     context_messages.append({
         "role": "system",
-        "content": build_tool_capabilities_prompt({
-            "chat": bool(API_KEY),
-            "web_search": bool(os.getenv("TAVILY_API_KEY", "").strip()),
-            "vision": bool(API_KEY and os.getenv("AI_VISION_MODEL", "").strip()),
-            "file_generation": bool(API_KEY),
-            "transcription": bool(os.getenv("TTS_GEMINI_API_KEY", "").strip()),
-            "speech": bool(API_KEY),
-            "memory": bool(MEMORY_ENCRYPTION_KEY),
-            "accounts": bool(JWT_SECRET),
-        }),
+        "content": build_tool_capabilities_prompt(_runtime_tool_status()),
     })
     context_messages.append({
         "role": "system",
