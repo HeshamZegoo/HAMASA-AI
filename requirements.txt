@@ -11,3 +11,4 @@ psycopg[binary]==3.2.9
 cryptography==44.0.3
 arabic-reshaper==3.0.0
 python-bidi==0.6.6
+python-pptx==1.0.2
