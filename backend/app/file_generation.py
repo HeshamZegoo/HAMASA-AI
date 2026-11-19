@@ -1,5 +1,6 @@
 import base64
 import io
+from io import BytesIO
 from pathlib import Path
 from xml.sax.saxutils import escape
 
