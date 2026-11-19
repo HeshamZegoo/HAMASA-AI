@@ -826,10 +826,32 @@ function speechCleanText(value) {
   return text.replace(/[\t ]+/g, ' ').replace(/ *\n */g, '. ')
     .replace(/([.!?؟،؛])\s*([.!?؟،؛])+/g, '$1').trim();
 }
+function splitSpeechSegments(text) {
+  const tokens = text.match(/[\\u0600-\\u06FF\\u0750-\\u077F]+|[A-Za-z]+(?:['’-][A-Za-z]+)*|[^A-Za-z\\u0600-\\u06FF\\u0750-\\u077F]+/gu) || [];
+  const segments = [];
+  let prefix = '';
+  for (const token of tokens) {
+    const language = /[\\u0600-\\u06FF\\u0750-\\u077F]/u.test(token)
+      ? 'ar-XA'
+      : /[A-Za-z]/u.test(token) ? 'en-US' : null;
+    if (!language) {
+      if (segments.length) segments[segments.length - 1].text += token;
+      else prefix += token;
+      continue;
+    }
+    const value = !segments.length && prefix ? prefix + token : token;
+    prefix = '';
+    if (segments.length && segments[segments.length - 1].language === language) {
+      segments[segments.length - 1].text += value;
+    } else {
+      segments.push({ text: value, language });
+    }
+  }
+  return segments.filter(segment => segment.text.trim());
+}
+
 async function readMessageAloud(text, button) {
   if (activeSpeechButton === button && activeSpeech) {
-    // If Safari blocked the first automatic play attempt, a second tap retries
-    // the already-generated audio without calling the phone's speech engine.
     if (activeSpeech.paused) {
       try { await activeSpeech.play(); }
       catch { toast('اضغط مرة تانية لتشغيل الصوت.'); }
@@ -841,37 +863,43 @@ async function readMessageAloud(text, button) {
   const spokenText = speechCleanText(text);
   if (!spokenText) { toast(lang === 'ar' ? 'مفيش نص واضح للنطق.' : 'There is no readable text.'); return; }
 
+  const textSegments = splitSpeechSegments(spokenText);
+  if (!textSegments.length) { toast('مفيش نص واضح للنطق.'); return; }
+
   activeSpeechButton = button;
   button.setAttribute('aria-pressed', 'true');
   button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg><span>' + t('stopReading') + '</span>';
   try {
-    const response = await apiFetch(API_BASE + '/api/tts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: spokenText, gender: voiceGender }),
-      signal: AbortSignal.timeout ? AbortSignal.timeout(90000) : undefined
-    });
-    if (!response.ok) {
-      let detail = 'تعذر إنشاء الصوت.';
-      try { detail = (await response.json()).detail || detail; } catch {}
-      throw new Error(detail);
+    // Request each language run separately. This also works with older
+    // backend deployments that return only one merged WAV for a mixed reply.
+    const playableSegments = [];
+    for (const segment of textSegments) {
+      if (activeSpeechButton !== button) return;
+      const response = await apiFetch(API_BASE + '/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: segment.text, gender: voiceGender }),
+        signal: AbortSignal.timeout ? AbortSignal.timeout(90000) : undefined
+      });
+      if (!response.ok) {
+        let detail = 'تعذر إنشاء الصوت.';
+        try { detail = (await response.json()).detail || detail; } catch {}
+        throw new Error(detail);
+      }
+      const data = await response.json();
+      if (!data.audio) throw new Error('خدمة الصوت رجّعت ملف صوت فارغ.');
+      playableSegments.push(data.audio);
     }
-    const data = await response.json();
-    if (!data.audio) throw new Error('خدمة الصوت رجّعت ملف صوت فارغ.');
     if (activeSpeechButton !== button) return;
-    const segments = Array.isArray(data.audio_segments) && data.audio_segments.length
-      ? data.audio_segments
-      : [{ audio: data.audio, mime_type: data.mime_type || 'audio/wav' }];
+
     let segmentIndex = 0;
     const playNextSegment = async () => {
       if (activeSpeechButton !== button) return;
-      if (segmentIndex >= segments.length) { stopReading(); return; }
-      const segment = segments[segmentIndex++];
-      if (!segment.audio) throw new Error('مقطع صوت رجع فاضي.');
-      const binary = atob(segment.audio);
+      if (segmentIndex >= playableSegments.length) { stopReading(); return; }
+      const binary = atob(playableSegments[segmentIndex++]);
       const bytes = new Uint8Array(binary.length);
       for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      const blob = new Blob([bytes], { type: segment.mime_type || 'audio/wav' });
+      const blob = new Blob([bytes], { type: 'audio/wav' });
       if (activeSpeechUrl) URL.revokeObjectURL(activeSpeechUrl);
       activeSpeechUrl = URL.createObjectURL(blob);
       const audio = new Audio(activeSpeechUrl);
@@ -895,13 +923,7 @@ async function readMessageAloud(text, button) {
       };
       await audio.play();
     };
-    try {
-      await playNextSegment();
-    } catch (error) {
-      // Keep the generated audio ready; the next tap is a direct play gesture.
-      console.warn('Audio playback needs another tap:', error);
-      toast('الصوت جاهز. دوس تاني على تشغيل الصوت.');
-    }
+    await playNextSegment();
   } catch (error) {
     if (activeSpeechButton === button) stopReading();
     console.error('HAMASA TTS failed:', error);
