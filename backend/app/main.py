@@ -199,7 +199,7 @@ def _tts_segments(text: str) -> list[tuple[str, str]]:
 def _pcm_silence(nchannels: int, sampwidth: int, framerate: int, seconds: float = 0.12) -> bytes:
     """Return correctly sized silent PCM frames for a WAV stream."""
     samples = max(0, int(framerate * seconds))
-    return b"\\x00" * (samples * nchannels * sampwidth)
+    return b"\x00" * (samples * nchannels * sampwidth)
 
 
 def _tts_clean(text: str) -> str:
