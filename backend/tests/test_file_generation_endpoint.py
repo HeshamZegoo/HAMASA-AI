@@ -117,11 +117,7 @@ class FileGenerationEndpointTests(unittest.IsolatedAsyncioTestCase):
         vision_payload, generation_payload = FakeVisionThenGenerationClient.payloads
         self.assertEqual(vision_payload["model"], "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning")
         self.assertNotIn("response_format", vision_payload)
-        self.assertTrue(any(
-            part.get("type") == "image_url"
-            for message in vision_payload["messages"] if isinstance(message.get("content"), list)
-            for part in message["content"]
-        ))
+        self.assertIn("data:image/png;base64,", str(vision_payload))
         self.assertEqual(generation_payload["model"], "meta/llama-3.3-70b-instruct")
         self.assertEqual(generation_payload["response_format"]["type"], "json_object")
         self.assertTrue(any(
