@@ -155,7 +155,7 @@ class TranscriptionRequest(BaseModel):
 def _tts_language(text: str) -> str:
     """Choose the NVIDIA Magpie locale from the actual spoken script."""
     import re
-    arabic_letters = len(re.findall(r"[\\u0600-\\u06FF\\u0750-\\u077F]", text))
+    arabic_letters = len(re.findall(r"[\u0600-\u06FF\u0750-\u077F]", text))
     latin_letters = len(re.findall(r"[A-Za-z]", text))
     return "ar-XA" if arabic_letters > latin_letters else "en-US"
 
