@@ -5,11 +5,11 @@ from urllib.parse import urlparse
 
 _SEARCH_INTENT = re.compile(
     r"(?:\b(?:search(?:\s+(?:for|the web|online))?|browse(?:\s+the\s+web)?|google|research|look\s+up|look\s+for|"
-    r"find(?:\s+me)?(?:\s+(?:current|latest|recent))?|latest|current|up.?to.?date|today|tonight|"
+    r"find(?:\s+me)?(?:\s+(?:current|latest|recent))?|look\s+into|check\s+(?:online|the\s+web)|latest|current|up.?to.?date|today|tonight|"
     r"this week|recent|news|sources?|citations?|references?|verify|fact.?check|is it true|"
     r"prove|evidence|official\s+(?:source|website|documentation)|price|release notes|latest version|"
     r"what changed|as of 202[5-9])\b)"
-    r"|(?:ابحث(?:\s+(?:على|في)\s+(?:النت|الإنترنت|الويب|مصادر))?|دور\s+على\s+النت|"
+    r"|(?:ابحث(?:لي)?(?:\s+(?:عن|على|في)\s+(?:النت|الإنترنت|الويب|مصادر|آخر|أحدث))?|دور(?:لي)?\s+على\s+(?:النت|الإنترنت|الويب)|شوفلي\s+(?:على\s+النت|آخر|أحدث)|"
     r"آخر\s+(?:الأخبار|التحديثات|إصدار|نسخة|المستجدات)|أحدث|احدث|إيه الجديد|ايه الجديد|فيه جديد|"
     r"مستجدات|حالي(?:اً|ا)?|دلوقتي|النهارده|اليوم|الأسبوع ده|مصادر موثوقة|مصادر|روابط|"
     r"اتأكد|تأكد|تحقق|هل الكلام ده صحيح|دليل|إثبات|رسمي|مصدر رسمي|سعر(?:ه|ها)?|أسعار|"
