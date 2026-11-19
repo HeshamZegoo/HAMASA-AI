@@ -88,6 +88,7 @@ def main() -> None:
             fail(f"referenced frontend asset is missing: {asset}")
 
     required_routes = {
+        "/ready": html,
         "/api/chat": html,
         "/api/transcribe": attachments,
         "/api/tts": html,
