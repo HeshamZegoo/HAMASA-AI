@@ -92,7 +92,7 @@ class LiveWebSearchTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(fake_client.request_body["topic"], "news")
         self.assertEqual(fake_client.request_body["days"], 1)
         self.assertGreaterEqual(fake_client.request_body["max_results"], 5)
-        self.assertIn("artificial intelligence", fake_client.request_body["query"])
+        self.assertEqual(fake_client.request_body["query"], "أحدث أخبار الذكاء الاصطناعي اليوم")
         self.assertIn("facebook.com", fake_client.request_body["exclude_domains"])
 
 
