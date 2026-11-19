@@ -56,6 +56,18 @@ class PublicStatusDisclosureTests(unittest.TestCase):
         self.assertEqual(response.headers.get("X-Frame-Options"), "DENY")
         self.assertEqual(response.headers.get("Cache-Control"), "no-store")
 
+    def test_readiness_requires_chat_provider_configuration(self):
+        with patch.object(main, "API_KEY", ""):
+            unavailable = self.client.get("/ready")
+        self.assertEqual(unavailable.status_code, 503)
+        self.assertNotIn("API_KEY", unavailable.text)
+
+        with patch.object(main, "API_KEY", "private-provider-key"):
+            ready = self.client.get("/ready")
+        self.assertEqual(ready.status_code, 200)
+        self.assertEqual(ready.json(), {"status": "ready"})
+        self.assertNotIn("private-provider-key", ready.text)
+
     def test_root_exposes_only_liveness(self):
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
