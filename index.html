@@ -290,10 +290,14 @@ async function checkBackend() {
   updStatus();
 }
 async function chatAdapter(messages) {
+  const basePayload = buildChatRequest(messages);
+  const payload = window.HAMASA_ATTACHMENTS
+    ? await window.HAMASA_ATTACHMENTS.addToPayload(basePayload)
+    : basePayload;
   const response = await apiFetch(HAMASA_CONFIG.chatUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(buildChatRequest(messages)),
+    body: JSON.stringify(payload),
     signal: AbortSignal.timeout ? AbortSignal.timeout(95000) : undefined
   });
   if (!response.ok) {
@@ -301,7 +305,9 @@ async function chatAdapter(messages) {
     try { detail = (await response.json()).detail || detail; } catch {}
     throw new Error(detail);
   }
-  return { text: parseChatResponse(await response.json()), demo: false };
+  const data = await response.json();
+  window.HAMASA_ATTACHMENTS?.clear();
+  return { text: parseChatResponse(data), demo: false };
 }
 
 /* =====================================================================
@@ -313,7 +319,7 @@ en:{newChat:'New chat',history:'Recent',noHist:'No conversations yet.',settings:
  greetT:'Ahlan, I’m Hamasa.',greetS:'Ask me anything. I’ll keep it sharp, warm, and a little bit funny.',
  s:['Explain something tricky in simple words','Help me plan my week','Write a short message to a friend','Tell me a joke, Egyptian style'],
  demoTag:'Demo reply · not from the AI',errT:'Couldn’t reach Hamasa',errB:'Check your connection, then try again.',retry:'Try again',
-attachSoon:'Attachments are coming soon.',cleared:'History cleared.',clearAll:'Clear all conversations',del:'Delete conversation',
+cleared:'History cleared.',clearAll:'Clear all conversations',del:'Delete conversation',
 memoryTitle:'Long-term memory',memoryHelp:'Saved only in this browser. Add useful facts you want Hamasa to remember. Avoid passwords or sensitive information.',memoryPreference:'Preferences',memoryProject:'Projects',memoryDecision:'Decisions',memoryTemporary:'Temporary context',memoryPlaceholder:'Write one clear fact to remember…',memoryAdd:'Save memory',memoryEmpty:'No saved memories yet.',memoryRemove:'Delete memory',memorySaved:'Memory saved.',memoryLimit:'Memory list is full. Delete an old item first.',
  backend:'Connection',beNone:'Backend is offline or the NVIDIA provider is not configured.',beLive:'Connected to the HAMASA NVIDIA chat service.',
  demo:['This is a demo reply. Connect the chat endpoint in HAMASA_CONFIG and I’ll answer for real.','Demo mode is on, so I’m not the real model yet. Once the backend is wired in, ask me again.','Placeholder answer: the interface works, the AI isn’t connected yet.']},
@@ -322,7 +328,7 @@ ar:{newChat:'محادثة جديدة',history:'الأخيرة',noHist:'لا تو
  greetT:'أهلاً، أنا حماصة.',greetS:'اسألني في أي حاجة. هرد عليك بذكاء ودفا وشوية خفة دم.',
  s:['اشرحلي حاجة معقدة ببساطة','ساعدني أنظّم أسبوعي','اكتبلي رسالة قصيرة لصاحبي','قولّي نكتة مصرية'],
  demoTag:'رد تجريبي · ليس من الذكاء الاصطناعي',errT:'مقدرتش أوصل لحماصة',errB:'اتأكد من الاتصال وجرّب تاني.',retry:'جرّب تاني',
-attachSoon:'المرفقات هتتوفر قريباً.',cleared:'تم مسح السجل.',clearAll:'مسح كل المحادثات',del:'حذف المحادثة',
+cleared:'تم مسح السجل.',clearAll:'مسح كل المحادثات',del:'حذف المحادثة',
 memoryTitle:'الذاكرة طويلة المدى',memoryHelp:'الذاكرة محفوظة على المتصفح ده فقط. أضف المعلومات المهمة اللي عايز حماصة يفتكرها. متحفظش كلمات مرور أو معلومات حساسة.',memoryPreference:'تفضيلات',memoryProject:'مشاريع',memoryDecision:'قرارات',memoryTemporary:'معلومات مؤقتة',memoryPlaceholder:'اكتب معلومة واضحة عايز حماصة يفتكرها…',memoryAdd:'حفظ في الذاكرة',memoryEmpty:'لسه مفيش معلومات محفوظة.',memoryRemove:'حذف المعلومة',memorySaved:'اتحفظت في الذاكرة.',memoryLimit:'الذاكرة وصلت للحد الأقصى. احذف معلومة قديمة الأول.',
  backend:'الاتصال',beNone:'الخادم غير متصل أو مزود NVIDIA غير مُعدّ.',beLive:'متصل بخادم حماصة وNVIDIA.',
  demo:['ده رد تجريبي. اربط خادم المحادثة في HAMASA_CONFIG وهرد عليك بجد.','الوضع التجريبي شغال، فأنا لسه مش النموذج الحقيقي. اسألني تاني بعد ربط الخادم.','رد مؤقت: الواجهة شغالة والذكاء الاصطناعي لسه مش متصل.']}
@@ -713,6 +719,6 @@ async function validateSavedSession() {
 /* INIT */
 mountOrbs(); applyTheme(); applyLang(); renderChat(); checkBackend(); validateSavedSession().then(syncMemoriesFromServer);
 </script>
-<script src="./attachments.js"></script>
+<script src="./attachments.js?v=20261119-2"></script>
 </body>
 </html>
