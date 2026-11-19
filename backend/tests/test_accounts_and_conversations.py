@@ -109,6 +109,32 @@ class AccountAndConversationFlowTests(unittest.TestCase):
         self.assertEqual(listed.status_code, 200)
         self.assertEqual(listed.json()["memories"][0]["text"], "أفضل الرد بالمصري")
 
+    def test_saved_memories_are_isolated_between_accounts(self):
+        first = self.client.post("/api/auth/signup", json={
+            "email": "memory-owner@example.com",
+            "password": "correct-horse-battery",
+        }).json()["token"]
+        second = self.client.post("/api/auth/signup", json={
+            "email": "memory-outsider@example.com",
+            "password": "correct-horse-battery",
+        }).json()["token"]
+        owner_headers = {"Authorization": f"Bearer {first}"}
+        outsider_headers = {"Authorization": f"Bearer {second}"}
+
+        created = self.client.post("/api/memory", headers=owner_headers, json={
+            "category": "project",
+            "text": "Private HAMASA project context",
+        })
+        self.assertEqual(created.status_code, 200)
+
+        outsider_list = self.client.get("/api/memory", headers=outsider_headers)
+        self.assertEqual(outsider_list.status_code, 200)
+        self.assertEqual(outsider_list.json()["memories"], [])
+
+        owner_list = self.client.get("/api/memory", headers=owner_headers)
+        self.assertEqual(owner_list.status_code, 200)
+        self.assertEqual(owner_list.json()["memories"][0]["text"], "Private HAMASA project context")
+
     def test_users_cannot_read_or_overwrite_another_users_conversation(self):
         first = self.client.post("/api/auth/signup", json={
             "email": "owner@example.com",
