@@ -89,6 +89,24 @@ _RATE_WINDOWS = {
 _rate_events = defaultdict(deque)
 _rate_lock = Lock()
 
+
+def _prune_rate_events(now: float) -> None:
+    """Bound per-process rate-limit state and remove expired client buckets."""
+    for old_key in list(_rate_events.keys())[:5000]:
+        events = _rate_events.get(old_key)
+        if events is None:
+            continue
+        window = _RATE_WINDOWS.get(old_key[1], (120, 60))[1]
+        while events and now - events[0] >= window:
+            events.popleft()
+        if not events:
+            _rate_events.pop(old_key, None)
+    # Under a high-cardinality flood, cap memory even if every bucket is recent.
+    if len(_rate_events) > 25000:
+        for old_key in list(_rate_events.keys())[:5000]:
+            _rate_events.pop(old_key, None)
+
+
 @app.middleware("http")
 async def security_and_rate_limit(request: Request, call_next):
     path = request.url.path
@@ -117,9 +135,7 @@ async def security_and_rate_limit(request: Request, call_next):
                 )
             events.append(now)
             if len(_rate_events) > 20000:
-                for old_key in list(_rate_events.keys())[:5000]:
-                    if not _rate_events[old_key]:
-                        _rate_events.pop(old_key, None)
+                _prune_rate_events(now)
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
