@@ -49,14 +49,14 @@ class MixedLanguageTTSTests(unittest.TestCase):
                 self.auth_headers.append(headers.copy())
                 return FakeResponse(audio)
 
-        with patch.dict(os.environ, {"AI_API_KEY": "test-provider-key", "NVIDIA_API_KEY": "test-nvidia-key"}):
+        with patch.dict(os.environ, {"AI_API_KEY": "test-provider-key"}):
             with patch("backend.app.main.httpx.AsyncClient", FakeClient):
                 result = self._run_async(text_to_speech(
                     TTSRequest(text="أهلاً welcome عامل إيه", gender="female")
                 ))
 
         self.assertEqual([call["language"] for call in FakeClient.calls], ["ar-XA", "en-US", "ar-XA"])
-        self.assertTrue(all(headers["Authorization"] == "Bearer test-nvidia-key" for headers in FakeClient.auth_headers))
+        self.assertTrue(all(headers["Authorization"] == "Bearer test-provider-key" for headers in FakeClient.auth_headers))
         self.assertTrue(all(call["voice"].endswith(".Sofia") for call in FakeClient.calls))
         decoded = base64.b64decode(result["audio"])
         with wave.open(io.BytesIO(decoded), "rb") as wav:
