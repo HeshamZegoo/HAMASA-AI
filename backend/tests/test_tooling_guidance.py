@@ -23,6 +23,20 @@ class AssistantBehaviorGuidanceTests(unittest.TestCase):
         self.assertIn("Image understanding: AVAILABLE", prompt)
         self.assertIn("DOCX/PDF/XLSX file generation: UNAVAILABLE", prompt)
 
+
+    def test_guidance_requires_tool_first_execution_before_limitation_claims(self):
+        guidance = RELIABILITY_AND_TASK_EXECUTION_GUIDANCE
+        self.assertIn('Before saying "I can\'t"', guidance)
+        self.assertIn("inspect the tools, integrations", guidance)
+        self.assertIn("execute it now", guidance)
+        self.assertIn("closest safe alternative", guidance)
+
+    def test_guidance_uses_relevant_tools_not_every_unrelated_tool(self):
+        guidance = RELIABILITY_AND_TASK_EXECUTION_GUIDANCE
+        self.assertIn("every tool relevant to the task", guidance)
+        self.assertIn("Avoid redundant calls", guidance)
+        self.assertIn("Continue through all safe independent steps", guidance)
+
     def test_guidance_distinguishes_prompt_tuning_from_weight_training(self):
         self.assertIn("not model-weight training", RELIABILITY_AND_TASK_EXECUTION_GUIDANCE)
         self.assertIn("real training job", RELIABILITY_AND_TASK_EXECUTION_GUIDANCE)
