@@ -260,7 +260,7 @@ def build_file(fmt: str, title: str, content: str, rows: list, page_count: int =
         presentation.slide_height = Inches(7.5)
         sections = []
         current = {"title": title, "body": []}
-        for line in content.replace("\\r", "").splitlines():
+        for line in content.replace("\r", "").splitlines():
             line = line.strip()
             if not line:
                 continue
