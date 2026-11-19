@@ -22,7 +22,6 @@ class PublicStatusDisclosureTests(unittest.TestCase):
                         with patch.dict(os.environ, {
                             "TAVILY_API_KEY": "search-key",
                             "TTS_GEMINI_API_KEY": "transcription-key",
-                            "NVIDIA_API_KEY": "nvidia-speech-key",
                             "AI_VISION_MODEL": "vision-model",
                         }):
                             status = main._runtime_tool_status()
@@ -48,24 +47,16 @@ class PublicStatusDisclosureTests(unittest.TestCase):
         self.assertTrue(available["memory"])
         self.assertTrue(available["accounts"])
 
-    def test_openai_chat_key_is_not_mistaken_for_nvidia_speech_key(self):
-        with patch.object(main, "API_KEY", "openai-provider-key"):
-            with patch.object(main, "NVIDIA_API_KEY", ""):
+    def test_shared_chat_provider_key_also_enables_nvidia_speech(self):
+        with patch.object(main, "API_KEY", "shared-provider-key"):
+            with patch.dict(os.environ, {"AI_API_KEY": ""}):
                 with patch.object(main, "BASE_URL", "https://api.openai.com/v1"):
-                    self.assertFalse(main._runtime_tool_status()["speech"])
-
-    def test_legacy_nvidia_chat_provider_key_can_power_speech(self):
-        with patch.object(main, "API_KEY", "nvidia-provider-key"):
-            with patch.object(main, "NVIDIA_API_KEY", ""):
-                with patch.object(main, "BASE_URL", "https://integrate.api.nvidia.com/v1"):
                     self.assertTrue(main._runtime_tool_status()["speech"])
 
-    def test_dedicated_nvidia_key_enables_speech_without_chat_provider_key(self):
+    def test_speech_is_unavailable_when_shared_provider_key_is_missing(self):
         with patch.object(main, "API_KEY", ""):
-            with patch.object(main, "NVIDIA_API_KEY", "dedicated-nvidia-key"):
-                status = main._runtime_tool_status()
-        self.assertFalse(status["chat"])
-        self.assertTrue(status["speech"])
+            with patch.dict(os.environ, {"AI_API_KEY": ""}):
+                self.assertFalse(main._runtime_tool_status()["speech"])
 
     def test_sqlite_does_not_claim_cloud_persistent_memory_or_accounts(self):
         with patch.object(main, "JWT_SECRET", "j" * 40):
