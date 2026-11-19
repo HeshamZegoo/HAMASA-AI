@@ -106,6 +106,8 @@ def main() -> None:
     for route, frontend_source in required_routes.items():
         if route not in frontend_source or route not in backend_source:
             fail(f"frontend/backend route contract is incomplete: {route}")
+    if "source-list" not in html or "class ConversationSource" not in backend_source:
+        fail("verified web sources must be displayed and persisted in chat history")
 
     for extension in ("mp3", "wav", "m4a", "aac", "ogg", "webm"):
         if f'"{extension}"' not in attachments or f".{extension}" not in attachments:
