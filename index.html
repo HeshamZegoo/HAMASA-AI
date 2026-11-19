@@ -545,14 +545,20 @@ const msgs = $('#msgs'), chat = $('#chat'), inp = $('#inp'), sendBtn = $('#sendB
 const scrollEnd = () => requestAnimationFrame(() => { chat.scrollTop = chat.scrollHeight; });
 let activeSpeech = null;
 let activeSpeechButton = null;
+let activeSpeechUrl = null;
 function stopReading() {
-  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+  if (activeSpeech) {
+    activeSpeech.pause();
+    try { activeSpeech.currentTime = 0; } catch {}
+  }
+  if (activeSpeechUrl) URL.revokeObjectURL(activeSpeechUrl);
   if (activeSpeechButton) {
     activeSpeechButton.setAttribute('aria-pressed', 'false');
     activeSpeechButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M8 7v10M4 10v4M16 7v10M20 10v4"/></svg><span>' + t('readAloud') + '</span>';
   }
   activeSpeech = null;
   activeSpeechButton = null;
+  activeSpeechUrl = null;
 }
 async function copyMessage(text) {
   try {
@@ -592,37 +598,64 @@ function speechCleanText(value) {
     .replace(/([.!?؟،؛])\s*([.!?؟،؛])+/g, '$1').trim();
 }
 async function readMessageAloud(text, button) {
-  if (!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) {
-    toast(t('speechUnavailable')); return;
+  if (activeSpeechButton === button && activeSpeech) {
+    // If Safari blocked the first automatic play attempt, a second tap retries
+    // the already-generated audio without calling the phone's speech engine.
+    if (activeSpeech.paused) {
+      try { await activeSpeech.play(); }
+      catch { toast('اضغط مرة تانية لتشغيل الصوت.'); }
+    } else stopReading();
+    return;
   }
-  if (activeSpeechButton === button) { stopReading(); return; }
+  if (activeSpeechButton === button && !activeSpeech) { stopReading(); return; }
   stopReading();
   const spokenText = speechCleanText(text);
   if (!spokenText) { toast(lang === 'ar' ? 'مفيش نص واضح للنطق.' : 'There is no readable text.'); return; }
-  const arabic = /[\u0600-\u06FF]/.test(spokenText);
-  // iOS Safari may populate its voice list shortly after the page starts.
-  await new Promise(resolve => setTimeout(resolve, 350));
-  const voices = window.speechSynthesis.getVoices();
-  const voice = arabic
-    ? (voices.find(v => /^ar[-_]eg$/i.test(v.lang)) ||
-       voices.find(v => /^ar([-_]|$)/i.test(v.lang)))
-    : (voices.find(v => /^en([-_]|$)/i.test(v.lang)) || null);
-  if (arabic && !voice) {
-    toast('مفيش صوت عربي متاح على الجهاز. نزّل صوت عربي من إعدادات iPhone ثم جرّب تاني.');
-    return;
-  }
-  const utterance = new SpeechSynthesisUtterance(spokenText);
-  utterance.lang = arabic ? (voice?.lang || 'ar-EG') : (voice?.lang || 'en-US');
-  utterance.voice = voice || null;
-  utterance.rate = 0.88;
-  utterance.pitch = 1;
-  activeSpeech = utterance;
+
   activeSpeechButton = button;
   button.setAttribute('aria-pressed', 'true');
   button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg><span>' + t('stopReading') + '</span>';
-  utterance.onend = () => { if (activeSpeech === utterance) stopReading(); };
-  utterance.onerror = () => { if (activeSpeech === utterance) stopReading(); };
-  window.speechSynthesis.speak(utterance);
+  try {
+    const response = await apiFetch(API_BASE + '/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: spokenText, gender: 'male' }),
+      signal: AbortSignal.timeout ? AbortSignal.timeout(90000) : undefined
+    });
+    if (!response.ok) {
+      let detail = 'تعذر إنشاء الصوت.';
+      try { detail = (await response.json()).detail || detail; } catch {}
+      throw new Error(detail);
+    }
+    const data = await response.json();
+    if (!data.audio) throw new Error('خدمة الصوت رجّعت ملف صوت فارغ.');
+    if (activeSpeechButton !== button) return;
+    const binary = atob(data.audio);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const blob = new Blob([bytes], { type: data.mime_type || 'audio/wav' });
+    activeSpeechUrl = URL.createObjectURL(blob);
+    const audio = new Audio(activeSpeechUrl);
+    activeSpeech = audio;
+    audio.onended = () => { if (activeSpeech === audio) stopReading(); };
+    audio.onerror = () => {
+      if (activeSpeech === audio) {
+        stopReading();
+        toast('حصلت مشكلة أثناء تشغيل الصوت.');
+      }
+    };
+    try {
+      await audio.play();
+    } catch (error) {
+      // Keep the generated audio ready; the next tap is a direct play gesture.
+      console.warn('Audio playback needs another tap:', error);
+      toast('الصوت جاهز. دوس تاني على تشغيل الصوت.');
+    }
+  } catch (error) {
+    if (activeSpeechButton === button) stopReading();
+    console.error('HAMASA TTS failed:', error);
+    toast(error.message || 'تعذر تشغيل الصوت حالياً.');
+  }
 }
 function bubble(m) {
   const row = document.createElement('div'); row.className = 'm ' + (m.role === 'user' ? 'user' : 'bot');
