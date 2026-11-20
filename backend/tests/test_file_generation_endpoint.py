@@ -8,6 +8,7 @@ from openpyxl import load_workbook
 from pypdf import PdfReader
 
 from backend.app import main
+from backend.app.main import _requested_pdf_page_count
 
 
 class FakeGenerationResponse:
@@ -53,6 +54,13 @@ class FakeVisionThenGenerationClient:
             return VisionResponse()
         return FakeGenerationResponse()
 
+
+    def test_pdf_page_count_parser_accepts_digits_and_arabic_words(self):
+        self.assertEqual(_requested_pdf_page_count("اعمل PDF من 3 صفحات"), 3)
+        self.assertEqual(_requested_pdf_page_count("خليه تلت صفحات"), 3)
+        self.assertEqual(_requested_pdf_page_count("ملف PDF من ثلاثة صفحات"), 3)
+        self.assertEqual(_requested_pdf_page_count("Create a PDF with three pages"), 3)
+        self.assertEqual(_requested_pdf_page_count("تقرير من صفحتين"), 0)
 
 class FileGenerationEndpointTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
