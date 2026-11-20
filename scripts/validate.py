@@ -80,8 +80,10 @@ def main() -> None:
     attachments = ATTACHMENTS.read_text(encoding="utf-8")
     if '<script src="./config.js"></script>' not in html:
         fail("index.html must load config.js before the inline application script")
-    if any(term in html.lower() for term in ("getusermedia", "microphone", "micbtn", "id=\"mic\"", "/api/live", "voicemode")):
-        fail("microphone/live voice code or UI is still present in index.html")
+    if any(term in html.lower() for term in ("/api/live", "voicemode")):
+        fail("unimplemented live voice streaming code is still present in index.html")
+    if 'id="micBtn"' not in html or "MediaRecorder" not in html or "getUserMedia" not in html:
+        fail("the user-initiated microphone recording flow is incomplete")
     if "voiceUrl" in config or "/api/live" in config:
         fail("live voice endpoint is still present in config.js")
     if "response.status === 401" not in html or "keeping it for the next retry" not in html:
