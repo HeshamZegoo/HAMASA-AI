@@ -473,29 +473,62 @@ async function checkBackend() {
   }
   updStatus();
 }
-async function chatAdapter(messages) {
+async function chatAdapter(messages, onDelta = () => {}) {
   const basePayload = buildChatRequest(messages);
   const payload = window.HAMASA_ATTACHMENTS
     ? await window.HAMASA_ATTACHMENTS.addToPayload(basePayload)
     : basePayload;
-  const response = await apiFetch(HAMASA_CONFIG.chatUrl, {
+  const response = await apiFetch(API_BASE + "/api/chat/stream", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
-    signal: AbortSignal.timeout ? AbortSignal.timeout(95000) : undefined
+    signal: AbortSignal.timeout ? AbortSignal.timeout(185000) : undefined
   });
   if (!response.ok) {
     let detail = "HTTP " + response.status;
     try { detail = (await response.json()).detail || detail; } catch {}
     throw new Error(detail);
   }
-  const data = await response.json();
-  window.HAMASA_ATTACHMENTS?.clear();
-  return {
-    text: parseChatResponse(data),
-    demo: false,
-    sources: Array.isArray(data.sources) ? data.sources.slice(0, 10) : []
+  if (!response.body?.getReader) throw new Error("This browser cannot read streamed responses. Please update the browser.");
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "", text = "", sources = [], completed = false;
+  const consume = frame => {
+    const dataLine = frame.split(/\r?\n/).find(line => line.startsWith("data:"));
+    if (!dataLine) return;
+    let event;
+    try { event = JSON.parse(dataLine.slice(5).trim()); } catch { return; }
+    if (event.type === "delta" && typeof event.content === "string") {
+      text += event.content;
+      onDelta(text);
+    } else if (event.type === "done") {
+      sources = Array.isArray(event.sources) ? event.sources.slice(0, 10) : [];
+      completed = true;
+    } else if (event.type === "error") {
+      throw new Error(event.message || "The streamed response failed.");
+    }
   };
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
+      let boundary;
+      while ((boundary = buffer.indexOf("\n\n")) >= 0) {
+        const frame = buffer.slice(0, boundary);
+        buffer = buffer.slice(boundary + 2);
+        consume(frame);
+      }
+    }
+    buffer += decoder.decode();
+    if (buffer.trim()) consume(buffer);
+  } catch (error) {
+    try { await reader.cancel(); } catch {}
+    throw error;
+  }
+  if (!completed || !text.trim()) throw new Error("The AI stream ended before a complete answer arrived.");
+  window.HAMASA_ATTACHMENTS?.clear();
+  return { text: text.trim(), demo: false, sources };
 }
 
 /* =====================================================================
@@ -1240,7 +1273,10 @@ async function respond() {
       cur.messages.push(m);
       msgs.append(bubble(m)); save(); scrollEnd(); setBusy(false); return m.text;
     }
-    const r = await chatAdapter(cur.messages);
+    const r = await chatAdapter(cur.messages, streamedText => {
+      const liveBubble = $('#typing .bub');
+      if (liveBubble) { liveBubble.textContent = streamedText; scrollEnd(); }
+    });
     $('#typing')?.remove(); const m = { role: 'bot', text: r.text, demo: r.demo, sources: r.sources || [] }; cur.messages.push(m); msgs.append(bubble(m)); save();
     scrollEnd(); setBusy(false); return r.text;
   } catch (e) { console.error(e); $('#typing')?.remove(); errorRow(e); setBusy(false); return null; }
