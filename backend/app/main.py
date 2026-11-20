@@ -238,7 +238,7 @@ app.add_middleware(
 
 class Message(BaseModel):
     role: Literal["user", "assistant"]
-    content: str = Field(min_length=1, max_length=12000)
+    content: str = Field(min_length=1, max_length=100000)
 
 class MemoryContextItem(BaseModel):
     category: Literal["preference", "project", "decision", "temporary"]
@@ -266,8 +266,8 @@ class ChatRequest(BaseModel):
         for index, message in enumerate(messages):
             if isinstance(message, dict):
                 content = message.get("content")
-                if isinstance(content, str) and len(content) > 12_000 and index < len(messages) - 1:
-                    message = {**message, "content": content[-12_000:]}
+                if isinstance(content, str) and len(content) > 100_000 and index < len(messages) - 1:
+                    message = {**message, "content": content[-100_000:]}
             normalized.append(message)
         return {**value, "messages": normalized}
 
@@ -338,7 +338,7 @@ def _requested_pdf_page_count(prompt: str) -> int:
 
 
 class FileCreateRequest(BaseModel):
-    prompt: str = Field(min_length=2, max_length=12000)
+    prompt: str = Field(min_length=2, max_length=100000)
     format: Literal["docx", "pdf", "xlsx", "pptx", "csv", "txt", "md", "json", "html", "css", "js", "ts", "py", "sql", "sh", "java", "c", "h", "cpp", "hpp", "cs", "go", "rs", "php", "rb", "kt", "swift"]
     messages: list[Message] = Field(default_factory=list, max_length=20)
     attachments: list[AttachmentInput] = Field(default_factory=list, max_length=8)
