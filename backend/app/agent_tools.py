@@ -298,7 +298,7 @@ def explicit_code_execution_request(text: str) -> bool:
     javascript_statement = re.compile(
         r"(?im)^\s*(?:"
         r"(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*(?:=|;)|"
-        r"import\s+.+\s+from\s+['\\"]|"
+        r"import\\s+.+\\s+from\\s+|"
         r"export\s+(?:default|const|function|class)|"
         r"(?:async\s+)?function\s+[A-Za-z_$][\w$]*\s*\(|"
         r"class\s+[A-Za-z_$][\w$]*|"
