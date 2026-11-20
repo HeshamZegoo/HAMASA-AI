@@ -1062,6 +1062,12 @@ def readiness():
     return {"status": "ready"}
 
 
+@app.get("/api/capabilities")
+def capabilities():
+    """Return public feature availability without exposing provider names or secrets."""
+    return {"status": "ok", "capabilities": _runtime_tool_status()}
+
+
 @app.post("/api/images/generate")
 async def generate_image(body: ImageCreateRequest):
     """Generate or edit an image through an explicitly configured image-capable provider."""
