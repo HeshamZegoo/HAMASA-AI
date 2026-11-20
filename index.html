@@ -381,17 +381,31 @@ async function apiFetch(url, options = {}) {
 let backendOnline = false;
 const isConnected = () => backendOnline;
 
+const MAX_CHAT_MESSAGE_CHARS = 12000;
 function buildChatRequest(messages) {
   const olderContext = messages.slice(0, -40).slice(-16)
-    .map(m => (m.role === "bot" ? "المساعد: " : "المستخدم: ") + m.text)
-    .join("\n").slice(-3500);
+    .map(m => (m.role === "bot" ? "المساعد: " : "المستخدم: ") + String(m.text ?? ""))
+    .join("\\n").slice(-3500);
 
   // Keep older context from this same conversation, but never inject arbitrary
   // excerpts from unrelated chats. Cross-chat context must be explicitly saved
   // as a memory so the backend can relevance-filter it before model inference.
   const memory = [
-    olderContext ? "سياق أقدم من المحادثة الحالية:\n" + olderContext : ""
-  ].filter(Boolean).join("\n\n").slice(-3500);
+    olderContext ? "سياق أقدم من المحادثة الحالية:\\n" + olderContext : ""
+  ].filter(Boolean).join("\\n\\n").slice(-3500);
+
+  const chatMessages = messages.slice(-40).map(m => ({
+    role: m.role === "bot" || m.role === "assistant" ? "assistant" : "user",
+    content: String(m.text ?? "")
+  })).filter(m => m.content.trim().length > 0);
+  if (!chatMessages.length) {
+    throw new Error(lang === "ar" ? "اكتب رسالة الأول قبل الإرسال." : "Please enter a message before sending.");
+  }
+  if (chatMessages.some(m => m.content.length > MAX_CHAT_MESSAGE_CHARS)) {
+    throw new Error(lang === "ar"
+      ? "الرسالة طويلة جدًا. الحد الأقصى 12,000 حرف للرسالة الواحدة. قسّمها على رسائل أصغر."
+      : "This message is too long. The limit is 12,000 characters per message. Please split it into smaller messages.");
+  }
 
   return {
     memory,
@@ -400,10 +414,7 @@ function buildChatRequest(messages) {
       text: String(item.text || "").slice(0, 500),
       updated_at: String(item.updatedAt || "").slice(0, 40)
     })),
-    messages: messages.slice(-40).map(m => ({
-      role: m.role === "bot" ? "assistant" : m.role,
-      content: m.text
-    }))
+    messages: chatMessages
   };
 }
 function parseChatResponse(json) {
