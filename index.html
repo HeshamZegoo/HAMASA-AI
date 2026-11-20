@@ -924,6 +924,8 @@ function bubble(m) {
   const row = document.createElement('div'); row.className = 'm ' + (m.role === 'user' ? 'user' : 'bot');
   const content = document.createElement('div'); content.className = 'msg-content';
   const b = document.createElement('div'); b.className = 'bub'; b.textContent = m.text; content.append(b);
+  // Rebuild generated-file actions from the attachment persisted with this chat message.
+  if (m.file && typeof m.file.data === 'string' && m.file.data) addFileDownload(b, m.file);
   if (m.demo) { const g = document.createElement('div'); g.className = 'tag'; g.dataset.demo = ''; g.textContent = t('demoTag'); b.append(document.createElement('br'), g); }
   if (m.role !== 'user' && Array.isArray(m.sources) && m.sources.length) {
     const details = document.createElement('details');
@@ -1094,11 +1096,17 @@ async function respond() {
     if (generated) {
       window.HAMASA_ATTACHMENTS?.clear();
       $('#typing')?.remove();
-      const m = { role: 'bot', text: generated.message || 'جهزتلك الملف.' };
+      const m = {
+        role: 'bot',
+        text: generated.message || 'جهزتلك الملف.',
+        file: {
+          filename: generated.filename || 'hamasa-file',
+          mime_type: generated.mime_type || 'application/octet-stream',
+          data: generated.data
+        }
+      };
       cur.messages.push(m);
-      const row = bubble(m);
-      addFileDownload(row.querySelector('.bub'), generated);
-      msgs.append(row); save(); scrollEnd(); setBusy(false); return m.text;
+      msgs.append(bubble(m)); save(); scrollEnd(); setBusy(false); return m.text;
     }
     const r = await chatAdapter(cur.messages);
     $('#typing')?.remove(); const m = { role: 'bot', text: r.text, demo: r.demo, sources: r.sources || [] }; cur.messages.push(m); msgs.append(bubble(m)); save();

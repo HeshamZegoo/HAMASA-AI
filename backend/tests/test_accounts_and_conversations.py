@@ -72,7 +72,8 @@ class AccountAndConversationFlowTests(unittest.TestCase):
                 "title": "Test conversation",
                 "messages": [
                     {"role": "user", "text": "Hello"},
-                    {"role": "bot", "text": "Hi", "sources": [{"title": "Official docs", "url": "https://example.com/docs", "published_date": "2026-11-19"}]},
+                    {"role": "bot", "text": "Hi", "sources": [{"title": "Official docs", "url": "https://example.com/docs", "published_date": "2026-11-19"}],
+                     "file": {"filename": "report.pdf", "mime_type": "application/pdf", "data": "JVBERi0xLjQK"}},
                 ],
             },
         )
@@ -82,6 +83,8 @@ class AccountAndConversationFlowTests(unittest.TestCase):
         self.assertEqual(listed.json()["conversations"][0]["id"], conversation_id)
         self.assertEqual(listed.json()["conversations"][0]["messages"][1]["text"], "Hi")
         self.assertEqual(listed.json()["conversations"][0]["messages"][1]["sources"][0]["url"], "https://example.com/docs")
+        self.assertEqual(listed.json()["conversations"][0]["messages"][1]["file"]["filename"], "report.pdf")
+        self.assertEqual(listed.json()["conversations"][0]["messages"][1]["file"]["data"], "JVBERi0xLjQK")
 
     def test_saved_memory_is_encrypted_at_rest_and_decrypted_for_owner(self):
         signup = self.client.post("/api/auth/signup", json={

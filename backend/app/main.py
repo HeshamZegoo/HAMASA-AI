@@ -228,11 +228,17 @@ class ConversationSource(BaseModel):
         return value.strip()
 
 
+class ConversationFile(BaseModel):
+    filename: str = Field(min_length=1, max_length=180)
+    mime_type: str = Field(min_length=1, max_length=120)
+    data: str = Field(min_length=1, max_length=7_000_000)
+
 class ConversationMessage(BaseModel):
     role: Literal["user", "bot"]
     text: str = Field(min_length=1, max_length=12000)
     demo: bool = False
     sources: list[ConversationSource] = Field(default_factory=list, max_length=10)
+    file: ConversationFile | None = None
 
 class ConversationSaveRequest(BaseModel):
     title: str = Field(min_length=1, max_length=120)
