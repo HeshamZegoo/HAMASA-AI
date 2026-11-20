@@ -12,6 +12,13 @@ const MAX_CONCURRENT_RUNS = 2;
 const MAX_RUNS_PER_MINUTE = 8;
 const recentRuns = [];
 let activeRuns = 0;
+const PYTHON_TEMPLATE = Sandbox.template().withPackages("python3");
+
+function createRailwaySandbox(options, language) {
+  return language === "python"
+    ? Sandbox.create(PYTHON_TEMPLATE, options)
+    : Sandbox.create(options);
+}
 
 function sendJson(response, status, payload) {
   if (response.headersSent) return;
@@ -69,7 +76,7 @@ function validateCodeRequest(body) {
   return null;
 }
 
-export function createServer({ sandboxCreate = (options) => Sandbox.create(options) } = {}) {
+export function createServer({ sandboxCreate = createRailwaySandbox } = {}) {
   return http.createServer(async (request, response) => {
     const pathname = new URL(request.url || "/", "http://localhost").pathname;
 
@@ -122,7 +129,7 @@ export function createServer({ sandboxCreate = (options) => Sandbox.create(optio
         idleTimeoutMinutes: 1,
         resources: { cpu: 1, memoryGB: 2 },
         networkIsolation: "ISOLATED",
-      });
+      }, body.language);
 
       const filePath = body.language === "python"
         ? "/tmp/hamasa_main.py"
