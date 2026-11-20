@@ -21,6 +21,7 @@ from threading import Lock
 
 import httpx
 from fastapi import FastAPI, HTTPException, Header, Request, Cookie, Response, Depends
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
@@ -95,6 +96,49 @@ app = FastAPI(
     redoc_url=None if APP_ENV == "production" else "/redoc",
     openapi_url=None if APP_ENV == "production" else "/openapi.json",
 )
+
+
+def _validation_detail(path: str, errors: list[dict]) -> str:
+    """Return a safe, actionable message without echoing submitted user data."""
+    if path == "/api/chat":
+        if any(
+            error.get("type") == "string_too_long"
+            and tuple(error.get("loc", ()))[-1:] == ("content",)
+            for error in errors
+        ):
+            return "A chat message is too long. Please keep each message under 12,000 characters."
+        if any(
+            error.get("type") == "string_too_short"
+            and tuple(error.get("loc", ()))[-1:] == ("content",)
+            for error in errors
+        ):
+            return "A chat message is empty. Please enter text and try again."
+        return "Invalid chat request. Please check the message and attachments."
+    return "Invalid request data."
+
+
+@app.exception_handler(RequestValidationError)
+async def request_validation_error_handler(request: Request, exc: RequestValidationError):
+    # Never log request bodies, message text, attachment contents, or credentials.
+    summary = [
+        {
+            "loc": ".".join(str(part) for part in error.get("loc", ())),
+            "type": str(error.get("type", "validation_error")),
+        }
+        for error in exc.errors()[:8]
+    ]
+    logger.warning(
+        "Request validation failed: method=%s path=%s errors=%s",
+        request.method,
+        request.url.path,
+        summary,
+    )
+    return JSONResponse(
+        status_code=422,
+        content={"detail": _validation_detail(request.url.path, exc.errors())},
+    )
+
+
 # Lightweight per-instance abuse controls. For multi-replica deployments, use an edge/WAF or shared rate-limit store.
 _RATE_WINDOWS = {
     "/api/auth/signup": (5, 3600),

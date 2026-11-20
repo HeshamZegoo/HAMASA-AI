@@ -381,9 +381,10 @@ async function apiFetch(url, options = {}) {
 let backendOnline = false;
 const isConnected = () => backendOnline;
 
+const MAX_CHAT_MESSAGE_CHARS = 12000;
 function buildChatRequest(messages) {
   const olderContext = messages.slice(0, -40).slice(-16)
-    .map(m => (m.role === "bot" ? "المساعد: " : "المستخدم: ") + m.text)
+    .map(m => (m.role === "bot" ? "المساعد: " : "المستخدم: ") + String(m.text ?? ""))
     .join("\n").slice(-3500);
 
   // Keep older context from this same conversation, but never inject arbitrary
@@ -393,6 +394,19 @@ function buildChatRequest(messages) {
     olderContext ? "سياق أقدم من المحادثة الحالية:\n" + olderContext : ""
   ].filter(Boolean).join("\n\n").slice(-3500);
 
+  const chatMessages = messages.slice(-40).map(m => ({
+    role: m.role === "bot" || m.role === "assistant" ? "assistant" : "user",
+    content: String(m.text ?? "")
+  })).filter(m => m.content.trim().length > 0);
+  if (!chatMessages.length) {
+    throw new Error(lang === "ar" ? "اكتب رسالة الأول قبل الإرسال." : "Please enter a message before sending.");
+  }
+  if (chatMessages.some(m => m.content.length > MAX_CHAT_MESSAGE_CHARS)) {
+    throw new Error(lang === "ar"
+      ? "الرسالة طويلة جدًا. الحد الأقصى 12,000 حرف للرسالة الواحدة. قسّمها على رسائل أصغر."
+      : "This message is too long. The limit is 12,000 characters per message. Please split it into smaller messages.");
+  }
+
   return {
     memory,
     saved_memories: memories.slice(0, 40).map(item => ({
@@ -400,10 +414,7 @@ function buildChatRequest(messages) {
       text: String(item.text || "").slice(0, 500),
       updated_at: String(item.updatedAt || "").slice(0, 40)
     })),
-    messages: messages.slice(-40).map(m => ({
-      role: m.role === "bot" ? "assistant" : m.role,
-      content: m.text
-    }))
+    messages: chatMessages
   };
 }
 function parseChatResponse(json) {
@@ -656,11 +667,11 @@ async function syncMemoriesFromServer() {
     let data = await response.json();
     if (!Array.isArray(data.memories)) return;
     const cloud = data.memories.slice(0, 40);
-    const known = new Set(cloud.map(x => String(x.category) + "\\n" + String(x.text).trim().toLocaleLowerCase()));
+    const known = new Set(cloud.map(x => String(x.category) + "\n" + String(x.text).trim().toLocaleLowerCase()));
     let uploaded = false;
     for (const item of memories.slice(0, 40)) {
       const category = normalizeMemoryCategory(item.category);
-      const key = category + "\\n" + String(item.text || "").trim().toLocaleLowerCase();
+      const key = category + "\n" + String(item.text || "").trim().toLocaleLowerCase();
       if (!item.text || known.has(key) || cloud.length >= 40) continue;
       const migrated = await apiFetch(API_BASE + "/api/memory", {
         method: "POST", headers: memoryHeaders(),

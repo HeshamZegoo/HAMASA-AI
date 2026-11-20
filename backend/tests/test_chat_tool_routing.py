@@ -90,6 +90,31 @@ class ChatToolRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("https://example.com/docs", str(FakeProviderClient.payloads[-1]["messages"]))
         self.assertEqual(result["sources"][0]["url"], "https://example.com/docs")
 
+    def test_chat_validation_errors_are_actionable_and_do_not_echo_input(self):
+        detail = main._validation_detail("/api/chat", [{
+            "loc": ("body", "messages", 0, "content"),
+            "type": "string_too_long",
+            "input": "PRIVATE USER MESSAGE",
+        }])
+        self.assertIn("12,000 characters", detail)
+        self.assertNotIn("PRIVATE USER MESSAGE", detail)
+
+    def test_chat_validation_empty_message_has_clear_feedback(self):
+        detail = main._validation_detail("/api/chat", [{
+            "loc": ("body", "messages", 0, "content"),
+            "type": "string_too_short",
+        }])
+        self.assertIn("empty", detail.lower())
+
+    def test_other_validation_errors_do_not_expose_submitted_data(self):
+        detail = main._validation_detail("/api/auth/login", [{
+            "loc": ("body", "password"),
+            "type": "string_too_short",
+            "input": "secret-password",
+        }])
+        self.assertEqual(detail, "Invalid request data.")
+        self.assertNotIn("secret-password", detail)
+
     async def test_normal_question_does_not_trigger_live_search(self):
         search = AsyncMock(return_value=[])
         body = main.ChatRequest(messages=[
