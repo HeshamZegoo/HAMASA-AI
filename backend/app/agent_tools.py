@@ -308,6 +308,72 @@ def explicit_code_execution_request(text: str) -> bool:
     )
     return bool(javascript_statement.search(stripped))
 
+
+def extract_code_source(text: str) -> tuple[str, str] | None:
+    """Recover source from a code-only user turn instead of trusting model reserialization."""
+    import re
+
+    if not isinstance(text, str):
+        return None
+    source = text.strip()
+    if not source:
+        return None
+
+    fenced = re.fullmatch(
+        r"```\s*(python|py|javascript|js)?\s*\n([\s\S]*?)\n?```",
+        source,
+        re.IGNORECASE,
+    )
+    if fenced:
+        declared = (fenced.group(1) or "").lower()
+        source = fenced.group(2)
+        if declared in {"javascript", "js"}:
+            return ("javascript", source) if source.strip() else None
+        if declared in {"python", "py"}:
+            try:
+                ast.parse(source, mode="exec")
+                return ("python", source) if source.strip() else None
+            except (SyntaxError, ValueError, TypeError):
+                return None
+
+    # Recognize JavaScript first: expressions such as console.log(...) are also
+    # syntactically valid Python attribute calls, but must run in Node.
+    javascript_statement = re.compile(
+        r"(?im)^\s*(?:"
+        r"(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*(?:=|;)|"
+        r"import\s+.+\s+from\s+|"
+        r"export\s+(?:default|const|function|class)|"
+        r"(?:async\s+)?function\s+[A-Za-z_$][\w$]*\s*\(|"
+        r"class\s+[A-Za-z_$][\w$]*|"
+        r"console\.(?:log|error|warn|info)\s*\(|"
+        r"(?:if|for|while|switch|try)\s*\("
+        r")"
+    )
+    if javascript_statement.search(source):
+        return "javascript", source
+
+    try:
+        tree = ast.parse(source, mode="exec")
+    except (SyntaxError, ValueError, TypeError):
+        return None
+    executable_nodes = (
+        ast.Import, ast.ImportFrom, ast.Assign, ast.AnnAssign, ast.AugAssign,
+        ast.Expr, ast.If, ast.For, ast.AsyncFor, ast.While, ast.With,
+        ast.AsyncWith, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef,
+        ast.Try, ast.Assert,
+    )
+    if any(
+        isinstance(node, executable_nodes)
+        and (
+            not isinstance(node, ast.Expr)
+            or isinstance(node.value, (ast.Call, ast.Await, ast.Yield, ast.NamedExpr))
+        )
+        for node in tree.body
+    ):
+        return "python", source
+    return None
+
+
 def code_execution_available() -> bool:
     """Expose code execution only after the private runner and both auth settings are configured."""
     return (
