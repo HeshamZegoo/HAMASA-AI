@@ -116,7 +116,7 @@
         try{
           const reply=await window.HAMASA_VOICE_BRIDGE?.send?.(text);
           if(!reply)throw new Error("الرد مش متاح دلوقتي.");
-          transcript.textContent="أنت: "+text+"\\n\\nحماصة: "+reply;
+          transcript.textContent="أنت: "+text+"\n\nحماصة: "+reply;
           setStatus("حماصة بترد عليك…","talking");
           await speak(String(reply));
         }catch(error){setStatus(error?.message||"حصل خطأ أثناء الرد.");}
