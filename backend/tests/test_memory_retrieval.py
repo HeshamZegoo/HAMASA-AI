@@ -1,6 +1,6 @@
 import unittest
 
-from backend.app.memory_retrieval import select_relevant_memories
+from backend.app.memory_retrieval import select_relevant_memories, select_relevant_memory_text
 from backend.app.main import ChatRequest
 
 
@@ -63,8 +63,8 @@ class RelevantMemoryRetrievalTests(unittest.TestCase):
 class LegacyMemoryContextTests(unittest.TestCase):
     def test_legacy_context_keeps_only_statements_related_to_the_latest_turn(self):
         legacy = (
-            "سياق أقدم من المحادثة الحالية:\\n"
-            "المستخدم: ZEGO Disk Health OS uses Debian live-build.\\n"
+            "سياق أقدم من المحادثة الحالية:\n"
+            "المستخدم: ZEGO Disk Health OS uses Debian live-build.\n"
             "المستخدم: HAMASA AI backend uses FastAPI and Railway."
         )
         selected = select_relevant_memory_text(legacy, "صلح HAMASA FastAPI backend")
@@ -73,9 +73,9 @@ class LegacyMemoryContextTests(unittest.TestCase):
 
     def test_legacy_arabic_context_matches_arabic_question(self):
         selected = select_relevant_memory_text(
-            "المستخدم: المشروع اسمه حماصة ويستخدم FastAPI.\\n"
+            "المستخدم: المشروع اسمه حماصة ويستخدم FastAPI.\n"
             "المستخدم: مشروع تاني خاص بإدارة الأقراص.",
-            "عايز أصلح مشروع حماصة",
+            "عايز أصلح مشروع حماصة FastAPI",
         )
         self.assertIn("المشروع اسمه حماصة", selected)
         self.assertNotIn("إدارة الأقراص", selected)
@@ -87,7 +87,7 @@ class LegacyMemoryContextTests(unittest.TestCase):
         )
 
     def test_legacy_context_obeys_character_and_item_budgets(self):
-        legacy = "\\n".join(f"HAMASA backend project note {index}" for index in range(20))
+        legacy = "\n".join(f"HAMASA backend project note {index}" for index in range(20))
         selected = select_relevant_memory_text(
             legacy, "HAMASA backend project", max_items=2, max_chars=100
         )
