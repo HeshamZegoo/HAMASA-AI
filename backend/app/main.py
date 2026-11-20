@@ -32,7 +32,7 @@ from .quality import coding_instructions_for
 from .research import latest_user_text, should_search_web, format_search_context, rank_search_results
 from .tooling import build_tool_capabilities_prompt
 from .memory_retrieval import select_relevant_memories
-from .agent_tools import code_execution_available, execute_chat_tool, get_chat_tools
+from .agent_tools import code_execution_available, execute_chat_tool, explicit_code_execution_request, get_chat_tools
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper())
 logger = logging.getLogger("hamasa.provider")
@@ -1406,6 +1406,16 @@ async def chat(body: ChatRequest):
     # Enforce language from the latest user turn after every other system instruction.
     # This prevents an older/default Arabic persona prompt from overriding English requests.
     latest_text = latest_user_text(coding_context)
+    force_code_execution = explicit_code_execution_request(latest_text) and code_execution_available()
+    if force_code_execution:
+        context_messages.append({
+            "role": "system",
+            "content": (
+                "The user explicitly requested code execution. You MUST call the run_code tool with the exact requested program; "
+                "do not calculate or simulate its output yourself. Treat the tool result as authoritative. "
+                "If execution fails or times out, clearly report that it failed and never invent stdout or an exit code."
+            ),
+        })
     context_messages.append({
         "role": "system",
         "content": (
@@ -1436,8 +1446,19 @@ async def chat(body: ChatRequest):
             # they are useful. Images keep the existing vision-only route.
             active_payload = dict(payload)
             if not has_images:
-                active_payload["tools"] = get_chat_tools()
-                active_payload["tool_choice"] = "auto"
+                available_tools = get_chat_tools()
+                if force_code_execution:
+                    active_payload["tools"] = [
+                        tool for tool in available_tools
+                        if tool.get("function", {}).get("name") == "run_code"
+                    ]
+                    active_payload["tool_choice"] = {
+                        "type": "function",
+                        "function": {"name": "run_code"},
+                    }
+                else:
+                    active_payload["tools"] = available_tools
+                    active_payload["tool_choice"] = "auto"
             response = await client.post(
                 f"{BASE_URL}/chat/completions",
                 headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"},
@@ -1446,7 +1467,7 @@ async def chat(body: ChatRequest):
 
             # Some OpenAI-compatible endpoints/models do not implement function
             # calling. Fall back to ordinary chat rather than breaking the chat.
-            if response.status_code in (400, 404, 422) and not has_images:
+            if response.status_code in (400, 404, 422) and not has_images and not force_code_execution:
                 logger.info("Provider does not accept tool calling; retrying standard chat.")
                 response = await client.post(
                     f"{BASE_URL}/chat/completions",

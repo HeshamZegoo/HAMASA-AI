@@ -246,6 +246,20 @@ CHAT_TOOLS = [
 ]
 
 
+def explicit_code_execution_request(text: str) -> bool:
+    """Detect clear user instructions to execute supplied code, not merely explain it."""
+    if not isinstance(text, str):
+        return False
+    normalized = " ".join(text.casefold().replace("ّ", "").split())
+    phrases = (
+        "نفذ الكود", "نفذ ده", "نفذ التالي", "شغل الكود", "شغل ده",
+        "اختبر الكود", "جرب الكود", "شغل البرنامج", "نفذ البرنامج",
+        "run this code", "run the code", "execute this code", "execute the code",
+        "test this code", "run it", "execute it",
+    )
+    return any(phrase in normalized for phrase in phrases)
+
+
 def code_execution_available() -> bool:
     """Expose code execution only after the private runner and both auth settings are configured."""
     return (
