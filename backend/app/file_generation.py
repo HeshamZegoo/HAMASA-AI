@@ -166,7 +166,7 @@ def _build_pdf(title: str, content: str, page_count: int = 0) -> bytes:
             )
     return raw
 
-def build_file(fmt: str, title: str, content: str, rows: list, page_count: int = 0) -> bytes:
+def build_file(fmt: str, title: str, content: str, rows: list, page_count: int = 0, sheet_name: str | None = None) -> bytes:
     if fmt == "docx":
         doc = Document()
         title_paragraph = doc.add_heading(title, 0)
@@ -220,7 +220,9 @@ def build_file(fmt: str, title: str, content: str, rows: list, page_count: int =
     if fmt == "xlsx":
         workbook = Workbook()
         sheet = workbook.active
-        sheet.title = "Hamasa"
+        requested_sheet = str(sheet_name or title or "Sheet1").strip()
+        requested_sheet = re.sub(r"[\\/*?:\[\]]", "_", requested_sheet)[:31] or "Sheet1"
+        sheet.title = requested_sheet
         spreadsheet_text = " ".join([title, content] + [
             str(value) for row in rows[:5000] if isinstance(row, list)
             for value in row[:100] if value is not None
@@ -236,7 +238,16 @@ def build_file(fmt: str, title: str, content: str, rows: list, page_count: int =
                 sheet.append(values)
                 for cell in sheet[sheet.max_row]:
                     if isinstance(cell.value, str):
-                        cell.data_type = "s"
+                        # Preserve ordinary text literally; allow only simple, local Excel formulas.
+                        formula = cell.value.strip()
+                        if formula.startswith("=") and re.fullmatch(
+                            r"=(?:SUM|AVERAGE|MIN|MAX|COUNT|COUNTA)\([A-Z]{1,3}[1-9][0-9]*:[A-Z]{1,3}[1-9][0-9]*\)|=[0-9]+(?:\.[0-9]+)?(?:[+*/-][0-9]+(?:\.[0-9]+)?)+",
+                            formula,
+                            re.IGNORECASE,
+                        ):
+                            cell.value = formula
+                        else:
+                            cell.data_type = "s"
         sheet["A1"].font = Font(bold=True, size=16, color="FFFFFF")
         sheet["A1"].fill = PatternFill("solid", fgColor="17324D")
         if sheet.max_row >= header_row and rows:

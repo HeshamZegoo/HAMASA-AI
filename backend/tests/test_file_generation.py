@@ -58,7 +58,7 @@ class FileGenerationTests(unittest.TestCase):
         self.assertIn("/Font", resources)
 
     def test_xlsx_contains_title_description_and_rows(self):
-        raw = build_file("xlsx", "Sales", "Monthly totals", [["Month", "Total"], ["January", 10], ["Formula", "=1+1"]],)
+        raw = build_file("xlsx", "Sales", "Monthly totals", [["Month", "Total"], ["January", 10], ["Formula", "=HYPERLINK(\"https://example.com\",\"click\")"]],)
         workbook = load_workbook(io.BytesIO(raw), data_only=True)
         sheet = workbook.active
         self.assertEqual(sheet["A1"].value, "Sales")
@@ -67,8 +67,22 @@ class FileGenerationTests(unittest.TestCase):
         self.assertEqual(sheet["B4"].value, 10)
         self.assertEqual(sheet["B4"].data_type, "n")
         self.assertEqual(sheet["A5"].value, "Formula")
-        self.assertEqual(sheet["B5"].value, "=1+1")
+        self.assertEqual(sheet["B5"].value, "=HYPERLINK(\"https://example.com\",\"click\")")
         self.assertEqual(sheet["B5"].data_type, "s")
+        workbook.close()
+
+
+    def test_xlsx_uses_requested_sheet_name_and_keeps_safe_formulas(self):
+        raw = build_file(
+            "xlsx", "HAMASA_Test", "",
+            [["Employee", "Salary"], ["Ahmed", 15000], ["Average", "=AVERAGE(B2:B2)"]],
+            sheet_name="Employees",
+        )
+        workbook = load_workbook(io.BytesIO(raw), data_only=False)
+        sheet = workbook.active
+        self.assertEqual(sheet.title, "Employees")
+        self.assertEqual(sheet["B4"].value, "=AVERAGE(B2:B2)")
+        self.assertEqual(sheet["B4"].data_type, "f")
         workbook.close()
 
     def test_pdf_renders_markdown_table_and_explicit_three_pages(self):

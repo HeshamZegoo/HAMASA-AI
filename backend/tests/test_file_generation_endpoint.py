@@ -8,7 +8,7 @@ from openpyxl import load_workbook
 from pypdf import PdfReader
 
 from backend.app import main
-from backend.app.main import _requested_pdf_page_count
+from backend.app.main import _requested_pdf_page_count, _requested_spreadsheet_sheet_name
 
 
 class FakeGenerationResponse:
@@ -61,6 +61,8 @@ class FakeVisionThenGenerationClient:
         self.assertEqual(_requested_pdf_page_count("ملف PDF من ثلاثة صفحات"), 3)
         self.assertEqual(_requested_pdf_page_count("Create a PDF with three pages"), 3)
         self.assertEqual(_requested_pdf_page_count("تقرير من صفحتين"), 0)
+        self.assertEqual(_requested_spreadsheet_sheet_name("اعمل Excel في ورقة باسم Employees"), "Employees")
+        self.assertEqual(_requested_spreadsheet_sheet_name("Create workbook with sheet named Employees"), "Employees")
 
 class FileGenerationEndpointTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):

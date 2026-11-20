@@ -121,7 +121,7 @@ class ChatToolRoutingTests(unittest.IsolatedAsyncioTestCase):
             "type": "string_too_long",
             "input": "PRIVATE USER MESSAGE",
         }])
-        self.assertIn("12,000 characters", detail)
+        self.assertIn("100,000 characters", detail)
         self.assertNotIn("PRIVATE USER MESSAGE", detail)
 
     def test_chat_validation_empty_message_has_clear_feedback(self):
