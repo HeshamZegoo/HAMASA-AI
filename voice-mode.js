@@ -74,14 +74,14 @@
       try {
         setStatus("بحوّل كلامك لنص…","thinking");
         const text = await transcribe(blob);
-        transcript.textContent = "أنت: " + text;
+        transcript.textContent = "أنت: " + text + String.fromCharCode(10,10) + "حماصة: " + lastReply;
         setStatus("حماصة بتفكر في ردك…","thinking");
         const bridge = window.HAMASA_VOICE_BRIDGE;
         if (!bridge?.send) throw new Error("واجهة المحادثة غير جاهزة. حدّث الصفحة وجرب تاني.");
         const reply = await bridge.send(text);
         if (!reply) throw new Error("ماوصلنيش رد من حماصة. جرّب تبعت كلامك تاني.");
         lastReply = String(reply);
-        transcript.textContent = "أنت: " + text + "\\n\\nحماصة: " + lastReply;
+        transcript.textContent = "أنت: " + text + String.fromCharCode(10,10) + "حماصة: " + lastReply;
         listen.disabled = false;
         setStatus("حماصة ردّت عليك. اضغط لسماع الرد.","talking");
       } catch(error) { setStatus(error.message || "حصل خطأ أثناء المحادثة."); }
