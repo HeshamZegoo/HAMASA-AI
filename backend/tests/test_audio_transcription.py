@@ -85,7 +85,7 @@ class AudioTranscriptionTests(unittest.IsolatedAsyncioTestCase):
             wav.setnchannels(2)
             wav.setsampwidth(2)
             wav.setframerate(22050)
-            wav.writeframes((b"\\x01\\x00\\x02\\x00") * 2205)
+            wav.writeframes((b"\x01\x00\x02\x00") * 2205)
         normalized = main._normalize_wav_for_nvidia(source.getvalue())
         with wave.open(io.BytesIO(normalized), "rb") as wav:
             self.assertEqual(wav.getnchannels(), 1)
