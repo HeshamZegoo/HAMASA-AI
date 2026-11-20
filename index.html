@@ -83,6 +83,9 @@ header{display:flex;align-items:center;gap:8px;padding:calc(10px + env(safe-area
 .box textarea::placeholder{color:var(--mut)}
 .cb{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;flex:none;color:var(--mut)}
 .cb:hover{background:var(--glass2);color:var(--fg)}
+.cb.recording{background:#d83a4a;color:#fff;box-shadow:0 0 0 5px rgba(216,58,74,.14);animation:micPulse 1.2s infinite}
+@keyframes micPulse{50%{box-shadow:0 0 0 8px rgba(216,58,74,.05)}}
+.mic-status{max-width:760px;margin:0 auto 6px;padding:0 8px;color:var(--mut);font-size:12px;line-height:1.4}
 .cb svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .send{background:linear-gradient(135deg,var(--acc),#6a1bd6);color:#fff;box-shadow:0 8px 22px rgba(209,0,209,.4)}
 .send:hover{color:#fff;background:linear-gradient(135deg,var(--acc),#6a1bd6)}
@@ -313,8 +316,10 @@ dialog{background:var(--bg2)}
 </main>
 
 <div class="comp">
+ <span id="micStatus" class="mic-status" role="status" aria-live="polite" hidden></span>
  <div class="box">
   <button class="cb" id="attach" data-a="attach" type="button"><svg viewBox="0 0 24 24"><path d="M21 11.5l-8.6 8.6a5 5 0 0 1-7-7l8.6-8.6a3.3 3.3 0 0 1 4.7 4.7l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9"/></svg></button>
+  <button class="cb mic" id="micBtn" data-a="recordVoice" type="button" aria-pressed="false"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M8 21h8"/></svg></button>
   <textarea id="inp" rows="1" enterkeyhint="send" data-p="placeholder" aria-label="Message"></textarea>
   <button class="cb send" id="sendBtn" data-a="send" type="button" disabled><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
  </div>
@@ -466,7 +471,7 @@ async function chatAdapter(messages) {
    ===================================================================== */
 const I18N = {
 en:{newChat:'New chat',history:'Recent',noHist:'No conversations yet.',settings:'Settings',menu:'Menu',close:'Close',theme:'Theme',language:'Language',dark:'Dark',light:'Light',voiceGender:'Voice',voiceMan:'Man',voiceWoman:'Woman',
- stDemo:'Demo mode · no backend',stLive:'Online',placeholder:'Ask Hamasa anything',send:'Send message',attach:'Attach files or audio',
+ stDemo:'Demo mode · no backend',stLive:'Online',placeholder:'Ask Hamasa anything',send:'Send message',attach:'Attach files or audio',recordVoice:'Record voice',stopRecording:'Stop recording',recording:'Recording… Tap the mic again to finish.',transcribing:'Transcribing audio…',micUnavailable:'Microphone recording is not supported in this browser. You can attach an audio file instead.',micPermission:'Allow microphone access to record.',micFailed:'Could not record or transcribe audio.',micEmpty:'No clear speech was detected. Try again.',micTooLarge:'Recording is too large. Keep it under 11 MB.',micTooLong:'The transcript is too long. Split it into shorter messages.',micReady:'Voice converted to text. Review it, then send.',recordingLimit:'Maximum recording time reached. Transcribing now.',stopRecordingFirst:'Stop the recording before sending.',
  greetT:'Ahlan, I’m Hamasa.',greetS:'Ask me anything. I’ll keep it sharp, warm, and a little bit funny.',
  s:['Explain something tricky in simple words','Help me plan my week','Write a short message to a friend','Tell me a joke, Egyptian style'],
  demoTag:'Demo reply · not from the AI',copyMessage:'Copy',copied:'Copied',copyFailed:'Could not copy',readAloud:'Read aloud',stopReading:'Stop reading',speechUnavailable:'Speech is not available in this browser.',errT:'Couldn’t reach Hamasa',errB:'Check your connection, then try again.',retry:'Try again',
@@ -475,7 +480,7 @@ memoryTitle:'Long-term memory',memoryHelp:'Saved to your account when signed in;
  backend:'Connection',beNone:'The HAMASA chat service is offline or not configured.',beLive:'Connected to the HAMASA AI server.',
  demo:['This is a demo reply. Connect the chat endpoint in HAMASA_CONFIG and I’ll answer for real.','Demo mode is on, so I’m not the real model yet. Once the backend is wired in, ask me again.','Placeholder answer: the interface works, the AI isn’t connected yet.']},
 ar:{newChat:'محادثة جديدة',history:'الأخيرة',noHist:'لا توجد محادثات بعد.',settings:'الإعدادات',menu:'القائمة',close:'إغلاق',theme:'المظهر',language:'اللغة',dark:'داكن',light:'فاتح',voiceGender:'الصوت',voiceMan:'راجل',voiceWoman:'ست',
- stDemo:'وضع تجريبي · بدون خادم',stLive:'متصل',placeholder:'اسأل حماصة في أي حاجة',send:'إرسال الرسالة',attach:'إرفاق ملفات أو ملف صوتي',
+ stDemo:'وضع تجريبي · بدون خادم',stLive:'متصل',placeholder:'اسأل حماصة في أي حاجة',send:'إرسال الرسالة',attach:'إرفاق ملفات أو ملف صوتي',recordVoice:'تسجيل صوت',stopRecording:'إيقاف التسجيل',recording:'جاري التسجيل… اضغط المايك تاني لما تخلص.',transcribing:'بحوّل التسجيل لنص…',micUnavailable:'تسجيل الصوت مش مدعوم في المتصفح ده. تقدر ترفق ملف صوتي.',micPermission:'اسمح للمتصفح باستخدام المايك عشان تسجل.',micFailed:'حصلت مشكلة في التسجيل أو تحويل الصوت لنص.',micEmpty:'ملقتش كلام واضح في التسجيل. جرّب تاني.',micTooLarge:'حجم التسجيل كبير. خليه أقل من 11 ميجابايت.',micTooLong:'النص طويل جدًا. قسّمه على رسائل أقصر.',micReady:'حوّلت الصوت لنص. راجعه وبعدها ابعته.',recordingLimit:'وصلت للحد الأقصى للتسجيل. جاري تحويله لنص.',stopRecordingFirst:'أوقف التسجيل الأول قبل الإرسال.',
  greetT:'أهلاً، أنا حماصة.',greetS:'اسألني في أي حاجة. هرد عليك بذكاء ودفا وشوية خفة دم.',
  s:['اشرحلي حاجة معقدة ببساطة','ساعدني أنظّم أسبوعي','اكتبلي رسالة قصيرة لصاحبي','قولّي نكتة مصرية'],
  demoTag:'رد تجريبي · ليس من الذكاء الاصطناعي',copyMessage:'نسخ',copied:'اتنسخ',copyFailed:'مقدرتش أنسخ الرسالة',readAloud:'اقرأ بصوت',stopReading:'إيقاف القراءة',speechUnavailable:'ميزة القراءة الصوتية مش متاحة في المتصفح ده.',errT:'مقدرتش أوصل لحماصة',errB:'اتأكد من الاتصال وجرّب تاني.',retry:'جرّب تاني',
@@ -1168,7 +1173,119 @@ async function respond() {
     scrollEnd(); setBusy(false); return r.text;
   } catch (e) { console.error(e); $('#typing')?.remove(); errorRow(e); setBusy(false); return null; }
 }
+let voiceRecorder = null;
+let voiceStream = null;
+let voiceChunks = [];
+let voiceTimer = null;
+let voiceTranscribing = false;
+const micButton = $('#micBtn');
+const micStatus = $('#micStatus');
+function setMicStatus(key) {
+  if (!micStatus) return;
+  micStatus.textContent = key ? t(key) : '';
+  micStatus.hidden = !key;
+}
+function resetMicButton() {
+  if (!micButton) return;
+  micButton.classList.remove('recording');
+  micButton.setAttribute('aria-pressed', 'false');
+  micButton.dataset.a = 'recordVoice';
+  applyLang();
+}
+function stopVoiceStream() {
+  if (voiceStream) voiceStream.getTracks().forEach(track => track.stop());
+  voiceStream = null;
+}
+async function transcribeVoiceBlob(blob) {
+  if (!blob || blob.size < 1200) throw new Error(t('micEmpty'));
+  if (blob.size > 11 * 1024 * 1024) throw new Error(t('micTooLarge'));
+  const rawMime = String(blob.type || 'audio/webm').split(';')[0].toLowerCase();
+  const mimeType = rawMime === 'audio/x-m4a' ? 'audio/mp4' : rawMime;
+  const dataUrl = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error(t('micFailed')));
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.readAsDataURL(blob);
+  });
+  const comma = dataUrl.indexOf(',');
+  if (comma < 0) throw new Error(t('micFailed'));
+  const response = await apiFetch(API_BASE + '/api/transcribe', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ audio: dataUrl.slice(comma + 1), mime_type: mimeType }),
+    signal: AbortSignal.timeout ? AbortSignal.timeout(120000) : undefined
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.detail || t('micFailed'));
+  const transcript = String(result.transcript || '').trim();
+  if (!transcript) throw new Error(t('micEmpty'));
+  const current = inp.value.trim();
+  if (current.length + transcript.length + (current ? 1 : 0) > MAX_CHAT_MESSAGE_CHARS) {
+    throw new Error(t('micTooLong'));
+  }
+  inp.value = current ? current + '\n' + transcript : transcript;
+  grow();
+  inp.focus({ preventScroll: true });
+  toast(t('micReady'));
+}
+async function startVoiceRecording() {
+  if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+    toast(t('micUnavailable')); return;
+  }
+  try {
+    voiceStream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+    });
+    const candidates = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'];
+    const preferred = typeof MediaRecorder.isTypeSupported === 'function'
+      ? candidates.find(type => MediaRecorder.isTypeSupported(type)) : '';
+    voiceRecorder = new MediaRecorder(voiceStream, preferred ? { mimeType: preferred } : undefined);
+    const recorder = voiceRecorder;
+    voiceChunks = [];
+    recorder.ondataavailable = event => { if (event.data?.size) voiceChunks.push(event.data); };
+    recorder.onerror = () => {
+      toast(t('micFailed'));
+      if (recorder.state === 'recording') recorder.stop();
+    };
+    recorder.onstop = async () => {
+      clearTimeout(voiceTimer); voiceTimer = null;
+      stopVoiceStream();
+      const blob = new Blob(voiceChunks, { type: recorder.mimeType || 'audio/webm' });
+      voiceChunks = []; voiceRecorder = null;
+      resetMicButton();
+      voiceTranscribing = true; micButton.disabled = true;
+      setMicStatus('transcribing');
+      try { await transcribeVoiceBlob(blob); }
+      catch (error) { toast(error.message || t('micFailed')); }
+      finally {
+        voiceTranscribing = false; micButton.disabled = false; setMicStatus('');
+      }
+    };
+    recorder.start(250);
+    micButton.classList.add('recording');
+    micButton.setAttribute('aria-pressed', 'true');
+    micButton.dataset.a = 'stopRecording';
+    applyLang();
+    setMicStatus('recording');
+    voiceTimer = setTimeout(() => {
+      if (voiceRecorder === recorder && recorder.state === 'recording') {
+        recorder.stop(); toast(t('recordingLimit'));
+      }
+    }, 90_000);
+  } catch (error) {
+    stopVoiceStream(); voiceRecorder = null; resetMicButton(); setMicStatus('');
+    toast(error?.name === 'NotAllowedError' ? t('micPermission') : t('micFailed'));
+  }
+}
+if (micButton) micButton.addEventListener('click', () => {
+  if (voiceTranscribing) return;
+  if (voiceRecorder?.state === 'recording') voiceRecorder.stop();
+  else startVoiceRecording();
+});
+
 async function send(text) {
+  if (voiceRecorder?.state === 'recording') { toast(t('stopRecordingFirst')); return; }
+  if (voiceTranscribing) { toast(t('transcribing')); return; }
   text = (text || '').trim(); if (!text || busy) return;
   if (!cur) { cur = { id: crypto.randomUUID(), updated_at: Date.now(), title: text.slice(0, 40), messages: [] }; convs.unshift(cur); }
   $('#empty').style.display = 'none';
