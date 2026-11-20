@@ -99,9 +99,31 @@
   });
   $("hvClose").addEventListener("click",close);
   dialog.addEventListener("click",event => { if(event.target === dialog) close(); });
+  function stopRecording() {
+    if (busy || recorder?.state !== "recording") return false;
+    busy = true;
+    mic.disabled = true;
+    setStatus("بجهّز التسجيل…","thinking");
+    try {
+      // Flush the final audio chunk before stopping (helps Safari/iOS MediaRecorder).
+      if (typeof recorder.requestData === "function") recorder.requestData();
+      recorder.stop();
+      return true;
+    } catch (error) {
+      busy = false;
+      mic.disabled = false;
+      setStatus(error?.message || "تعذر إيقاف التسجيل.");
+      return false;
+    }
+  }
+  // iOS Safari can delay/suppress the synthesized click after a touch.
+  // Stop on the physical release, then let the click handler cover keyboard use.
+  mic.addEventListener("pointerup", () => {
+    if (recorder?.state === "recording") stopRecording();
+  }, {passive:true});
   mic.addEventListener("click",async() => {
     if (busy) return;
-    if (recorder?.state === "recording") { busy = true; mic.disabled = true; setStatus("بجهّز التسجيل…","thinking"); recorder.stop(); return; }
+    if (recorder?.state === "recording") { stopRecording(); return; }
     try { busy = true; listen.disabled = true; await beginRecording(); busy = false; }
     catch(error) { stopTracks(); recorder = null; busy = false; mic.disabled = false; setStatus(error.name === "NotAllowedError" ? "اسمح للمتصفح باستخدام الميكروفون من إعدادات الموقع." : (error.message || "تعذر بدء التسجيل.")); }
   });
