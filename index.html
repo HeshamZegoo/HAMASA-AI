@@ -1252,7 +1252,7 @@ async function startVoiceRecording() {
     recorder.ondataavailable = event => { if (event.data?.size) voiceChunks.push(event.data); };
     recorder.onerror = () => {
       toast(t('micFailed'));
-      if (recorder.state === 'recording') recorder.stop();
+      if (recorder.state === 'recording') { voiceTranscribing = true; grow(); recorder.stop(); }
     };
     recorder.onstop = async () => {
       clearTimeout(voiceTimer); voiceTimer = null;
@@ -1265,7 +1265,7 @@ async function startVoiceRecording() {
       try { await transcribeVoiceBlob(blob); }
       catch (error) { toast(error.message || t('micFailed')); }
       finally {
-        voiceTranscribing = false; micButton.disabled = false; setMicStatus('');
+        voiceTranscribing = false; micButton.disabled = false; setMicStatus(''); grow();
       }
     };
     recorder.start(250);
@@ -1280,14 +1280,17 @@ async function startVoiceRecording() {
       }
     }, 90_000);
   } catch (error) {
-    stopVoiceStream(); voiceRecorder = null; resetMicButton(); setMicStatus('');
+    stopVoiceStream(); voiceRecorder = null; resetMicButton(); setMicStatus(''); grow();
     toast(error?.name === 'NotAllowedError' ? t('micPermission') : t('micFailed'));
   }
 }
 if (micButton) micButton.addEventListener('click', () => {
   if (voiceTranscribing) return;
-  if (voiceRecorder?.state === 'recording') voiceRecorder.stop();
-  else startVoiceRecording();
+  if (voiceRecorder?.state === 'recording') {
+    voiceTranscribing = true;
+    grow();
+    voiceRecorder.stop();
+  } else startVoiceRecording();
 });
 
 async function send(text) {
@@ -1299,7 +1302,11 @@ async function send(text) {
   const m = { role: 'user', text }; cur.messages.push(m); msgs.append(bubble(m)); save(); renderHist();
   inp.value = ''; grow(); return respond();
 }
-function grow() { inp.style.height = '42px'; inp.style.height = Math.min(inp.scrollHeight, 160) + 'px'; sendBtn.disabled = busy || !inp.value.trim(); }
+function grow() {
+  inp.style.height = '42px';
+  inp.style.height = Math.min(inp.scrollHeight, 160) + 'px';
+  sendBtn.disabled = busy || voiceTranscribing || voiceRecorder?.state === 'recording' || !inp.value.trim();
+}
 inp.addEventListener('input', grow);
 inp.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(inp.value); } });
 sendBtn.onclick = () => { send(inp.value); inp.focus({ preventScroll: true }); };
