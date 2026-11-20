@@ -1412,7 +1412,10 @@ async def chat(body: ChatRequest):
             "role": "system",
             "content": (
                 "The user explicitly requested code execution. You MUST call the run_code tool with the exact requested program; "
-                "do not calculate or simulate its output yourself. Treat the tool result as authoritative. "
+                "copy the source faithfully, preserving every newline, blank line, indentation level, and statement boundary. "
+                "Never join separate Python statements on one line: for example, `import random` and `print(...)` must remain separate lines. "
+                "When encoding the tool arguments as JSON, represent line breaks as `\\n` inside the code string so the decoded code contains real newlines. "
+                "Do not calculate or simulate its output yourself. Treat the tool result as authoritative. "
                 "If execution fails or times out, clearly report that it failed and never invent stdout or an exit code."
             ),
         })
