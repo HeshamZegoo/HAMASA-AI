@@ -396,7 +396,7 @@ function buildChatRequest(messages) {
   return {
     memory,
     saved_memories: memories.slice(0, 40).map(item => ({
-      category: item.category,
+      category: normalizeMemoryCategory(item.category),
       text: String(item.text || "").slice(0, 500),
       updated_at: String(item.updatedAt || "").slice(0, 40)
     })),
@@ -496,9 +496,15 @@ if (!/^[0-9a-f-]{36}$/i.test(memoryClientId)) {
   memoryClientId = crypto.randomUUID();
   store.set("hamasa.memoryClientId", memoryClientId);
 }
-memories = memories.filter(x => x && typeof x.text === 'string' && typeof x.category === 'string').slice(0, 40);
+memories = memories.filter(x => x && typeof x.text === 'string' && typeof x.category === 'string').slice(0, 40)
+  .map(x => ({ ...x, category: normalizeMemoryCategory(x.category) }));
+store.set('hamasa.memory', memories);
 let cur = convs[0] || null, busy = false;
 const t = k => I18N[lang][k];
+const VALID_MEMORY_CATEGORIES = new Set(['preference', 'project', 'decision', 'temporary']);
+function normalizeMemoryCategory(category) {
+  return VALID_MEMORY_CATEGORIES.has(category) ? category : 'preference';
+}
 
 function orbSVG() {
   return `<div class="robot-stage" aria-hidden="true">
@@ -653,11 +659,12 @@ async function syncMemoriesFromServer() {
     const known = new Set(cloud.map(x => String(x.category) + "\\n" + String(x.text).trim().toLocaleLowerCase()));
     let uploaded = false;
     for (const item of memories.slice(0, 40)) {
-      const key = String(item.category) + "\\n" + String(item.text || "").trim().toLocaleLowerCase();
+      const category = normalizeMemoryCategory(item.category);
+      const key = category + "\\n" + String(item.text || "").trim().toLocaleLowerCase();
       if (!item.text || known.has(key) || cloud.length >= 40) continue;
       const migrated = await apiFetch(API_BASE + "/api/memory", {
         method: "POST", headers: memoryHeaders(),
-        body: JSON.stringify({ category: item.category, text: item.text })
+        body: JSON.stringify({ category, text: item.text })
       });
       if (!migrated.ok) continue;
       const saved = await migrated.json();
