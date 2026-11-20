@@ -10,7 +10,7 @@ This private Railway service runs user-requested Python and JavaScript in a fres
 - 1 vCPU / 2 GB memory ceiling, 20-second command timeout, 50,000-byte source limit, 24,000-byte output cap.
 - Maximum two concurrent runs and eight starts per minute per service instance.
 - Internal bearer authentication; no public domain should be attached to this service.
-- Only Python and JavaScript are enabled initially. Third-party packages are not installed per request.
+- Python VMs are created from a cached Railway template with `python3` installed; JavaScript uses the standard Node-enabled image. Third-party packages are not installed per request.
 
 ## Railway service configuration
 
