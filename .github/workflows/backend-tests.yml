@@ -6,17 +6,42 @@ on:
     paths:
       - "backend/**"
       - ".github/workflows/backend-tests.yml"
+      - "index.html"
+      - "config.js"
+      - "attachments.js"
+      - "scripts/validate.py"
   pull_request:
     branches: [main]
     paths:
       - "backend/**"
       - ".github/workflows/backend-tests.yml"
+      - "index.html"
+      - "config.js"
+      - "attachments.js"
+      - "scripts/validate.py"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
+  frontend-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate frontend and backend contract
+        run: python scripts/validate.py
+
   unittest:
     runs-on: ubuntu-latest
     timeout-minutes: 15
