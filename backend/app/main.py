@@ -274,7 +274,7 @@ def _requested_pdf_page_count(prompt: str) -> int:
 
 class FileCreateRequest(BaseModel):
     prompt: str = Field(min_length=2, max_length=12000)
-    format: Literal["docx", "pdf", "xlsx", "pptx", "csv", "txt", "md", "json", "html", "css", "js", "ts", "py", "sql", "sh"]
+    format: Literal["docx", "pdf", "xlsx", "pptx", "csv", "txt", "md", "json", "html", "css", "js", "ts", "py", "sql", "sh", "java", "c", "h", "cpp", "hpp", "cs", "go", "rs", "php", "rb", "kt", "swift"]
     messages: list[Message] = Field(default_factory=list, max_length=20)
     attachments: list[AttachmentInput] = Field(default_factory=list, max_length=8)
 
@@ -978,7 +978,7 @@ def readiness():
 async def generate_file(body: FileCreateRequest):
     if not API_KEY:
         raise HTTPException(status_code=503, detail="File generation is temporarily unavailable.")
-    format_names = {"docx": "Microsoft Word document", "pdf": "PDF document", "xlsx": "Excel spreadsheet", "pptx": "PowerPoint presentation", "csv": "CSV file", "txt": "text file", "md": "Markdown document", "json": "JSON file", "html": "HTML webpage/source file", "css": "CSS stylesheet", "js": "JavaScript source file", "ts": "TypeScript source file", "py": "Python source file", "sql": "SQL script", "sh": "shell script"}
+    format_names = {"docx": "Microsoft Word document", "pdf": "PDF document", "xlsx": "Excel spreadsheet", "pptx": "PowerPoint presentation", "csv": "CSV file", "txt": "text file", "md": "Markdown document", "json": "JSON file", "html": "HTML webpage/source file", "css": "CSS stylesheet", "js": "JavaScript source file", "ts": "TypeScript source file", "py": "Python source file", "sql": "SQL script", "sh": "shell script", "java": "Java source file", "c": "C source file", "h": "C/C++ header", "cpp": "C++ source file", "hpp": "C++ header", "cs": "C# source file", "go": "Go source file", "rs": "Rust source file", "php": "PHP source file", "rb": "Ruby source file", "kt": "Kotlin source file", "swift": "Swift source file"}
     requested_pages = _requested_pdf_page_count(body.prompt) if body.format == "pdf" else 0
     system = (
         "You create useful, complete downloadable files. Return ONLY valid JSON with keys "
@@ -993,7 +993,7 @@ async def generate_file(body: FileCreateRequest):
         "For spreadsheets, put column headers and data in rows, each row an array of cell values; content may contain a short description. "
         "For PowerPoint, structure content into slide sections using one Markdown # heading per slide; keep each slide focused and concise. "
         "For CSV, provide clean tabular data in rows. For JSON, provide structured rows and content. "
-        "For Markdown, use semantic headings, lists, and tables. For HTML, create a complete usable webpage with semantic HTML, responsive CSS, accessible controls, and JavaScript when the requested behavior needs it. Return actual source code, not an escaped code sample. For CSS, JS, TS, Python, SQL, and shell files, return complete runnable source code with imports, error handling, and brief useful comments; never wrap source code in Markdown fences. "
+        "For Markdown, use semantic headings, lists, and tables. For HTML, create a complete usable webpage with semantic HTML, responsive CSS, accessible controls, and JavaScript when the requested behavior needs it. Return actual source code, not an escaped code sample. For CSS, JS, TS, Python, SQL, shell, Java, C, C++, C#, Go, Rust, PHP, Ruby, Kotlin, and Swift files, return complete runnable source code with imports, error handling, and brief useful comments; never wrap source code in Markdown fences. "
         "Always plan the document before writing: identify audience, language, purpose, sections, and requested format. "
         "Use the full requested scope, meaningful examples, accurate facts, consistent terminology, and a clear conclusion. "
         "Never claim a file was created unless the renderer returns valid bytes. "
@@ -1022,6 +1022,18 @@ async def generate_file(body: FileCreateRequest):
         "py": "Return a complete Python source file with imports, executable entry point when appropriate, validation, and useful error handling. No Markdown fences.",
         "sql": "Return a complete SQL script with clear schema/query structure and safe parameterization guidance. No Markdown fences.",
         "sh": "Return a complete POSIX shell script with safe quoting, error handling, and a shebang when appropriate. No Markdown fences.",
+        "java": "Return complete Java source with correct public class/file naming, imports, and a runnable main when appropriate. No Markdown fences.",
+        "c": "Return complete compilable C source with headers, main when appropriate, safe memory handling, and clear compiler assumptions. No Markdown fences.",
+        "h": "Return a valid C/C++ header with include guards or pragma once and correct declarations. No Markdown fences.",
+        "cpp": "Return complete compilable modern C++ source with standard headers, RAII, and a runnable main when appropriate. No Markdown fences.",
+        "hpp": "Return a valid C++ header with pragma once or include guards and correct declarations. No Markdown fences.",
+        "cs": "Return complete C# source using appropriate namespaces and types, runnable entry point when appropriate. No Markdown fences.",
+        "go": "Return complete idiomatic Go source with package declaration, imports, error handling, and main when appropriate. No Markdown fences.",
+        "rs": "Return complete idiomatic Rust source with ownership-safe code, imports, and main when appropriate. No Markdown fences.",
+        "php": "Return complete PHP source with opening tag and safe input/output handling. No Markdown fences.",
+        "rb": "Return complete idiomatic Ruby source with required imports and executable entry point when appropriate. No Markdown fences.",
+        "kt": "Return complete Kotlin source with correct declarations and main when appropriate. No Markdown fences.",
+        "swift": "Return complete Swift source with correct imports, types, and executable entry point when appropriate. No Markdown fences.",
         "md": "Use a clear Markdown document with headings, lists, and tables when appropriate.",
         "txt": "Use clean plain text with clear section labels and no Markdown syntax."
     }[body.format]
@@ -1112,7 +1124,12 @@ async def generate_file(body: FileCreateRequest):
             "json": "application/json", "html": "text/html; charset=utf-8", "css": "text/css; charset=utf-8",
             "js": "text/javascript; charset=utf-8", "ts": "text/plain; charset=utf-8",
             "py": "text/x-python; charset=utf-8", "sql": "application/sql; charset=utf-8",
-            "sh": "text/x-shellscript; charset=utf-8",
+            "sh": "text/x-shellscript; charset=utf-8", "java": "text/x-java-source; charset=utf-8",
+            "c": "text/x-c; charset=utf-8", "h": "text/x-c; charset=utf-8",
+            "cpp": "text/x-c++; charset=utf-8", "hpp": "text/x-c++; charset=utf-8",
+            "cs": "text/plain; charset=utf-8", "go": "text/x-go; charset=utf-8",
+            "rs": "text/x-rust; charset=utf-8", "php": "application/x-httpd-php; charset=utf-8",
+            "rb": "text/x-ruby; charset=utf-8", "kt": "text/plain; charset=utf-8", "swift": "text/x-swift; charset=utf-8",
         }[body.format]
         return {"message": message, "filename": filename, "mime_type": mime,
                 "data": base64.b64encode(file_bytes).decode("ascii")}
