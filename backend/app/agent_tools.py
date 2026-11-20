@@ -196,6 +196,14 @@ CHAT_TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "deep_research",
+            "description": "Conduct a deeper web investigation for complex research or verification requests. Search the topic, open up to three relevant public pages, compare evidence, and return source URLs with readable page content. Use only when the user asks for deep research, a comparison, or verification that needs multiple sources.",
+            "parameters": {"type": "object", "properties": {"query": {"type": "string", "description": "The research question or topic."}}, "required": ["query"], "additionalProperties": False},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "open_webpage",
             "description": "Open and read a public webpage when search snippets are insufficient. Use the URL from a search result. Returns page title, readable text, and links. Only public HTML/text pages are supported.",
             "parameters": {"type": "object", "properties": {"url": {"type": "string", "description": "A public HTTP or HTTPS webpage URL."}}, "required": ["url"], "additionalProperties": False},
@@ -488,6 +496,34 @@ async def execute_chat_tool(
                 for item in results[:8]
             ],
         }
+    if name == "deep_research":
+        query = arguments.get("query")
+        if not isinstance(query, str) or not query.strip():
+            raise ValueError("query must be a non-empty string")
+        results = await search(query[:400])
+        source_records = []
+        for item in results[:3]:
+            url = str(item.get("url") or "").strip()
+            if not url:
+                continue
+            try:
+                page = await open_webpage(url)
+                source_records.append({
+                    "title": str(page.get("title") or item.get("title") or "")[:180],
+                    "url": str(page.get("url") or url)[:1000],
+                    "published_date": str(item.get("published_date") or "")[:40],
+                    "content": str(page.get("content") or item.get("content") or item.get("raw_content") or "")[:5000],
+                    "page_opened": bool(page.get("ok")),
+                })
+            except (ValueError, httpx.HTTPError, OSError):
+                source_records.append({
+                    "title": str(item.get("title") or "")[:180],
+                    "url": url[:1000],
+                    "published_date": str(item.get("published_date") or "")[:40],
+                    "content": str(item.get("content") or item.get("raw_content") or "")[:3000],
+                    "page_opened": False,
+                })
+        return {"ok": bool(source_records), "research_question": query[:400], "sources": source_records}
     if name == "open_webpage":
         url = arguments.get("url")
         if not isinstance(url, str):
