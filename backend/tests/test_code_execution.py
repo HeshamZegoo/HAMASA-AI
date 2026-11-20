@@ -67,8 +67,19 @@ class IsolatedCodeExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(agent_tools.explicit_code_execution_request("print(1 + 1)"))
         self.assertTrue(agent_tools.explicit_code_execution_request("console.log(1 + 1)"))
         self.assertTrue(agent_tools.explicit_code_execution_request("```python\nprint(1 + 1)\n```"))
+        self.assertTrue(agent_tools.explicit_code_execution_request(
+            "import random\nprint('HAMASA-RUN:', random.randint(100000, 999999))"
+        ))
+        self.assertTrue(agent_tools.explicit_code_execution_request(
+            "values = [1, 2, 3]\nfor value in values:\n    print(value * 10)"
+        ))
+        self.assertTrue(agent_tools.explicit_code_execution_request(
+            "const value = 42;\nconsole.log(value);"
+        ))
         self.assertFalse(agent_tools.explicit_code_execution_request("اشرحلي الكود ده"))
         self.assertFalse(agent_tools.explicit_code_execution_request("What does print(1 + 1) do?"))
+        self.assertFalse(agent_tools.explicit_code_execution_request("Hello there"))
+        self.assertFalse(agent_tools.explicit_code_execution_request("print is a Python function"))
 
     def test_runner_is_disabled_without_all_three_settings(self):
         cases = [
