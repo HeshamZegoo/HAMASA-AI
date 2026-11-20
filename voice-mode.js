@@ -6,7 +6,7 @@
   const openButton = $("voice-mode-open");
   if (!openButton) return;
   const apiBase = String(window.HAMASA_CONFIG?.API_URL || "https://hamasa-api-production.up.railway.app").replace(/\/+$/, "");
-  let recorder=null, stream=null, chunks=[], busy=false, active=false, audioContext=null, analyser=null, raf=0;
+  let recorder=null, stream=null, chunks=[], busy=false, active=false, audioContext=null, analyser=null, raf=0, browserRecognition=null;
   let speechStarted=0, lastVoice=0, segmentHasSpeech=false, segmentStarted=0, lastReply="";
   let speechButton=null;
   const dialog=document.createElement("section");
@@ -29,6 +29,7 @@
   function endSession(){
     active=false; busy=false;
     if(raf)cancelAnimationFrame(raf); raf=0;
+    if(browserRecognition){try{browserRecognition.onend=null;browserRecognition.stop();}catch{}browserRecognition=null;}
     try{if(recorder&&recorder.state!=="inactive"){recorder.onstop=null;recorder.stop();}}catch{}
     recorder=null; stopTracks();
     if(audioContext){audioContext.close().catch(()=>{});audioContext=null;} analyser=null;
@@ -55,7 +56,7 @@
     await bridge.speakAndWait(text,speechButton);
   }
   function startSegment(){
-    if(!active||busy||!stream)return;
+    if(!active||busy||!stream||browserRecognition)return;
     const mime=mimeType();
     recorder=mime?new MediaRecorder(stream,{mimeType:mime}):new MediaRecorder(stream);
     const current=recorder; chunks=[];speechStarted=0;lastVoice=0;segmentHasSpeech=false;segmentStarted=performance.now();
@@ -68,11 +69,11 @@
       if(!segmentHasSpeech||blob.size<1200){startSegment();return;}
       busy=true;mic.disabled=true;
       try{
-        setStatus("بفهم كلامك…","thinking");
+        setStatus("سامعك…","listening");
         const text=await transcribe(blob);
         if(!text){setStatus("ماسمعتش كلام واضح. كمل كلامك…","listening");return;}
         transcript.textContent="أنت: "+text+"\n\nحماصة: بتحضّر الرد…";
-        setStatus("حماصة بتفكر…","thinking");
+        setStatus("سامعك…","listening");
         const bridge=window.HAMASA_VOICE_BRIDGE;
         const reply=await bridge?.send?.(text);
         if(!reply)throw new Error("ماوصلنيش رد من حماصة.");
@@ -82,13 +83,70 @@
         await speak(lastReply);
         if(active)setStatus("سامعك… كمل كلامك","listening");
       }catch(error){
-        setStatus(error?.message||"حصل خطأ أثناء المحادثة.");
+        const message=String(error?.message||"");
+        if(/NVIDIA transcription|خدمة تحويل الصوت لنص غير متاحة|Could not connect to NVIDIA/i.test(message)&&startBrowserFallback()){
+          setStatus("رجعت أسمعك بالطريقة البديلة…","listening");
+        }else{
+          setStatus(message||"حصل خطأ أثناء المحادثة.");
+        }
       }finally{
         busy=false;mic.disabled=false;
-        if(active)startSegment();
+        if(active&&!browserRecognition)startSegment();
       }
     };
     current.start(250);
+  }
+  function startBrowserFallback(){
+    const Recognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+    if(!Recognition)return false;
+    try{
+      if(raf)cancelAnimationFrame(raf);raf=0;
+      try{if(recorder&&recorder.state!=="inactive")recorder.stop();}catch{}
+      recorder=null;stopTracks();
+      if(audioContext){audioContext.close().catch(()=>{});audioContext=null;}analyser=null;
+      const recognition=new Recognition();
+      browserRecognition=recognition;
+      recognition.lang=(window.HAMASA_VOICE_BRIDGE?.language?.()==="ar"?"ar-EG":"en-US");
+      recognition.continuous=false;recognition.interimResults=false;recognition.maxAlternatives=1;
+      recognition.onresult=async event=>{
+        const text=Array.from(event.results||[]).slice(event.resultIndex||0).map(r=>r[0]?.transcript||"").join(" ").trim();
+        if(!text||!active||busy)return;
+        busy=true;setStatus("سامعك…","listening");
+        transcript.textContent="أنت: "+text;
+        try{
+          const reply=await window.HAMASA_VOICE_BRIDGE?.send?.(text);
+          if(!reply)throw new Error("الرد مش متاح دلوقتي.");
+          transcript.textContent="أنت: "+text+"\n\nحماصة: "+reply;
+          setStatus("حماصة بترد عليك…","talking");
+          await speak(String(reply));
+        }catch(error){setStatus(error?.message||"حصل خطأ أثناء الرد.");}
+        finally{
+          busy=false;
+          if(active&&browserRecognition===recognition){
+            try{recognition.start();setStatus("سامعك… كمل كلامك","listening");}
+            catch{setStatus("الميكروفون محتاج إعادة تشغيل. اقفل الغرفة وافتحها تاني.");}
+          }
+        }
+      };
+      recognition.onerror=event=>{
+        if(!active)return;
+        if(event.error==="not-allowed"||event.error==="service-not-allowed"){
+          setStatus("المتصفح منع التعرف على الكلام. اسمح بخدمة الإملاء الصوتي من إعدادات Safari.");
+        }else if(event.error!=="no-speech"){
+          setStatus("التعرف الصوتي البديل غير متاح حاليًا.");
+        }
+      };
+      recognition.onend=()=>{
+        if(active&&browserRecognition===recognition&&!busy){
+          try{recognition.start();}catch{}
+        }
+      };
+      recognition.start();
+      return true;
+    }catch(error){
+      browserRecognition=null;
+      return false;
+    }
   }
   function monitor(){
     if(!active||!analyser)return;
