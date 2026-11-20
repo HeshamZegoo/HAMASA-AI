@@ -114,6 +114,30 @@ class IsolatedCodeExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("DATABASE_URL", str(call["json"]))
         self.assertFalse(call["options"]["follow_redirects"])
         self.assertFalse(call["options"]["trust_env"])
+        self.assertEqual(call["options"]["timeout"].read, 300.0)
+        self.assertEqual(call["options"]["timeout"].connect, 8.0)
+
+    async def test_success_response_with_invalid_json_is_rejected(self):
+        class InvalidResponse:
+            status_code = 200
+
+            def json(self):
+                raise ValueError("not json")
+
+        class InvalidJsonClient(FakeAsyncClient):
+            async def post(self, url, headers=None, json=None):
+                return InvalidResponse()
+
+        with patch.dict(os.environ, {
+            "HAMASA_EXECUTOR_ENABLED": "true",
+            "HAMASA_EXECUTOR_URL": "http://runner:3000",
+            "HAMASA_EXECUTOR_TOKEN": "shared-secret",
+        }, clear=True):
+            with patch.object(agent_tools.httpx, "AsyncClient", InvalidJsonClient):
+                result = await agent_tools.run_isolated_code("javascript", "console.log(1)")
+
+        self.assertFalse(result["ok"])
+        self.assertIn("invalid response", result["error"].lower())
 
     async def test_unconfigured_runner_never_attempts_execution(self):
         with patch.dict(os.environ, {}, clear=True):
