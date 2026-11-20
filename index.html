@@ -991,7 +991,7 @@ function errorRow(error) {
 function setBusy(v) { busy = v; sendBtn.disabled = v || !inp.value.trim(); }
 function requestedFileFormat(text) {
   const s = String(text || '').toLowerCase().trim();
-  const formatMention = /\b(pdf|xlsx|excel|spreadsheet|docx|word|pptx|powerpoint|slides|presentation|csv|json|html|markdown|md|txt|css|javascript|js|typescript|ts|python|py|sql|shell|sh)\b|\.(pdf|html?|css|js|ts|py|sql|sh)\b|بي\s*دي\s*اف|بي دي اف|اكسل|إكسل|اكسيل|وورد|باوربوينت|عرض تقديمي|شرائح|ملف نصي|ملف كود|ملف برمجي/.test(s);
+  const formatMention = /\b(pdf|xlsx|excel|spreadsheet|docx|word|pptx|powerpoint|slides|presentation|csv|json|html|markdown|md|txt|css|javascript|js|typescript|ts|python|py|sql|shell|sh|java|golang|rust|cpp|csharp|php|ruby|kotlin|swift|dart|go|rs|cs|kt)\b|\.(pdf|html?|css|js|ts|py|sql|sh|java|c|h|cpp|hpp|cs|go|rs|php|rb|kt|swift)\b|بي\s*دي\s*اف|بي دي اف|اكسل|إكسل|اكسيل|وورد|باوربوينت|عرض تقديمي|شرائح|ملف نصي|ملف كود|ملف برمجي/.test(s);
   const action = /(اعمل|اعملي|اعمله|اعملهولي|اعمللي|اعمليلي|أنشئ|انشئ|انشأ|جهز|جهزي|جهزلي|حضّر|حضر|حوّل|حول|صدّر|صدر|اكتب|اكتبلي|نزّل|نزل|حمّل|حمل|احفظ|جهّز|generate|create|make|export|download|save|please|can you|could you|i need|i want)/.test(s) ||
     /(عايز|عاوز|عايزة|عاوزة|محتاج|محتاجة).{0,30}(ملف|مستند|تقرير|pdf|وورد|word|excel|اكسل|إكسل)/.test(s) ||
     /ممكن.{0,15}(تعمل|تعملي|تجهز|تنشئ|تطلع|تحول)/.test(s);
@@ -1009,6 +1009,16 @@ function requestedFileFormat(text) {
   if (/\b(python|py)\b|\.py\b|بايثون/.test(s)) return 'py';
   if (/\b(sql)\b|\.sql\b/.test(s)) return 'sql';
   if (/\b(shell|bash|sh)\b|\.sh\b/.test(s)) return 'sh';
+  if (/\b(java)\b|\.java\b/.test(s)) return 'java';
+  if (/\b(c\+\+|cpp)\b|\.(cpp|hpp)\b/.test(s)) return 'cpp';
+  if (/\b(c#|csharp)\b|\.cs\b/.test(s)) return 'cs';
+  if (/\b(golang|go)\b|\.go\b/.test(s)) return 'go';
+  if (/\b(rust)\b|\.rs\b/.test(s)) return 'rs';
+  if (/\b(php)\b|\.php\b/.test(s)) return 'php';
+  if (/\b(ruby)\b|\.rb\b/.test(s)) return 'rb';
+  if (/\b(kotlin)\b|\.kt\b/.test(s)) return 'kt';
+  if (/\b(swift)\b|\.swift\b/.test(s)) return 'swift';
+  if (/\b(c)\b|\.c\b/.test(s)) return 'c';
   if (/\b(markdown|md)\b/.test(s)) return 'md';
   if (/\b(txt|text file)\b|ملف نصي/.test(s)) return 'txt';
   if (/\b(docx|word)\b|وورد/.test(s)) return 'docx';
