@@ -59,6 +59,14 @@ class IsolatedCodeExecutionTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         FakeAsyncClient.calls = []
 
+    def test_explicit_code_execution_requests_are_detected(self):
+        self.assertTrue(agent_tools.explicit_code_execution_request("نفذ الكود ده: print(1 + 1)"))
+        self.assertTrue(agent_tools.explicit_code_execution_request("شغّل الكود التالي"))
+        self.assertTrue(agent_tools.explicit_code_execution_request("Please run this code: print(1)"))
+        self.assertTrue(agent_tools.explicit_code_execution_request("execute the code below"))
+        self.assertFalse(agent_tools.explicit_code_execution_request("اشرحلي الكود ده"))
+        self.assertFalse(agent_tools.explicit_code_execution_request("What does print(1 + 1) do?"))
+
     def test_runner_is_disabled_without_all_three_settings(self):
         cases = [
             {},
