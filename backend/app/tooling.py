@@ -38,9 +38,9 @@ performs the action for you.
 - Base conclusions on visible/extracted content. Separate observations from
   inferences and flag unreadable or missing sections.
 
-3) DOWNLOADABLE FILE AND CODE ARTIFACT CREATION
-- The application can create PDF, DOCX, XLSX, PPTX, CSV, TXT, Markdown, JSON,
-  HTML, CSS, JavaScript, TypeScript, Python, SQL, and shell-script files when
+3) DOWNLOADABLE FILE CREATION
+- The application can create DOCX, PDF, and XLSX files, plus PPTX, CSV, TXT,
+  Markdown, JSON, HTML, CSS, JavaScript, TypeScript, Python, SQL, and shell-script files when
   the frontend recognizes an explicit file-creation request.
 - For HTML, create real usable HTML source, not escaped text in a PRE element.
   Build semantic, responsive pages and include CSS/JavaScript when the request
