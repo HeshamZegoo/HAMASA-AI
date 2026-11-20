@@ -106,6 +106,34 @@ class CodeExecutionChatFlowTests(unittest.IsolatedAsyncioTestCase):
             for message in final_payload["messages"]
         ))
 
+    async def test_unexpected_tool_call_does_not_execute_any_tool(self):
+        execute = AsyncMock()
+        FakeProviderClient.responses = [
+            FakeProviderResponse({
+                "role": "assistant",
+                "tool_calls": [{
+                    "id": "call-calculator",
+                    "type": "function",
+                    "function": {
+                        "name": "calculator",
+                        "arguments": json.dumps({"expression": "1 + 1"}),
+                    },
+                }],
+            })
+        ]
+        with ExitStack() as stack:
+            for context in self._patches(execute):
+                stack.enter_context(context)
+            with self.assertRaises(HTTPException) as raised:
+                await main.chat(main.ChatRequest(messages=[
+                    main.Message(role="user", content="print(1 + 1)")
+                ]))
+
+        self.assertEqual(raised.exception.status_code, 502)
+        self.assertIn("No code was run", raised.exception.detail)
+        execute.assert_not_awaited()
+        self.assertEqual(len(FakeProviderClient.calls), 1)
+
     async def test_missing_required_tool_call_returns_error_instead_of_guessing(self):
         execute = AsyncMock()
         FakeProviderClient.responses = [
