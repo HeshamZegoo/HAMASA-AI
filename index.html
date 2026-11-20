@@ -308,6 +308,7 @@ header>.logo b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 }
 
 </style>
+<link rel="stylesheet" href="./voice-mode.css?v=20261120-1">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
@@ -350,6 +351,7 @@ header>.logo b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 <div class="comp">
  <span id="micStatus" class="mic-status" role="status" aria-live="polite" hidden></span>
  <div class="box">
+  <button class="cb voice-mode-open" id="voiceModeOpen" type="button" aria-label="فتح المحادثة الصوتية" title="محادثة صوتية">🎙</button>
   <button class="cb" id="workspaceOpen" type="button" aria-label="Open code workspace" title="Code workspace">⌘</button>
   <button class="cb" id="imageLab" type="button" aria-label="Generate or edit an image" title="Image lab">✦</button>
   <button class="cb" id="attach" data-a="attach" type="button"><svg viewBox="0 0 24 24"><path d="M21 11.5l-8.6 8.6a5 5 0 0 1-7-7l8.6-8.6a3.3 3.3 0 0 1 4.7 4.7l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9"/></svg></button>
@@ -1448,6 +1450,8 @@ async function send(text) {
   const m = { role: 'user', text }; cur.messages.push(m); msgs.append(bubble(m)); save(); renderHist();
   inp.value = ''; grow(); return respond();
 }
+window.HAMASA_VOICE_BRIDGE = Object.freeze({ send: (text) => send(text), speak: (text, button) => readMessageAloud(text, button), language: () => lang });
+
 function grow() {
   inp.style.height = '42px';
   inp.style.height = Math.min(inp.scrollHeight, 160) + 'px';
@@ -1608,5 +1612,6 @@ setInterval(async () => {
 <script src="./attachments.js?v=20261119-3"></script>
 <script src="./workspace.js?v=20261120-1"></script>
 <script src="./media.js?v=20261120-1"></script>
+<script src="./voice-mode.js?v=20261120-1"></script>
 </body>
 </html>
