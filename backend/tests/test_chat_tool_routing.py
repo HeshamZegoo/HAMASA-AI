@@ -27,6 +27,37 @@ class FakeProviderClient:
         return FakeResponse()
 
 
+class FakeToolCallResponse:
+    status_code = 200
+    def __init__(self, message):
+        self.message = message
+    def json(self):
+        return {"choices": [{"message": self.message}]}
+
+
+class FakeToolCallingClient:
+    payloads = []
+    def __init__(self, **kwargs):
+        pass
+    async def __aenter__(self):
+        return self
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+    async def post(self, url, headers=None, json=None):
+        self.payloads.append(json)
+        if len(self.payloads) == 1:
+            return FakeToolCallResponse({
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [{
+                    "id": "call_calc_1",
+                    "type": "function",
+                    "function": {"name": "calculator", "arguments": "{\\"expression\\":\\"12 * 13\\"}"},
+                }],
+            })
+        return FakeToolCallResponse({"role": "assistant", "content": "12 × 13 = 156"})
+
+
 class ChatToolRoutingTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         FakeProviderClient.payloads = []
@@ -89,6 +120,22 @@ class ChatToolRoutingTests(unittest.IsolatedAsyncioTestCase):
         search.assert_awaited_once()
         self.assertIn("https://example.com/docs", str(FakeProviderClient.payloads[-1]["messages"]))
         self.assertEqual(result["sources"][0]["url"], "https://example.com/docs")
+
+    async def test_model_can_call_calculator_and_receive_real_result(self):
+        FakeToolCallingClient.payloads = []
+        body = main.ChatRequest(messages=[
+            main.Message(role="user", content="احسب 12 في 13")
+        ])
+        with patch.object(main, "API_KEY", "test-api-key"):
+            with patch("backend.app.main.httpx.AsyncClient", FakeToolCallingClient):
+                result = await main.chat(body)
+        self.assertEqual(result["reply"], "12 × 13 = 156")
+        self.assertEqual(len(FakeToolCallingClient.payloads), 2)
+        tool_message = FakeToolCallingClient.payloads[1]["messages"][-1]
+        self.assertEqual(tool_message["role"], "tool")
+        self.assertEqual(tool_message["tool_call_id"], "call_calc_1")
+        self.assertIn('"result": 156', tool_message["content"])
+
 
     async def test_normal_question_does_not_trigger_live_search(self):
         search = AsyncMock(return_value=[])
