@@ -166,7 +166,15 @@ def _build_pdf(title: str, content: str, page_count: int = 0) -> bytes:
             )
     return raw
 
-def build_file(fmt: str, title: str, content: str, rows: list, page_count: int = 0) -> bytes:
+def _safe_excel_formula(value: str) -> bool:
+    """Allow only simple local aggregate formulas; reject external/dangerous formulas."""
+    return bool(re.fullmatch(
+        r"=(?:SUM|AVERAGE|MIN|MAX|COUNT|COUNTA)\(\$?[A-Z]{1,3}\$?\d+(?::\$?[A-Z]{1,3}\$?\d+)?(?:,\$?[A-Z]{1,3}\$?\d+(?::\$?[A-Z]{1,3}\$?\d+)?)*\)",
+        value.strip(), re.IGNORECASE,
+    ))
+
+
+def build_file(fmt: str, title: str, content: str, rows: list, page_count: int = 0, sheet_name: str | None = None) -> bytes:
     if fmt == "docx":
         doc = Document()
         title_paragraph = doc.add_heading(title, 0)
@@ -220,7 +228,7 @@ def build_file(fmt: str, title: str, content: str, rows: list, page_count: int =
     if fmt == "xlsx":
         workbook = Workbook()
         sheet = workbook.active
-        sheet.title = "Hamasa"
+        sheet.title = (re.sub(r"[\\/*?:\[\]]", " ", str(sheet_name or "Hamasa")).strip()[:31] or "Hamasa")
         spreadsheet_text = " ".join([title, content] + [
             str(value) for row in rows[:5000] if isinstance(row, list)
             for value in row[:100] if value is not None
@@ -235,7 +243,7 @@ def build_file(fmt: str, title: str, content: str, rows: list, page_count: int =
                 values = [cell if isinstance(cell, (int, float, bool)) else str(cell)[:32000] if cell is not None else "" for cell in row[:100]]
                 sheet.append(values)
                 for cell in sheet[sheet.max_row]:
-                    if isinstance(cell.value, str):
+                    if isinstance(cell.value, str) and not _safe_excel_formula(cell.value):
                         cell.data_type = "s"
         sheet["A1"].font = Font(bold=True, size=16, color="FFFFFF")
         sheet["A1"].fill = PatternFill("solid", fgColor="17324D")
