@@ -113,6 +113,7 @@ def main() -> None:
         "/api/capabilities": html + workspace,
         "/api/images/generate": html + media,
         "/api/chat": html,
+        "/api/chat/stream": html,
         "/api/transcribe": attachments,
         "/api/tts": html,
         "/api/files/generate": html,
