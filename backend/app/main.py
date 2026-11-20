@@ -31,6 +31,7 @@ from .quality import coding_instructions_for
 from .research import latest_user_text, should_search_web, format_search_context, rank_search_results
 from .tooling import build_tool_capabilities_prompt
 from .memory_retrieval import select_relevant_memories
+from .agent_tools import CHAT_TOOLS, execute_chat_tool
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper())
 logger = logging.getLogger("hamasa.provider")
@@ -1367,11 +1368,68 @@ async def chat(body: ChatRequest):
 
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(90.0, connect=15.0)) as client:
+            # Give the model real, narrowly-scoped tools and let it decide when
+            # they are useful. Images keep the existing vision-only route.
+            active_payload = dict(payload)
+            if not has_images:
+                active_payload["tools"] = CHAT_TOOLS
+                active_payload["tool_choice"] = "auto"
             response = await client.post(
                 f"{BASE_URL}/chat/completions",
                 headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"},
-                json=payload,
+                json=active_payload,
             )
+
+            # Some OpenAI-compatible endpoints/models do not implement function
+            # calling. Fall back to ordinary chat rather than breaking the chat.
+            if response.status_code in (400, 404, 422) and not has_images:
+                logger.info("Provider does not accept tool calling; retrying standard chat.")
+                response = await client.post(
+                    f"{BASE_URL}/chat/completions",
+                    headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"},
+                    json=payload,
+                )
+            elif response.status_code < 400 and not has_images:
+                # Bounded tool loop: the model can call tools, inspect their real
+                # results, and continue. Never execute arbitrary model-generated code.
+                for _tool_round in range(4):
+                    try:
+                        current_data = response.json()
+                        assistant_message = current_data["choices"][0]["message"]
+                    except (ValueError, KeyError, IndexError, TypeError):
+                        break
+                    tool_calls = assistant_message.get("tool_calls") or []
+                    if not tool_calls:
+                        break
+                    context_messages.append(assistant_message)
+                    for tool_call in tool_calls[:4]:
+                        call_id = str(tool_call.get("id") or "")
+                        function = tool_call.get("function") or {}
+                        name = str(function.get("name") or "")
+                        raw_arguments = function.get("arguments") or "{}"
+                        try:
+                            arguments = json.loads(raw_arguments) if isinstance(raw_arguments, str) else raw_arguments
+                            if not isinstance(arguments, dict):
+                                raise ValueError("Tool arguments must be an object.")
+                            tool_result = await execute_chat_tool(name, arguments, _live_web_search)
+                            if name == "web_search" and isinstance(tool_result, dict):
+                                web_sources.extend(tool_result.get("sources") or [])
+                        except Exception as tool_error:
+                            logger.warning("Chat tool failed: name=%s type=%s", name, type(tool_error).__name__)
+                            tool_result = {"ok": False, "error": "The requested tool could not complete this operation."}
+                        context_messages.append({
+                            "role": "tool",
+                            "tool_call_id": call_id,
+                            "content": json.dumps(tool_result, ensure_ascii=False)[:12000],
+                        })
+                    active_payload["messages"] = context_messages
+                    response = await client.post(
+                        f"{BASE_URL}/chat/completions",
+                        headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"},
+                        json=active_payload,
+                    )
+                    if response.status_code >= 400:
+                        break
 
         if response.status_code >= 400:
             provider_message = "AI provider rejected the request."
