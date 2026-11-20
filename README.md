@@ -12,6 +12,7 @@ HAMASA is an Arabic/English AI assistant built as a web application. It combines
 ## Features
 
 - **Arabic and English chat:** interact in either language.
+- **Token streaming:** assistant replies stream into the conversation as the provider generates them, while the bounded tool loop preserves web research, calculator, and sandbox execution.
 - **AI provider configuration:** connect an OpenAI-compatible chat-completions provider and choose its model through backend environment variables.
 - **Live and deep web research:** Tavily-backed search can open and read up to three relevant public pages for multi-source comparisons and verification, preserving source links in chat.
 - **Code workspace:** browser-local multi-file editor with automatic local saving, individual downloads, isolated HTML preview, and optional Python/JavaScript execution through the private sandbox.
