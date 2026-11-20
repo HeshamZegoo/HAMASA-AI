@@ -49,7 +49,8 @@ class AssistantBehaviorGuidanceTests(unittest.TestCase):
 
     def test_guidance_describes_real_github_read_and_external_tool_boundaries(self):
         guidance = " ".join((RELIABILITY_AND_TASK_EXECUTION_GUIDANCE + TOOL_CAPABILITIES_PROMPT).split())
-        self.assertIn("isolated code-execution sandbox", guidance)
+        self.assertIn("fresh Railway Linux VM", guidance)
+        self.assertIn("run_code", guidance)
         self.assertIn("interactive browser automation", guidance)
         self.assertIn("github_read_file", guidance)
         self.assertIn("Gmail or Calendar", guidance)
