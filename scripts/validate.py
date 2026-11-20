@@ -124,6 +124,8 @@ def main() -> None:
         fail("chat requests must validate the current message and send normalized non-empty messages")
     if "request_validation_error_handler" not in backend_source or "_validation_detail" not in backend_source:
         fail("backend must return safe, actionable request-validation errors")
+    if 'id="micBtn"' not in html or "MediaRecorder" not in html or "getUserMedia" not in html or "/api/transcribe" not in html:
+        fail("mobile microphone recording must use the existing server-side transcription endpoint")
 
     for extension in ("mp3", "wav", "m4a", "aac", "ogg", "webm"):
         if f'"{extension}"' not in attachments or f".{extension}" not in attachments:
