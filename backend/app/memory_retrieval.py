@@ -70,3 +70,63 @@ def select_relevant_memories(
         if len(selected) >= max_items:
             break
     return selected
+
+
+
+def select_relevant_memory_text(
+    memory_text: str,
+    query: str,
+    *,
+    max_items: int = 8,
+    max_chars: int = 1800,
+) -> str:
+    """Filter legacy same-conversation context before it reaches the model.
+
+    Legacy clients send a free-form summary string rather than structured memories.
+    Split it into bounded statements and reuse the deterministic relevance scorer so
+    unrelated earlier turns do not bypass the saved-memory relevance gate.
+    """
+    if not isinstance(memory_text, str) or not memory_text.strip():
+        return ""
+    if not _tokens(query) or max_items <= 0 or max_chars <= 0:
+        return ""
+
+    fragments: list[str] = []
+
+    def add_bounded(value: str) -> None:
+        words = value.split()
+        current: list[str] = []
+        for word in words:
+            candidate = " ".join((*current, word))
+            if len(candidate) > 500 and current:
+                fragments.append(" ".join(current))
+                current = [word]
+            else:
+                current.append(word)
+        if current:
+            fragments.append(" ".join(current))
+
+    for paragraph in re.split(r"[\r\n]+", memory_text):
+        paragraph = re.sub(r"^\s*(?:[-*•]+|\d+[.)])\s*", "", paragraph).strip()
+        paragraph = re.sub(
+            r"^(?:المستخدم|المساعد|user|assistant)\s*:\s*",
+            "",
+            paragraph,
+            flags=re.IGNORECASE,
+        )
+        if not paragraph:
+            continue
+        for sentence in re.split(r"(?<=[.!?؟])\s+", paragraph):
+            sentence = sentence.strip()
+            if sentence:
+                add_bounded(sentence)
+
+    unique = list(dict.fromkeys(fragment for fragment in fragments if fragment))
+    candidates = [{"category": "temporary", "text": fragment} for fragment in unique]
+    selected = select_relevant_memories(
+        candidates,
+        query,
+        max_items=max_items,
+        max_chars=max_chars,
+    )
+    return "\n".join(item["text"] for item in selected)
