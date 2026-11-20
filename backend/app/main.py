@@ -147,6 +147,7 @@ _RATE_WINDOWS = {
     "/api/auth/login": (10, 900),
     "/api/chat": (20, 60),
     "/api/files/generate": (4, 600),
+    "/api/images/generate": (3, 600),
     "/api/transcribe": (8, 60),
     "/api/tts": (10, 60),
     "/api/memory": (30, 60),
@@ -154,6 +155,7 @@ _RATE_WINDOWS = {
 _REQUEST_BODY_LIMITS = {
     "/api/chat": 90 * 1024 * 1024,
     "/api/files/generate": 90 * 1024 * 1024,
+    "/api/images/generate": 16 * 1024 * 1024,
     "/api/transcribe": 17 * 1024 * 1024,
     "/api/tts": 1 * 1024 * 1024,
 }
