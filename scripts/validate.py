@@ -106,10 +106,12 @@ def main() -> None:
         if not resolved.is_file():
             fail(f"referenced frontend asset is missing: {asset}")
 
+    workspace = (ROOT / "workspace.js").read_text(encoding="utf-8")
+    media = (ROOT / "media.js").read_text(encoding="utf-8")
     required_routes = {
         "/ready": html,
-        "/api/capabilities": html,
-        "/api/images/generate": html,
+        "/api/capabilities": html + workspace,
+        "/api/images/generate": html + media,
         "/api/chat": html,
         "/api/transcribe": attachments,
         "/api/tts": html,
