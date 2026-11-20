@@ -145,7 +145,7 @@ _RATE_WINDOWS = {
     "/api/auth/signup": (5, 3600),
     "/api/auth/login": (10, 900),
     "/api/chat": (20, 60),
-    "/api/files/generate": (4, 600),
+    "/api/files/generate": (10, 600),
     "/api/transcribe": (8, 60),
     "/api/tts": (10, 60),
     "/api/memory": (30, 60),
@@ -1045,6 +1045,11 @@ async def generate_file(body: FileCreateRequest):
         raise HTTPException(status_code=503, detail="File generation is temporarily unavailable.")
     format_names = {"docx": "Microsoft Word document", "pdf": "PDF document", "xlsx": "Excel spreadsheet", "pptx": "PowerPoint presentation", "csv": "CSV file", "txt": "text file", "md": "Markdown document", "json": "JSON file", "html": "HTML webpage/source file", "css": "CSS stylesheet", "js": "JavaScript source file", "ts": "TypeScript source file", "py": "Python source file", "sql": "SQL script", "sh": "shell script", "java": "Java source file", "c": "C source file", "h": "C/C++ header", "cpp": "C++ source file", "hpp": "C++ header", "cs": "C# source file", "go": "Go source file", "rs": "Rust source file", "php": "PHP source file", "rb": "Ruby source file", "kt": "Kotlin source file", "swift": "Swift source file"}
     requested_pages = _requested_pdf_page_count(body.prompt) if body.format == "pdf" else 0
+    requested_sheet_name = None
+    if body.format == "xlsx":
+        sheet_match = re.search(r"(?:ورقة\s+(?:باسم|اسم)\s+|sheet\s+(?:named|name(?:d)?\s+as)\s+)[\"'“]?([A-Za-z0-9 _-]{1,31})", body.prompt, re.IGNORECASE)
+        if sheet_match:
+            requested_sheet_name = sheet_match.group(1).strip().rstrip("\"'” ")
     system = (
         "You create useful, complete downloadable files. Return ONLY valid JSON with keys "
         "title (string), message (short Egyptian Arabic sentence), content (string), "
@@ -1056,6 +1061,7 @@ async def generate_file(body: FileCreateRequest):
         "and place a standalone [[PAGE_BREAK]] line between every section. Do not put a page break before the first section. "
         "Do not omit sections or compress a multi-page request into one page. "
         "For spreadsheets, put column headers and data in rows, each row an array of cell values; content may contain a short description. "
+        "When the user explicitly requests spreadsheet formulas, include simple local formulas such as =AVERAGE(D2:D5) in the appropriate cells. Do not create external links, macros, or volatile/dangerous formulas. "
         "For PowerPoint, structure content into slide sections using one Markdown # heading per slide; keep each slide focused and concise. "
         "For CSV, provide clean tabular data in rows. For JSON, provide structured rows and content. "
         "For Markdown, use semantic headings, lists, and tables. For HTML, create a complete usable webpage with semantic HTML, responsive CSS, accessible controls, and JavaScript when the requested behavior needs it. Return actual source code, not an escaped code sample. For CSS, JS, TS, Python, SQL, shell, Java, C, C++, C#, Go, Rust, PHP, Ruby, Kotlin, and Swift files, return complete runnable source code with imports, error handling, and brief useful comments; never wrap source code in Markdown fences. "
@@ -1076,7 +1082,7 @@ async def generate_file(body: FileCreateRequest):
     format_guidance = {
         "pdf": "Return polished Markdown content with # and ## headings, real pipe tables where useful, and explicit [[PAGE_BREAK]] markers between pages when an exact page count is requested. Never claim a page count you cannot guarantee; the renderer validates it.",
         "docx": "Use Markdown headings, concise paragraphs, bullet lists, and pipe tables for data that should become real Word tables.",
-        "xlsx": "Return rows as a two-dimensional JSON array. Put column headers in the first row of rows, then data rows. Keep numbers numeric and never put formulas in untrusted cells.",
+        "xlsx": "Return rows as a two-dimensional JSON array. Put column headers in the first row of rows, then data rows. Keep numbers numeric. Include simple local aggregate formulas only when explicitly requested by the user; never use external references, macros, or arbitrary functions.",
         "pptx": "Structure the presentation with one # heading per slide, followed by concise bullets or short paragraphs. Keep each slide focused and avoid overflowing it.",
         "csv": "Return rows as a two-dimensional JSON array with the header row first. Use consistent columns and no prose outside the rows.",
         "json": "Return valid structured JSON-compatible data in the rows field when appropriate; content may be a short description.",
@@ -1177,7 +1183,7 @@ async def generate_file(body: FileCreateRequest):
         data = json.loads(raw)
         title = str(data.get("title") or "Hamasa document")[:120]
         message = str(data.get("message") or "جهزتلك الملف.")[:500]
-        file_bytes = build_file(body.format, title, str(data.get("content") or ""), data.get("rows") or [], requested_pages if body.format == "pdf" else 0)
+        file_bytes = build_file(body.format, title, str(data.get("content") or ""), data.get("rows") or [], requested_pages if body.format == "pdf" else 0, sheet_name=requested_sheet_name)
         safe_title = "".join(c for c in title if c.isalnum() or c in " _-").strip()[:70] or "hamasa-file"
         filename = safe_title + "." + body.format
         mime = {
