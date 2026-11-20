@@ -10,6 +10,8 @@ from urllib.parse import urljoin, urlparse
 
 import httpx
 
+from .github_tools import read_public_github_file
+
 _BINOPS = {
     ast.Add: operator.add,
     ast.Sub: operator.sub,
@@ -201,6 +203,24 @@ CHAT_TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "github_read_file",
+            "description": "Read a text file from a public GitHub repository when the user asks to inspect public source code or documentation. This is read-only and does not access private repositories or modify code.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "owner": {"type": "string", "description": "GitHub owner or organization."},
+                    "repo": {"type": "string", "description": "Repository name."},
+                    "path": {"type": "string", "description": "File path inside the repository."},
+                    "ref": {"type": "string", "description": "Optional branch, tag, or commit reference; defaults to HEAD."}
+                },
+                "required": ["owner", "repo", "path"],
+                "additionalProperties": False
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "calculator",
             "description": "Calculate arithmetic accurately. Use for non-trivial calculations instead of mental arithmetic.",
             "parameters": {"type": "object", "properties": {"expression": {"type": "string", "description": "Arithmetic expression using numbers and + - * / // % ** and parentheses."}}, "required": ["expression"], "additionalProperties": False},
@@ -242,4 +262,10 @@ async def execute_chat_tool(
         if not isinstance(url, str):
             raise ValueError("url must be a string")
         return await open_webpage(url)
+    if name == "github_read_file":
+        owner, repo, path = arguments.get("owner"), arguments.get("repo"), arguments.get("path")
+        ref = arguments.get("ref", "HEAD")
+        if not all(isinstance(value, str) for value in (owner, repo, path, ref)):
+            raise ValueError("GitHub owner, repo, path, and ref must be strings.")
+        return await read_public_github_file(owner, repo, path, ref)
     raise ValueError("Unknown tool.")
