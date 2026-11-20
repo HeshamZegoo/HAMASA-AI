@@ -283,7 +283,14 @@ def explicit_code_execution_request(text: str) -> bool:
             ast.While, ast.With, ast.AsyncWith, ast.FunctionDef,
             ast.AsyncFunctionDef, ast.ClassDef, ast.Try, ast.Assert,
         )
-        if any(isinstance(node, executable_nodes) for node in python_tree.body):
+        if any(
+            isinstance(node, executable_nodes)
+            and (
+                not isinstance(node, ast.Expr)
+                or isinstance(node.value, (ast.Call, ast.Await, ast.Yield, ast.NamedExpr))
+            )
+            for node in python_tree.body
+        ):
             return True
 
     # JavaScript lacks a parser in this module. Require recognizable
