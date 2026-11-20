@@ -60,6 +60,11 @@ class IsolatedCodeRunnerClientTests(unittest.IsolatedAsyncioTestCase):
     async def test_forwards_code_only_to_private_executor_with_bearer_auth(self):
         captured = {}
 
+        class FakeHealthResponse:
+            status_code = 200
+            def json(self):
+                return {"status": "ok", "configured": True}
+
         class FakeResponse:
             status_code = 200
             def json(self):
@@ -72,6 +77,9 @@ class IsolatedCodeRunnerClientTests(unittest.IsolatedAsyncioTestCase):
                 return self
             async def __aexit__(self, exc_type, exc, tb):
                 return False
+            async def get(self, url, headers=None):
+                captured["health_url"] = url
+                return FakeHealthResponse()
             async def post(self, url, headers=None, json=None):
                 captured.update({"url": url, "headers": headers, "json": json})
                 return FakeResponse()
@@ -85,6 +93,7 @@ class IsolatedCodeRunnerClientTests(unittest.IsolatedAsyncioTestCase):
                 result = await run_isolated_code("python", "print(1 + 1)")
 
         self.assertTrue(result["ok"])
+        self.assertEqual(captured["health_url"], "http://hamasa-code-sandbox.railway.internal:3000/health")
         self.assertEqual(captured["url"], "http://hamasa-code-sandbox.railway.internal:3000/execute")
         self.assertEqual(captured["headers"]["Authorization"], "Bearer private-test-token")
         self.assertEqual(captured["json"], {"language": "python", "code": "print(1 + 1)"})

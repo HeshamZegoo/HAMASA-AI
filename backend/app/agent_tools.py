@@ -287,6 +287,21 @@ async def run_isolated_code(language: Any, code: Any) -> dict[str, Any]:
             follow_redirects=False,
             trust_env=False,
         ) as client:
+            health_response = await client.get(base_url + "/health")
+            try:
+                health = health_response.json()
+            except ValueError:
+                health = None
+            if (
+                health_response.status_code >= 400
+                or not isinstance(health, dict)
+                or health.get("configured") is not True
+            ):
+                return {
+                    "ok": False,
+                    "available": False,
+                    "error": "The isolated code runner is not fully configured.",
+                }
             response = await client.post(
                 base_url + "/execute",
                 headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"},
