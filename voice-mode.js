@@ -72,7 +72,7 @@
         setStatus("سامعك…","listening");
         const text=await transcribe(blob);
         if(!text){setStatus("ماسمعتش كلام واضح. كمل كلامك…","listening");return;}
-        transcript.textContent="أنت: "+text+"\n\nحماصة: بتحضّر الرد…";
+        transcript.textContent="أنت: "+text;
         setStatus("سامعك…","listening");
         const bridge=window.HAMASA_VOICE_BRIDGE;
         const reply=await bridge?.send?.(text);
