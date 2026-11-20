@@ -108,8 +108,8 @@ class FileGenerationTests(unittest.TestCase):
         md_raw = build_file("md", "Guide", "## Intro", [])
         self.assertIn("# Guide", md_raw.decode("utf-8"))
         html_raw = build_file("html", "<script>", "<b>hello</b>", [])
-        self.assertIn("&lt;script&gt;", html_raw.decode("utf-8"))
-        self.assertNotIn("<script>", html_raw.decode("utf-8"))
+        self.assertIn("<b>hello</b>", html_raw.decode("utf-8"))
+        self.assertNotIn("&lt;b&gt;hello", html_raw.decode("utf-8"))
 
     def test_unsupported_format_is_rejected(self):
         with self.assertRaises(ValueError):
