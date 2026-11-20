@@ -13,7 +13,7 @@ class FakeResponse:
             "ok": True,
             "language": "python",
             "exit_code": 0,
-            "stdout": "2\\n",
+            "stdout": "2\n",
             "stderr": "",
             "timed_out": False,
             "truncated": False,
@@ -105,7 +105,7 @@ class IsolatedCodeExecutionTests(unittest.IsolatedAsyncioTestCase):
                 result = await agent_tools.run_isolated_code("python", "print(1 + 1)")
 
         self.assertTrue(result["ok"])
-        self.assertEqual(result["stdout"], "2\\n")
+        self.assertEqual(result["stdout"], "2\n")
         call = FakeAsyncClient.calls[0]
         self.assertEqual(call["url"], "http://hamasa-code-sandbox.railway.internal:3000/execute")
         self.assertEqual(call["json"], {"language": "python", "code": "print(1 + 1)"})
