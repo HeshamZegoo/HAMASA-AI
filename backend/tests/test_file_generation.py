@@ -91,6 +91,26 @@ class FileGenerationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "عدد صفحات PDF غير مطابق"):
             build_file("pdf", "تقرير", "صفحة واحدة فقط", [], page_count=3)
 
+    def test_xlsx_uses_requested_sheet_name_and_safe_average_formula(self):
+        raw = build_file(
+            "xlsx", "Employees", "",
+            [["ID", "Name", "Salary"], [1, "Ahmed", 15000], [2, "Sara", 12000], ["Average", "", "=AVERAGE(C2:C3)"]],
+            sheet_name="Employees",
+        )
+        workbook = load_workbook(io.BytesIO(raw), data_only=False)
+        sheet = workbook.active
+        self.assertEqual(sheet.title, "Employees")
+        self.assertEqual(sheet["C4"].value, "=AVERAGE(C2:C3)")
+        self.assertEqual(sheet["C4"].data_type, "f")
+        workbook.close()
+
+    def test_xlsx_rejects_unsafe_formula_as_literal_text(self):
+        raw = build_file("xlsx", "Test", "", [["Value"], ["=HYPERLINK(\\\"https://bad.example\\\",\\\"click\\\")"]])
+        workbook = load_workbook(io.BytesIO(raw), data_only=False)
+        cell = workbook.active["A2"]
+        self.assertEqual(cell.data_type, "s")
+        workbook.close()
+
     def test_arabic_xlsx_uses_right_to_left_sheet_view(self):
         raw = build_file("xlsx", "تقرير", "إجمالي المبيعات", [["المنتج", "الكمية"]],)
         workbook = load_workbook(io.BytesIO(raw), data_only=True)
