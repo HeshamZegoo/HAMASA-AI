@@ -1416,6 +1416,15 @@ async def chat(body: ChatRequest):
                             tool_result = await execute_chat_tool(name, arguments, _live_web_search)
                             if name == "web_search" and isinstance(tool_result, dict):
                                 web_sources.extend(tool_result.get("sources") or [])
+                            elif name == "open_webpage" and isinstance(tool_result, dict) and tool_result.get("ok"):
+                                # Preserve opened-page provenance so the final chat response
+                                # can cite the actual page, not only its search snippet.
+                                web_sources.append({
+                                    "title": str(tool_result.get("title") or "")[:180],
+                                    "url": str(tool_result.get("url") or "")[:1000],
+                                    "published_date": "",
+                                    "content": str(tool_result.get("content") or "")[:1800],
+                                })
                         except Exception as tool_error:
                             logger.warning("Chat tool failed: name=%s type=%s", name, type(tool_error).__name__)
                             tool_result = {"ok": False, "error": "The requested tool could not complete this operation."}
