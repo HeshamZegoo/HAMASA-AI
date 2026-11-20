@@ -8,11 +8,11 @@ _CODING_SIGNALS = re.compile(
     r"(?:\b(?:code|coding|program(?:ming)?|debug(?:ging)?|bug|traceback|exception|"
     r"stack\s*trace|function|class|method|api|sdk|sql|python|javascript|typescript|"
     r"react|html|css|bash|powershell|terminal|shell|git|github|docker|railway|node(?:\.js)?|npm|pnpm|yarn|vite|next\.js|fastapi|django|flask|pytest|unittest|linux|windows|macos|regex|regular\s+expression|algorithm|data\s+structure|refactor|review|pull\s+request|merge\s+conflict|"
-    r"deploy(?:ment)?|compile|compiler|syntax|database|server|backend|frontend)\b)"
+    r"deploy(?:ment)?|compile|compiler|syntax|database|server|backend|frontend|website|webpage|web\s+app|source\s+file|code\s+file|unit\s+test|integration\s+test)\b)"
     r"|(?:كود|برمج(?:ة|ي|يات)|بايثون|جافاسكريبت|تايبسكريبت|ريأكت|دالة|كلاس|"
     r"خطأ في الكود|تصحيح|ديباج|ديباجنج|تيرمنال|طرفية|سطر أوامر|أوامر|"
     r"سيرفر|خادم|باك.?إند|فرونت.?إند|قاعدة بيانات|داتابيز|نشر المشروع|نود|npm|باكج|باكدج|باكدجات|اختبار(?:ات)?|خوارزمية|خوارزميات|هيكل بيانات|ريفاكتور|مراجعة كود|جيتهب|جيت هاب|لينكس|ويندوز|ماك|تعارض دمج|"
-    r"ملف(?:ات)? المشروع|مشروع(?:ي)?|واجهة برمجية|ملف\\s*(?:html|css|js|py|ts)|صفحة ويب|موقع إلكتروني|تطبيق ويب|ملف كود|ملف برمجي|اكتب كود|اكتبلي كود|اعمل موقع|اعمل صفحة|ابني موقع|ابني تطبيق)",
+    r"ملف(?:ات)? المشروع|مشروع(?:ي)?|واجهة برمجية|ملف\s*(?:html|css|js|py|ts)|صفحة ويب|موقع إلكتروني|تطبيق ويب|ملف كود|ملف برمجي|اكتب كود|اكتبلي كود|اعمل موقع|اعمل صفحة|ابني موقع|ابني تطبيق)",
     re.IGNORECASE,
 )
 
