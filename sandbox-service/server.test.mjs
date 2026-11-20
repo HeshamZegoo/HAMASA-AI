@@ -131,10 +131,12 @@ test("code runs in an isolated VM and the VM is destroyed after the run", async 
       assert.deepEqual(createOptions.resources, { cpu: 1, memoryGB: 2 });
       assert.equal(createOptions.idleTimeoutMinutes, 1);
       assert.equal(createLanguage, "python");
-      assert.equal(events[1].path, "/tmp/hamasa_main.py");
-      assert.equal(events[2].command, "python3 /tmp/hamasa_main.py");
-      assert.equal(events[2].options.timeoutSec, 20);
-      assert.equal(events[2].options.ephemeral, true);
+      assert.equal(events[1].command.includes("apt-get install -y -qq python3"), true);
+      assert.equal(events[1].options.timeoutSec, 120);
+      assert.equal(events[2].path, "/tmp/hamasa_main.py");
+      assert.equal(events[3].command, "python3 /tmp/hamasa_main.py");
+      assert.equal(events[3].options.timeoutSec, 20);
+      assert.equal(events[3].options.ephemeral, true);
       assert.equal(events.at(-1).type, "destroy");
     });
   } finally {
