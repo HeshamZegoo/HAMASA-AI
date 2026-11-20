@@ -257,7 +257,15 @@ def explicit_code_execution_request(text: str) -> bool:
         "run this code", "run the code", "execute this code", "execute the code",
         "test this code", "run it", "execute it",
     )
-    return any(phrase in normalized for phrase in phrases)
+    if any(phrase in normalized for phrase in phrases):
+        return True
+    # A message consisting only of a fenced program or simple print/log statement
+    # is a common mobile workflow; treat it as an execution request rather than guessing.
+    stripped = text.strip()
+    if stripped.startswith("```") and stripped.endswith("```") and len(stripped) > 6:
+        return True
+    import re
+    return bool(re.fullmatch(r"(?:print|console\\.log)\\s*\\([\\s\\S]*\\)\\s*;?", stripped))
 
 
 def code_execution_available() -> bool:

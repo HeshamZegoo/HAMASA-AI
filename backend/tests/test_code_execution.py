@@ -64,6 +64,9 @@ class IsolatedCodeExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(agent_tools.explicit_code_execution_request("شغّل الكود التالي"))
         self.assertTrue(agent_tools.explicit_code_execution_request("Please run this code: print(1)"))
         self.assertTrue(agent_tools.explicit_code_execution_request("execute the code below"))
+        self.assertTrue(agent_tools.explicit_code_execution_request("print(1 + 1)"))
+        self.assertTrue(agent_tools.explicit_code_execution_request("console.log(1 + 1)"))
+        self.assertTrue(agent_tools.explicit_code_execution_request("```python\nprint(1 + 1)\n```"))
         self.assertFalse(agent_tools.explicit_code_execution_request("اشرحلي الكود ده"))
         self.assertFalse(agent_tools.explicit_code_execution_request("What does print(1 + 1) do?"))
 
