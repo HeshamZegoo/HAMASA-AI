@@ -351,6 +351,13 @@ def _requested_pdf_page_count(prompt: str) -> int:
     return max(1, min(20, count)) if count else 0
 
 
+class ImageCreateRequest(BaseModel):
+    prompt: str = Field(min_length=3, max_length=4000)
+    size: Literal["1024x1024", "1536x1024", "1024x1536"] = "1024x1024"
+    image_data: str = Field(default="", max_length=15_000_000)
+    mime_type: Literal["image/png", "image/jpeg", "image/webp"] = "image/png"
+
+
 class FileCreateRequest(BaseModel):
     prompt: str = Field(min_length=2, max_length=100000)
     format: Literal["docx", "pdf", "xlsx", "pptx", "csv", "txt", "md", "json", "html", "css", "js", "ts", "py", "sql", "sh", "java", "c", "h", "cpp", "hpp", "cs", "go", "rs", "php", "rb", "kt", "swift"]
@@ -1051,6 +1058,63 @@ def readiness():
     if not API_KEY:
         raise HTTPException(status_code=503, detail="Chat service is not configured.")
     return {"status": "ready"}
+
+
+@app.post("/api/images/generate")
+async def generate_image(body: ImageCreateRequest):
+    """Generate or edit an image through an explicitly configured image-capable provider."""
+    image_model = os.getenv("AI_IMAGE_MODEL", "").strip()
+    image_base_url = os.getenv("AI_IMAGE_BASE_URL", BASE_URL).strip().rstrip("/")
+    if not API_KEY or not image_model:
+        raise HTTPException(status_code=503, detail="Image generation is not configured for this provider.")
+    payload = {"model": image_model, "prompt": body.prompt, "size": body.size, "n": 1}
+    headers = {"Authorization": f"Bearer {API_KEY}"}
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(180.0, connect=15.0), follow_redirects=False) as client:
+            if body.image_data:
+                try:
+                    image_bytes = base64.b64decode(body.image_data, validate=True)
+                except (ValueError, TypeError) as exc:
+                    raise HTTPException(status_code=400, detail="The reference image is not valid base64.") from exc
+                if not image_bytes or len(image_bytes) > 10 * 1024 * 1024:
+                    raise HTTPException(status_code=413, detail="Reference images must be smaller than 10 MB.")
+                response = await client.post(
+                    image_base_url + "/images/edits",
+                    headers=headers,
+                    data=payload,
+                    files={"image": ("reference-image", image_bytes, body.mime_type)},
+                )
+            else:
+                response = await client.post(
+                    image_base_url + "/images/generations",
+                    headers={**headers, "Content-Type": "application/json"},
+                    json=payload,
+                )
+        if response.status_code >= 400:
+            logger.warning("Image provider returned status=%s model=%s", response.status_code, image_model)
+            raise HTTPException(status_code=502, detail="The configured image provider could not complete the request.")
+        result = response.json()
+        item = (result.get("data") or [])[0]
+        encoded = item.get("b64_json")
+        image_url = item.get("url")
+        if encoded:
+            try:
+                decoded = base64.b64decode(encoded, validate=True)
+            except (ValueError, TypeError) as exc:
+                raise HTTPException(status_code=502, detail="The image provider returned invalid image data.") from exc
+            if not decoded or len(decoded) > 20 * 1024 * 1024:
+                raise HTTPException(status_code=502, detail="The image provider returned an unsupported image size.")
+            return {"model": image_model, "mime_type": "image/png", "data_url": "data:image/png;base64," + encoded, "revised_prompt": str(item.get("revised_prompt") or "")[:2000]}
+        if isinstance(image_url, str) and image_url.startswith("https://"):
+            return {"model": image_model, "image_url": image_url, "revised_prompt": str(item.get("revised_prompt") or "")[:2000]}
+        raise HTTPException(status_code=502, detail="The image provider returned no usable image.")
+    except HTTPException:
+        raise
+    except httpx.TimeoutException as exc:
+        raise HTTPException(status_code=504, detail="Image generation timed out. Try a shorter prompt.") from exc
+    except (httpx.RequestError, ValueError, KeyError, IndexError, TypeError) as exc:
+        logger.warning("Image generation failed: type=%s", type(exc).__name__)
+        raise HTTPException(status_code=502, detail="Image generation failed. Check the configured provider.") from exc
 
 
 @app.post("/api/files/generate")
