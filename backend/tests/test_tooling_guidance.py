@@ -23,12 +23,11 @@ class AssistantBehaviorGuidanceTests(unittest.TestCase):
         self.assertIn("Image understanding: AVAILABLE", prompt)
         self.assertIn("DOCX/PDF/XLSX file generation: UNAVAILABLE", prompt)
 
-
     def test_guidance_requires_tool_first_execution_before_limitation_claims(self):
         guidance = RELIABILITY_AND_TASK_EXECUTION_GUIDANCE
         self.assertIn('Before saying "I can\'t"', guidance)
         self.assertIn("inspect the tools, integrations", guidance)
-        self.assertIn("execute it now", guidance)
+        self.assertIn("execute, inspect the result", guidance)
         self.assertIn("closest safe alternative", guidance)
 
     def test_guidance_uses_relevant_tools_not_every_unrelated_tool(self):
@@ -38,16 +37,22 @@ class AssistantBehaviorGuidanceTests(unittest.TestCase):
         self.assertIn("Continue through all safe independent steps", guidance)
 
     def test_guidance_distinguishes_prompt_tuning_from_weight_training(self):
-        self.assertIn("not model-weight training", RELIABILITY_AND_TASK_EXECUTION_GUIDANCE)
         self.assertIn("real training job", RELIABILITY_AND_TASK_EXECUTION_GUIDANCE)
 
     def test_guidance_requires_verified_actions_and_test_results(self):
-        self.assertIn("Claim success only after receiving", RELIABILITY_AND_TASK_EXECUTION_GUIDANCE)
-        self.assertIn("do not claim tests passed unless they ran", RELIABILITY_AND_TASK_EXECUTION_GUIDANCE)
+        self.assertIn("Claim success only after a successful result", RELIABILITY_AND_TASK_EXECUTION_GUIDANCE)
+        self.assertIn("Never fabricate a tool call", RELIABILITY_AND_TASK_EXECUTION_GUIDANCE)
 
     def test_guidance_preserves_current_task_context_and_language(self):
-        self.assertIn("Do not make the", RELIABILITY_AND_TASK_EXECUTION_GUIDANCE)
         self.assertIn("latest user's language and dialect", RELIABILITY_AND_TASK_EXECUTION_GUIDANCE)
+
+    def test_large_commercial_site_requests_are_not_downgraded_to_mockups(self):
+        guidance = RELIABILITY_AND_TASK_EXECUTION_GUIDANCE
+        self.assertIn("Jumia or Amazon", guidance)
+        self.assertIn("interactive frontend/demo", guidance)
+        self.assertIn("Do not stop at explaining limitations", guidance)
+        self.assertIn("demo checkout", guidance)
+        self.assertIn("Do not ask the user to choose", guidance)
 
 
 if __name__ == "__main__":
