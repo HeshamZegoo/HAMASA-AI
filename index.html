@@ -276,6 +276,37 @@ dialog{background:var(--bg2)}
   .robot-3d,.robot-head,.robot-orbit,.robot-eye,.robot-aura,.robot-shadow,.robot-antenna i,.robot-arm-left,.empty,.m{animation:none!important}
 }
 
+
+/* Round-two audit fixes: compact, collision-free mobile header and readable surfaces */
+header{min-width:0}
+header>.logo{flex:1 1 40px;min-width:0;overflow:hidden}
+header>.logo>div{min-width:0;overflow:hidden}
+header>.logo b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:420px){
+ header{gap:4px;padding-inline:8px}
+ header>.ib{width:34px;height:36px;min-width:34px;padding:0;border-radius:11px}
+ header>.auth-open{width:auto;min-width:46px;padding:0 6px;font-size:10px;letter-spacing:0}
+ header>.lang{width:34px;min-width:34px;padding:0;font-size:12px}
+ header>.logo{gap:4px;flex:1 1 28px}
+ header>.logo [data-orb]{width:30px;height:30px}
+ header>.logo [data-orb] .robot-stage{width:30px;min-width:30px}
+ header>.logo b{font-size:11px;letter-spacing:.06em}
+}
+@media(max-width:360px){
+ header{gap:3px;padding-inline:6px}
+ header>.auth-open{min-width:42px;font-size:9px;padding:0 4px}
+ header>.logo b{font-size:10px}
+}
+[data-theme=dark] dialog,[data-theme=dark] .memory-box select,[data-theme=dark] .memory-box textarea,
+[data-theme=dark] .workspace-modal,[data-theme=dark] .workspace-panel,
+[data-theme=dark] .code-workspace,[data-theme=dark] .code-editor,
+[data-theme=dark] .image-lab,[data-theme=dark] .modal-panel{
+ color:var(--fg);background:var(--bg2);border-color:var(--line)
+}
+[data-theme=dark] input,[data-theme=dark] textarea,[data-theme=dark] select{
+ color:var(--fg);background:var(--bg2);border-color:var(--line)
+}
+
 </style>
 </head>
 <body>
@@ -910,7 +941,7 @@ function speechCleanText(value) {
     .replace(/([.!?؟،؛])\s*([.!?؟،؛])+/g, '$1').trim();
 }
 function splitSpeechSegments(text) {
-  const tokens = text.match(/[\\u0600-\\u06FF\\u0750-\\u077F]+|[A-Za-z]+(?:['’-][A-Za-z]+)*|[^A-Za-z\\u0600-\\u06FF\\u0750-\\u077F]+/gu) || [];
+  const tokens = text.match(/[\u0600-\u06FF\u0750-\u077F]+|[A-Za-z]+(?:['’-][A-Za-z]+)*|[^A-Za-z\u0600-\u06FF\u0750-\u077F]+/gu) || [];
   const segments = [];
   let prefix = '';
   for (const token of tokens) {
