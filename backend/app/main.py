@@ -245,6 +245,33 @@ class ConversationSaveRequest(BaseModel):
     messages: list[ConversationMessage] = Field(min_length=1, max_length=500)
     updated_at: int = Field(default_factory=lambda: int(time.time()))
 
+def _requested_pdf_page_count(prompt: str) -> int:
+    """Read numeric and common written page counts in Arabic or English requests."""
+    number_words = {
+        "one": 1, "a": 1, "an": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+        "واحدة": 1, "واحد": 1,
+        "اتنين": 2, "اثنين": 2, "اثنان": 2, "ثنتين": 2, "ثنتان": 2,
+        "تلت": 3, "تلات": 3, "تلاتة": 3, "ثلاث": 3, "ثلاثة": 3,
+        "اربع": 4, "أربع": 4, "اربعة": 4, "أربعة": 4,
+        "خمس": 5, "خمسة": 5,
+    }
+    match = re.search(
+        r"(?:exactly\\s+|بعدد\\s+|من\\s+)?"
+        r"(\\d+|[٠-٩]+|one|a|an|two|three|four|five|واحدة|واحد|اتنين|اثنين|اثنان|ثنتين|ثنتان|تلت|تلات|تلاتة|ثلاث|ثلاثة|اربع|أربع|اربعة|أربعة|خمس|خمسة)"
+        r"\\s*(?:pages?|صفحات|صفحة)(?=\\s|$|[،,.])",
+        prompt,
+        re.IGNORECASE,
+    )
+    if not match:
+        return 0
+    token = match.group(1).translate(str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")).lower()
+    try:
+        count = int(token)
+    except ValueError:
+        count = number_words.get(token, 0)
+    return max(1, min(20, count)) if count else 0
+
+
 class FileCreateRequest(BaseModel):
     prompt: str = Field(min_length=2, max_length=12000)
     format: Literal["docx", "pdf", "xlsx", "pptx", "csv", "txt", "md", "json", "html"]
@@ -952,14 +979,7 @@ async def generate_file(body: FileCreateRequest):
     if not API_KEY:
         raise HTTPException(status_code=503, detail="File generation is temporarily unavailable.")
     format_names = {"docx": "Microsoft Word document", "pdf": "PDF document", "xlsx": "Excel spreadsheet", "pptx": "PowerPoint presentation", "csv": "CSV file", "txt": "text file", "md": "Markdown document", "json": "JSON file", "html": "HTML document"}
-    requested_pages_match = re.search(r"(?:(?:exactly|بعدد|من)\s*)?(\d+|[٠-٩]+)\s*(?:pages?|صفحات)", body.prompt, re.IGNORECASE)
-    requested_pages = 0
-    if requested_pages_match:
-        page_token = requested_pages_match.group(1).translate(str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789"))
-        try:
-            requested_pages = max(1, min(20, int(page_token)))
-        except ValueError:
-            requested_pages = 0
+    requested_pages = _requested_pdf_page_count(body.prompt) if body.format == "pdf" else 0
     system = (
         "You create useful, complete downloadable files. Return ONLY valid JSON with keys "
         "title (string), message (short Egyptian Arabic sentence), content (string), "
