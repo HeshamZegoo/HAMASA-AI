@@ -120,8 +120,8 @@ def main() -> None:
             fail(f"frontend/backend route contract is incomplete: {route}")
     if "source-list" not in html or "class ConversationSource" not in backend_source:
         fail("verified web sources must be displayed and persisted in chat history")
-    if "MAX_CHAT_MESSAGE_CHARS = 12000" not in html or "messages: chatMessages" not in html:
-        fail("chat requests must validate message size and send only normalized non-empty messages")
+    if "MAX_CHAT_MESSAGE_CHARS = 12000" not in html or "messages: chatMessages" not in html or "chatMessages[chatMessages.length - 1]" not in html:
+        fail("chat requests must validate the current message and send normalized non-empty messages")
     if "request_validation_error_handler" not in backend_source or "_validation_detail" not in backend_source:
         fail("backend must return safe, actionable request-validation errors")
 
