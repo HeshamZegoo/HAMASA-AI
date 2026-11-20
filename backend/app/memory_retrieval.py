@@ -22,7 +22,8 @@ _STOP_WORDS = {
 
 def _tokens(value: str) -> set[str]:
     normalized = str(value or "").lower().translate(_ARABIC_NORMALIZATION)
-    return {token for token in _TOKEN.findall(normalized) if token not in _STOP_WORDS}
+    cleaned = (token.rstrip(".,;:!?؟") for token in _TOKEN.findall(normalized))
+    return {token for token in cleaned if len(token) >= 2 and token not in _STOP_WORDS}
 
 
 def select_relevant_memories(
