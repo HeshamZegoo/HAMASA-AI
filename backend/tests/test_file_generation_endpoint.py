@@ -134,6 +134,15 @@ class FileGenerationEndpointTests(unittest.IsolatedAsyncioTestCase):
         ))
         self.assertTrue(base64.b64decode(result["data"]).startswith(b"%PDF-"))
 
+    async def test_html_and_source_code_formats_are_accepted_by_endpoint(self):
+        for fmt, expected_mime in (("html", "text/html; charset=utf-8"), ("py", "text/x-python; charset=utf-8"), ("js", "text/javascript; charset=utf-8")):
+            body = main.FileCreateRequest(prompt="Create source file", format=fmt)
+            with patch.object(main, "API_KEY", "test-provider-key"):
+                with patch("backend.app.main.httpx.AsyncClient", FakeGenerationClient):
+                    result = await main.generate_file(body)
+            self.assertTrue(result["filename"].endswith("." + fmt))
+            self.assertEqual(result["mime_type"], expected_mime)
+            self.assertTrue(base64.b64decode(result["data"]))
     async def test_xlsx_endpoint_preserves_numeric_values(self):
         body = main.FileCreateRequest(prompt="اعمل جدول", format="xlsx")
         with patch.object(main, "API_KEY", "test-provider-key"):
