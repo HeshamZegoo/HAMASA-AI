@@ -178,6 +178,13 @@ export function createServer({ sandboxCreate = createRailwaySandbox } = {}) {
         truncated: Boolean(result.truncated) || outputWasTrimmed,
         duration_ms: Date.now() - startedAt,
       };
+      console.info("Isolated execution completed:", JSON.stringify({
+        language: resultPayload.language,
+        ok: resultPayload.ok,
+        exitCode: resultPayload.exit_code,
+        timedOut: resultPayload.timed_out,
+        durationMs: resultPayload.duration_ms,
+      }));
     } catch (error) {
       // Log safe provider metadata only; never log source code, tokens, or environment values.
       console.error("Isolated execution failed:", JSON.stringify({
