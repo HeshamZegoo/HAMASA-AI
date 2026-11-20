@@ -266,7 +266,7 @@ def explicit_code_execution_request(text: str) -> bool:
         return True
 
     import re
-    if re.fullmatch(r"(?:print|console\\.log)\\s*\\([\\s\\S]*\\)\\s*;?", stripped):
+    if re.fullmatch(r"(?:print|console\.log)\s*\([\s\S]*\)\s*;?", stripped):
         return True
 
     # Parse Python instead of relying on a single-line print() regex. This
@@ -296,14 +296,14 @@ def explicit_code_execution_request(text: str) -> bool:
     # JavaScript lacks a parser in this module. Require recognizable
     # statement-level syntax, not arbitrary words or explanatory prose.
     javascript_statement = re.compile(
-        r"(?im)^\\s*(?:"
-        r"(?:const|let|var)\\s+[A-Za-z_$][\\w$]*\\s*(?:=|;)|"
-        r"import\\s+.+\\s+from\\s+['\\\"]|"
-        r"export\\s+(?:default|const|function|class)|"
-        r"(?:async\\s+)?function\\s+[A-Za-z_$][\\w$]*\\s*\\(|"
-        r"class\\s+[A-Za-z_$][\\w$]*|"
-        r"console\\.(?:log|error|warn|info)\\s*\\(|"
-        r"(?:if|for|while|switch|try)\\s*\\("
+        r"(?im)^\s*(?:"
+        r"(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*(?:=|;)|"
+        r"import\s+.+\s+from\s+['\\"]|"
+        r"export\s+(?:default|const|function|class)|"
+        r"(?:async\s+)?function\s+[A-Za-z_$][\w$]*\s*\(|"
+        r"class\s+[A-Za-z_$][\w$]*|"
+        r"console\.(?:log|error|warn|info)\s*\(|"
+        r"(?:if|for|while|switch|try)\s*\("
         r")"
     )
     return bool(javascript_statement.search(stripped))
