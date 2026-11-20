@@ -1,5 +1,6 @@
 import json
 import unittest
+from contextlib import ExitStack
 from unittest.mock import AsyncMock, patch
 
 from fastapi import HTTPException
@@ -83,11 +84,12 @@ class CodeExecutionChatFlowTests(unittest.IsolatedAsyncioTestCase):
             }),
             FakeProviderResponse({"role": "assistant", "content": "2"}),
         ]
-        with patch.multiple(main, API_KEY="test-provider-key"):
-            with self._patches(execute)[1:]:
-                result = await main.chat(main.ChatRequest(messages=[
-                    main.Message(role="user", content="print(1 + 1)")
-                ]))
+        with ExitStack() as stack:
+            for context in self._patches(execute):
+                stack.enter_context(context)
+            result = await main.chat(main.ChatRequest(messages=[
+                main.Message(role="user", content="print(1 + 1)")
+            ]))
 
         self.assertEqual(result["reply"], "2")
         execute.assert_awaited_once()
@@ -109,12 +111,13 @@ class CodeExecutionChatFlowTests(unittest.IsolatedAsyncioTestCase):
         FakeProviderClient.responses = [
             FakeProviderResponse({"role": "assistant", "content": "The answer is 2."})
         ]
-        with patch.object(main, "API_KEY", "test-provider-key"):
-            with self._patches(execute):
-                with self.assertRaises(HTTPException) as raised:
-                    await main.chat(main.ChatRequest(messages=[
-                        main.Message(role="user", content="print(1 + 1)")
-                    ]))
+        with ExitStack() as stack:
+            for context in self._patches(execute):
+                stack.enter_context(context)
+            with self.assertRaises(HTTPException) as raised:
+                await main.chat(main.ChatRequest(messages=[
+                    main.Message(role="user", content="print(1 + 1)")
+                ]))
 
         self.assertEqual(raised.exception.status_code, 502)
         self.assertIn("No code was run", raised.exception.detail)
