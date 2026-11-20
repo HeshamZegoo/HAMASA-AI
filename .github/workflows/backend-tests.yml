@@ -20,6 +20,7 @@ on:
       - "config.js"
       - "attachments.js"
       - "scripts/validate.py"
+      - "sandbox-service/**"
   workflow_dispatch:
 
 permissions:
