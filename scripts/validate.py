@@ -79,6 +79,8 @@ def main() -> None:
     html = INDEX.read_text(encoding="utf-8")
     config = CONFIG.read_text(encoding="utf-8")
     attachments = ATTACHMENTS.read_text(encoding="utf-8")
+    workspace_source = (ROOT / "workspace.js").read_text(encoding="utf-8")
+    media_source = (ROOT / "media.js").read_text(encoding="utf-8")
     if '<script src="./config.js"></script>' not in html:
         fail("index.html must load config.js before the inline application script")
     if any(term in html.lower() for term in ("/api/live", "voicemode")):
