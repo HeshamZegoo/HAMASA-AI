@@ -18,11 +18,11 @@
       <div class="hv-stage" aria-hidden="true"><div class="hv-aura"></div><div class="hv-orbit"></div><div class="hv-robot" id="hvRobot"><div class="hv-face"><div class="hv-eyes"><i></i><i></i></div><div class="hv-mouth"></div></div></div></div>
       <div class="hv-status" id="hvStatus" role="status" aria-live="polite">اضغط بدء المحادثة واسمح باستخدام الميكروفون.</div>
       <div class="hv-transcript" id="hvTranscript">حماصة هتسمعك وترد عليك تلقائيًا.</div>
-      <div class="hv-controls"><button class="hv-btn primary" id="hvMic" type="button">🎙 ابدأ المحادثة</button><button class="hv-btn" id="hvListen" type="button" disabled>▶ أعد سماع آخر رد</button></div>
-      <p class="hv-note">اضغط مرة واحدة للبدء. حماصة تلتقط كلامك بعد سكتة قصيرة، ترد بصوتها، ثم تعود للاستماع. اضغط إيقاف المحادثة لإنهائها.</p>
+      <div class="hv-controls"><button class="hv-btn primary" id="hvMic" type="button">🎙 ابدأ المحادثة</button></div>
+      <p class="hv-note">اضغط مرة واحدة للبدء. حماصة هتسمعك وترد عليك تلقائيًا. لإغلاق المحادثة اضغط علامة × بالأعلى.</p>
     </div>`;
   document.body.append(dialog);
-  const status=$("hvStatus"), transcript=$("hvTranscript"), robot=$("hvRobot"), mic=$("hvMic"), listen=$("hvListen");
+  const status=$("hvStatus"), transcript=$("hvTranscript"), robot=$("hvRobot"), mic=$("hvMic");
   const setStatus=(message,mode="")=>{status.textContent=message;robot.className="hv-robot "+mode;};
   const mimeType=()=>["audio/mp4","audio/webm;codecs=opus","audio/webm","audio/ogg;codecs=opus"].find(x=>window.MediaRecorder?.isTypeSupported?.(x))||"";
   const stopTracks=()=>{if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;};
@@ -32,8 +32,8 @@
     try{if(recorder&&recorder.state!=="inactive"){recorder.onstop=null;recorder.stop();}}catch{}
     recorder=null; stopTracks();
     if(audioContext){audioContext.close().catch(()=>{});audioContext=null;} analyser=null;
-    mic.disabled=false;mic.textContent="🎙 ابدأ المحادثة";mic.classList.remove("primary");
-    listen.disabled=!lastReply;setStatus("المحادثة اتوقفت.");
+    mic.disabled=false;mic.hidden=false;mic.textContent="🎙 ابدأ المحادثة";mic.classList.add("primary");
+    setStatus("المحادثة اتوقفت.");
   }
   const close=()=>{endSession();dialog.classList.remove("open");};
   async function transcribe(blob){
@@ -76,7 +76,7 @@
         const bridge=window.HAMASA_VOICE_BRIDGE;
         const reply=await bridge?.send?.(text);
         if(!reply)throw new Error("ماوصلنيش رد من حماصة.");
-        lastReply=String(reply);listen.disabled=false;
+        lastReply=String(reply);
         transcript.textContent="أنت: "+text+"\n\nحماصة: "+lastReply;
         setStatus("حماصة بترد عليك…","talking");
         await speak(lastReply);
@@ -112,8 +112,7 @@
       if(!AudioCtx)throw new Error("المتصفح لا يدعم تحليل الصوت اللازم للاستماع التلقائي.");
       audioContext=new AudioCtx();await audioContext.resume();
       const source=audioContext.createMediaStreamSource(stream);analyser=audioContext.createAnalyser();analyser.fftSize=1024;source.connect(analyser);
-      active=true;mic.disabled=false;mic.textContent="■ إيقاف المحادثة";
-      listen.disabled=!lastReply;transcript.textContent="أنا سامعك. اتكلم…";
+      active=true;mic.disabled=false;mic.hidden=true;transcript.textContent="أنا سامعك. اتكلم…";
       setStatus("سامعك… اتكلم براحتك","listening");
       startSegment();monitor();
     }catch(error){endSession();setStatus(error?.name==="NotAllowedError"?"اسمح للمتصفح باستخدام الميكروفون من إعدادات الموقع.":error.message||"تعذر بدء المحادثة.");}
@@ -122,7 +121,6 @@
   $("hvClose").addEventListener("click",close);
   dialog.addEventListener("click",e=>{if(e.target===dialog)close();});
   mic.addEventListener("click",()=>{if(active)endSession();else startSession();});
-  listen.addEventListener("click",async()=>{if(lastReply){try{await speak(lastReply);}catch(e){setStatus(e.message||"تعذر تشغيل الرد.");}}});
   document.addEventListener("keydown",e=>{if(e.key==="Escape"&&dialog.classList.contains("open"))close();});
   window.addEventListener("pagehide",endSession);
 })();
