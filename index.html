@@ -385,14 +385,14 @@ const MAX_CHAT_MESSAGE_CHARS = 12000;
 function buildChatRequest(messages) {
   const olderContext = messages.slice(0, -40).slice(-16)
     .map(m => (m.role === "bot" ? "المساعد: " : "المستخدم: ") + String(m.text ?? ""))
-    .join("\\n").slice(-3500);
+    .join("\n").slice(-3500);
 
   // Keep older context from this same conversation, but never inject arbitrary
   // excerpts from unrelated chats. Cross-chat context must be explicitly saved
   // as a memory so the backend can relevance-filter it before model inference.
   const memory = [
-    olderContext ? "سياق أقدم من المحادثة الحالية:\\n" + olderContext : ""
-  ].filter(Boolean).join("\\n\\n").slice(-3500);
+    olderContext ? "سياق أقدم من المحادثة الحالية:\n" + olderContext : ""
+  ].filter(Boolean).join("\n\n").slice(-3500);
 
   const chatMessages = messages.slice(-40).map(m => ({
     role: m.role === "bot" || m.role === "assistant" ? "assistant" : "user",
@@ -667,11 +667,11 @@ async function syncMemoriesFromServer() {
     let data = await response.json();
     if (!Array.isArray(data.memories)) return;
     const cloud = data.memories.slice(0, 40);
-    const known = new Set(cloud.map(x => String(x.category) + "\\n" + String(x.text).trim().toLocaleLowerCase()));
+    const known = new Set(cloud.map(x => String(x.category) + "\n" + String(x.text).trim().toLocaleLowerCase()));
     let uploaded = false;
     for (const item of memories.slice(0, 40)) {
       const category = normalizeMemoryCategory(item.category);
-      const key = category + "\\n" + String(item.text || "").trim().toLocaleLowerCase();
+      const key = category + "\n" + String(item.text || "").trim().toLocaleLowerCase();
       if (!item.text || known.has(key) || cloud.length >= 40) continue;
       const migrated = await apiFetch(API_BASE + "/api/memory", {
         method: "POST", headers: memoryHeaders(),
