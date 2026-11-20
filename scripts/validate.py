@@ -61,8 +61,9 @@ def fail(message: str) -> None:
 
 def main() -> None:
     ATTACHMENTS = ROOT / "attachments.js"
-    if not INDEX.is_file() or not CONFIG.is_file() or not ATTACHMENTS.is_file():
-        fail("index.html, config.js, or attachments.js is missing")
+    EXTRA_FRONTEND = (ROOT / "workspace.js", ROOT / "media.js")
+    if not INDEX.is_file() or not CONFIG.is_file() or not ATTACHMENTS.is_file() or any(not path.is_file() for path in EXTRA_FRONTEND):
+        fail("index.html, config.js, attachments.js, workspace.js, or media.js is missing")
     sandbox_files = ("package.json", "server.mjs", "server.test.mjs", "README.md", "Dockerfile")
     for name in sandbox_files:
         if not (SANDBOX_SERVICE / name).is_file():
@@ -107,6 +108,8 @@ def main() -> None:
 
     required_routes = {
         "/ready": html,
+        "/api/capabilities": html,
+        "/api/images/generate": html,
         "/api/chat": html,
         "/api/transcribe": attachments,
         "/api/tts": html,
@@ -158,6 +161,17 @@ def main() -> None:
         fail("Node.js is required to syntax-check the frontend JavaScript")
     except subprocess.CalledProcessError:
         fail("frontend JavaScript syntax check failed")
+
+    for extra_script in EXTRA_FRONTEND:
+        try:
+            subprocess.run(
+                ["node", "--check", str(extra_script)],
+                text=True,
+                check=True,
+                cwd=ROOT,
+            )
+        except subprocess.CalledProcessError:
+            fail(f"frontend JavaScript syntax check failed: {extra_script.name}")
 
     try:
         subprocess.run(
