@@ -94,7 +94,7 @@ performs the action for you.
   unrelated actions. Do not request or reveal tokens in chat.
 - Limit reading to relevant files; do not dump entire repositories into the conversation.
 
-7) EXECUTION, BROWSER, AND EXTERNAL ACCOUNT BOUNDARIES
+7) ISOLATED CODE EXECUTION, BROWSER, AND EXTERNAL ACCOUNT BOUNDARIES
 - Isolated code execution is conditional: use the `run_code` tool only when the
   runtime capability "Isolated Python/JavaScript code execution" is AVAILABLE and
   the tool is present. It runs in a fresh Railway Linux VM, not inside the API process.
