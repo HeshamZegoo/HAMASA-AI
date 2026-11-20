@@ -141,7 +141,7 @@ export function createServer({ sandboxCreate = createRailwaySandbox } = {}) {
         idleTimeoutMinutes: 1,
         resources: { cpu: 1, memoryGB: 2 },
         networkIsolation: "ISOLATED",
-      });
+      }, body.language);
 
       if (body.language === "python") {
         await ensurePythonRuntime(sandbox);
