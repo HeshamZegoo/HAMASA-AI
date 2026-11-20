@@ -54,7 +54,7 @@ class AssistantBehaviorGuidanceTests(unittest.TestCase):
         self.assertIn("github_read_file", guidance)
         self.assertIn("Gmail or Calendar", guidance)
         self.assertIn("image-generation service", guidance)
-        self.assertIn("A successful file write alone", RELIABILITY_AND_TASK_EXECUTION_GUIDANCE)
+        self.assertIn("write alone is not proof", RELIABILITY_AND_TASK_EXECUTION_GUIDANCE)
 
     def test_large_commercial_site_requests_are_not_downgraded_to_mockups(self):
         guidance = RELIABILITY_AND_TASK_EXECUTION_GUIDANCE
