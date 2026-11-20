@@ -13,7 +13,9 @@ HAMASA is an Arabic/English AI assistant built as a web application. It combines
 
 - **Arabic and English chat:** interact in either language.
 - **AI provider configuration:** connect an OpenAI-compatible chat-completions provider and choose its model through backend environment variables.
-- **Live web research:** when a request asks for current information or external sources, HAMASA can use Tavily and include source links in its answer. News searches use a freshness window and filter common social-media domains.
+- **Live and deep web research:** Tavily-backed search can open and read up to three relevant public pages for multi-source comparisons and verification, preserving source links in chat.
+- **Code workspace:** browser-local multi-file editor with automatic local saving, individual downloads, isolated HTML preview, and optional Python/JavaScript execution through the private sandbox.
+- **Image generation and editing:** an optional image lab supports OpenAI-compatible `/images/generations` and `/images/edits` providers when `AI_IMAGE_MODEL` is configured. It is intentionally reported unavailable until a compatible provider is configured.
 - **Accounts and conversation sync:** authenticated users can save and retrieve conversations through the backend.
 - **Saved memory:** account memories can be supplied as relevant context; configure encryption for stored memory in production.
 - **Attachments:** text documents and supported office/PDF formats can be extracted for chat context. Images require a vision-capable model. See `backend/app/attachments.py` for supported formats and limits.
@@ -85,6 +87,8 @@ Set these in `backend/.env` for local development or in the Railway service's Va
 | `AI_BASE_URL` | OpenAI-compatible API base URL; defaults to OpenAI's API |
 | `AI_MODEL` | Chat model identifier supported by the provider |
 | `AI_VISION_MODEL` | Optional vision-capable model for image understanding |
+| `AI_IMAGE_MODEL` | Optional image model supporting OpenAI-compatible image generation and edits; leave blank to disable image generation |
+| `AI_IMAGE_BASE_URL` | Optional image API base URL; defaults to `AI_BASE_URL` |
 | `TAVILY_API_KEY` | Optional server-side key for live web research |
 | `DATABASE_URL` | Database connection string for persistent account data |
 | `JWT_SECRET` | Strong secret used to sign authentication tokens |
