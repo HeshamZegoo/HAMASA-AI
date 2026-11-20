@@ -55,6 +55,9 @@ def select_relevant_memories(
             continue
         # Cosine-like overlap penalizes generic matches against long memories.
         score = len(overlap) / sqrt(len(query_tokens) * max(1, len(memory_tokens)))
+        # Ignore weak one-word matches that commonly pull in another project.
+        if score < 0.32:
+            continue
         item = {"category": category, "text": text}
         ranked.append((score, index, item))
 
