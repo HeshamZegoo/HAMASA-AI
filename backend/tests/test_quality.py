@@ -19,6 +19,10 @@ class CodingGuidanceTests(unittest.TestCase):
         self.assertTrue(self.guidance("Help me fix this npm and Vite build"))
         self.assertTrue(self.guidance("راجعلي اختبارات المشروع"))
 
+    def test_html_and_website_requests_get_coding_guidance(self):
+        self.assertIn("صفحة أو تطبيق ويب", self.guidance("عايز تعمللي صفحة ويب"))
+        self.assertTrue(self.guidance("Create a website for my portfolio"))
+
     def test_normal_chat_does_not_get_coding_guidance(self):
         self.assertEqual(self.guidance("عامل إيه النهارده؟"), "")
 
