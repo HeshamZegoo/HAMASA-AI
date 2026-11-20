@@ -386,7 +386,7 @@ async function apiFetch(url, options = {}) {
 let backendOnline = false;
 const isConnected = () => backendOnline;
 
-const MAX_CHAT_MESSAGE_CHARS = 12000;
+const MAX_CHAT_MESSAGE_CHARS = 100000;
 function buildChatRequest(messages) {
   const olderContext = messages.slice(0, -40).slice(-16)
     .map(m => (m.role === "bot" ? "المساعد: " : "المستخدم: ") + String(m.text ?? ""))
@@ -413,8 +413,8 @@ function buildChatRequest(messages) {
   });
   if (chatMessages[chatMessages.length - 1].content.length > MAX_CHAT_MESSAGE_CHARS) {
     throw new Error(lang === "ar"
-      ? "الرسالة طويلة جدًا. الحد الأقصى 12,000 حرف للرسالة الواحدة. قسّمها على رسائل أصغر."
-      : "This message is too long. The limit is 12,000 characters per message. Please split it into smaller messages.");
+      ? "الرسالة طويلة جدًا. الحد الأقصى 100,000 حرف للرسالة الواحدة. قسّمها على رسائل أصغر."
+      : "This message is too long. The limit is 100,000 characters per message. Please split it into smaller messages.");
   }
 
   return {
