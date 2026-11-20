@@ -165,7 +165,14 @@ export function createServer({ sandboxCreate = createRailwaySandbox } = {}) {
         duration_ms: Date.now() - startedAt,
       };
     } catch (error) {
-      console.error("Isolated execution failed:", error?.name || "Error");
+      // Log safe provider metadata only; never log source code, tokens, or environment values.
+      console.error("Isolated execution failed:", JSON.stringify({
+        name: error?.name || "Error",
+        message: String(error?.message || "Unknown execution failure").slice(0, 500),
+        templateId: error?.templateId || null,
+        environmentId: error?.environmentId || process.env.RAILWAY_ENVIRONMENT_ID || null,
+        status: error?.status || null,
+      }));
       status = 502;
       resultPayload = {
         ok: false,
