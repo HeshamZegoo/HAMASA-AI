@@ -32,7 +32,7 @@ from .quality import coding_instructions_for
 from .research import latest_user_text, should_search_web, format_search_context, rank_search_results
 from .tooling import build_tool_capabilities_prompt
 from .memory_retrieval import select_relevant_memories
-from .agent_tools import code_execution_available, execute_chat_tool, explicit_code_execution_request, get_chat_tools
+from .agent_tools import code_execution_available, execute_chat_tool, explicit_code_execution_request, extract_code_source, get_chat_tools
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper())
 logger = logging.getLogger("hamasa.provider")
@@ -1513,6 +1513,24 @@ async def chat(body: ChatRequest):
                             arguments = json.loads(raw_arguments) if isinstance(raw_arguments, str) else raw_arguments
                             if not isinstance(arguments, dict):
                                 raise ValueError("Tool arguments must be an object.")
+                            if force_code_execution and name == "run_code":
+                                # For code-only requests, execute the user's original source
+                                # verbatim. This prevents provider tool-call serialization
+                                # from flattening newlines or silently dropping statements.
+                                original_user_text = next(
+                                    (
+                                        message.content
+                                        for message in reversed(body.messages)
+                                        if message.role == "user" and isinstance(message.content, str)
+                                    ),
+                                    "",
+                                )
+                                original_source = extract_code_source(original_user_text)
+                                if original_source:
+                                    arguments = {
+                                        "language": original_source[0],
+                                        "code": original_source[1],
+                                    }
                             tool_result = await execute_chat_tool(name, arguments, _live_web_search)
                             if name == "web_search" and isinstance(tool_result, dict):
                                 web_sources.extend(tool_result.get("sources") or [])
