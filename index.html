@@ -501,9 +501,8 @@ memories = memories.filter(x => x && typeof x.text === 'string' && typeof x.cate
 store.set('hamasa.memory', memories);
 let cur = convs[0] || null, busy = false;
 const t = k => I18N[lang][k];
-const VALID_MEMORY_CATEGORIES = new Set(['preference', 'project', 'decision', 'temporary']);
 function normalizeMemoryCategory(category) {
-  return VALID_MEMORY_CATEGORIES.has(category) ? category : 'preference';
+  return ['preference', 'project', 'decision', 'temporary'].includes(category) ? category : 'preference';
 }
 
 function orbSVG() {
