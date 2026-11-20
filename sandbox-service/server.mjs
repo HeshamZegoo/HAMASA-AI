@@ -12,12 +12,22 @@ const MAX_CONCURRENT_RUNS = 2;
 const MAX_RUNS_PER_MINUTE = 8;
 const recentRuns = [];
 let activeRuns = 0;
-const PYTHON_TEMPLATE = Sandbox.template().withPackages("python3");
+function createRailwaySandbox(options) {
+  // Use Railway's standard Ubuntu sandbox image. Building a custom apt template
+  // can fail before a VM exists, so install Python inside the disposable VM.
+  return Sandbox.create(options);
+}
 
-function createRailwaySandbox(options, language) {
-  return language === "python"
-    ? Sandbox.create(PYTHON_TEMPLATE, options)
-    : Sandbox.create(options);
+async function ensurePythonRuntime(sandbox) {
+  const result = await sandbox.exec(
+    "if command -v python3 >/dev/null 2>&1; then python3 --version; else apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq python3 && python3 --version; fi",
+    { timeoutSec: 120, maxOutputBytes: 4_000, ephemeral: true },
+  );
+  if (result.exitCode !== 0 || result.timedOut) {
+    throw new Error(
+      `Python runtime setup failed (exit ${result.exitCode}): ${String(result.stderr || result.stdout || "no diagnostic output").slice(0, 500)}`,
+    );
+  }
 }
 
 function sendJson(response, status, payload) {
@@ -131,7 +141,11 @@ export function createServer({ sandboxCreate = createRailwaySandbox } = {}) {
         idleTimeoutMinutes: 1,
         resources: { cpu: 1, memoryGB: 2 },
         networkIsolation: "ISOLATED",
-      }, body.language);
+      });
+
+      if (body.language === "python") {
+        await ensurePythonRuntime(sandbox);
+      }
 
       const filePath = body.language === "python"
         ? "/tmp/hamasa_main.py"
