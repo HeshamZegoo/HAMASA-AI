@@ -1499,6 +1499,12 @@ async def chat(body: ChatRequest):
                         call_id = str(tool_call.get("id") or "")
                         function = tool_call.get("function") or {}
                         name = str(function.get("name") or "")
+                        if force_code_execution and name != "run_code":
+                            logger.error("Provider returned an unexpected tool during forced code execution.")
+                            raise HTTPException(
+                                status_code=502,
+                                detail="The AI provider did not start the required code execution. No code was run.",
+                            )
                         raw_arguments = function.get("arguments") or "{}"
                         try:
                             arguments = json.loads(raw_arguments) if isinstance(raw_arguments, str) else raw_arguments
