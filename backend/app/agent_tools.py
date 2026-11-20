@@ -1,7 +1,14 @@
 """Safe, explicitly allow-listed tools available to HAMASA chat."""
 import ast
+import asyncio
+import ipaddress
 import operator
+import socket
+from html.parser import HTMLParser
 from typing import Any, Awaitable, Callable
+from urllib.parse import urljoin, urlparse
+
+import httpx
 
 _BINOPS = {
     ast.Add: operator.add,
@@ -13,6 +20,8 @@ _BINOPS = {
     ast.Pow: operator.pow,
 }
 _UNARY = {ast.UAdd: operator.pos, ast.USub: operator.neg}
+MAX_PAGE_BYTES = 1_000_000
+MAX_PAGE_CHARS = 12_000
 
 
 def _number(node: ast.AST) -> float:
@@ -39,12 +48,137 @@ def calculate(expression: str) -> dict[str, Any]:
     expression = expression.strip()
     if not expression or len(expression) > 200:
         raise ValueError("Expression is empty or too long.")
-    tree = ast.parse(expression, mode="eval")
-    result = _number(tree)
+    result = _number(ast.parse(expression, mode="eval"))
     if not (float("-inf") < result < float("inf")):
         raise ValueError("Result is not finite.")
     rendered = int(result) if result.is_integer() else result
     return {"ok": True, "expression": expression, "result": rendered}
+
+
+class _ReadableHTML(HTMLParser):
+    """Extract readable page text while ignoring scripts, styles, and hidden content."""
+    BLOCKED = {"script", "style", "noscript", "svg", "canvas", "template"}
+    BLOCK_TAGS = {"p", "div", "section", "article", "main", "header", "footer", "li", "h1", "h2", "h3", "h4", "br", "tr"}
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.parts: list[str] = []
+        self.title_parts: list[str] = []
+        self.links: list[dict[str, str]] = []
+        self._blocked = 0
+        self._in_title = False
+        self._anchor: dict[str, str] | None = None
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if tag in self.BLOCKED:
+            self._blocked += 1
+        if tag == "title":
+            self._in_title = True
+        if tag in self.BLOCK_TAGS:
+            self.parts.append("\n")
+        if tag == "a" and attrs.get("href"):
+            self._anchor = {"href": attrs["href"][:1000], "text": ""}
+
+    def handle_endtag(self, tag):
+        if tag in self.BLOCKED and self._blocked:
+            self._blocked -= 1
+        if tag == "title":
+            self._in_title = False
+        if tag in self.BLOCK_TAGS:
+            self.parts.append("\n")
+        if tag == "a" and self._anchor:
+            if self._anchor["text"].strip():
+                self.links.append(self._anchor)
+            self._anchor = None
+
+    def handle_data(self, data):
+        if self._blocked:
+            return
+        clean = " ".join(data.split())
+        if not clean:
+            return
+        self.parts.append(clean + " ")
+        if self._in_title:
+            self.title_parts.append(clean)
+        if self._anchor is not None:
+            self._anchor["text"] += clean + " "
+
+
+async def _validate_public_url(url: str) -> str:
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise ValueError("Only public HTTP and HTTPS webpages can be opened.")
+    if parsed.username or parsed.password or parsed.port not in (None, 80, 443):
+        raise ValueError("Credentials and non-standard ports are not allowed.")
+    host = parsed.hostname.rstrip(".").lower()
+    if host in {"localhost", "localhost.localdomain"} or host.endswith(".local"):
+        raise ValueError("Local network addresses are not allowed.")
+    try:
+        addresses = {ipaddress.ip_address(host)}
+    except ValueError:
+        try:
+            records = await asyncio.to_thread(socket.getaddrinfo, host, parsed.port or (443 if parsed.scheme == "https" else 80), 0, socket.SOCK_STREAM)
+            addresses = {ipaddress.ip_address(record[4][0]) for record in records}
+        except (OSError, ValueError) as exc:
+            raise ValueError("The webpage hostname could not be resolved.") from exc
+    if not addresses or any(not address.is_global for address in addresses):
+        raise ValueError("Private, reserved, and local network addresses are blocked.")
+    return url
+
+
+async def open_webpage(url: str) -> dict[str, Any]:
+    """Fetch a small public HTML/text page with redirect, size, and SSRF checks."""
+    if not isinstance(url, str) or len(url) > 2000:
+        raise ValueError("A valid webpage URL is required.")
+    current = url.strip()
+    timeout = httpx.Timeout(18.0, connect=8.0)
+    async with httpx.AsyncClient(timeout=timeout, follow_redirects=False, trust_env=False, headers={"User-Agent": "HAMASA-AI-WebReader/1.0", "Accept": "text/html,text/plain,application/xhtml+xml"}) as client:
+        for redirect_count in range(4):
+            await _validate_public_url(current)
+            async with client.stream("GET", current) as response:
+                if response.status_code in {301, 302, 303, 307, 308}:
+                    location = response.headers.get("location")
+                    if not location or redirect_count == 3:
+                        raise ValueError("The webpage redirected too many times.")
+                    current = urljoin(current, location)
+                    continue
+                response.raise_for_status()
+                media_type = response.headers.get("content-type", "").split(";", 1)[0].lower()
+                if media_type not in {"text/html", "application/xhtml+xml", "text/plain"}:
+                    raise ValueError("This reader currently supports HTML and plain-text webpages only.")
+                length = response.headers.get("content-length")
+                if length and int(length) > MAX_PAGE_BYTES:
+                    raise ValueError("The webpage is too large to read safely.")
+                chunks = bytearray()
+                async for chunk in response.aiter_bytes():
+                    chunks.extend(chunk)
+                    if len(chunks) > MAX_PAGE_BYTES:
+                        raise ValueError("The webpage is too large to read safely.")
+                charset = response.encoding or "utf-8"
+                raw = bytes(chunks).decode(charset, errors="replace")
+                if media_type == "text/plain":
+                    text = " ".join(raw.split())
+                    title = current
+                    links = []
+                else:
+                    parser = _ReadableHTML()
+                    parser.feed(raw)
+                    text = " ".join(" ".join(parser.parts).split())
+                    title = " ".join(parser.title_parts).strip() or current
+                    links = [
+                        {"text": item["text"].strip()[:160], "url": urljoin(current, item["href"])}
+                        for item in parser.links[:20]
+                        if urlparse(urljoin(current, item["href"])).scheme in {"http", "https"}
+                    ]
+                return {
+                    "ok": True,
+                    "url": current,
+                    "title": title[:240],
+                    "content": text[:MAX_PAGE_CHARS],
+                    "truncated": len(text) > MAX_PAGE_CHARS,
+                    "links": links,
+                }
+    raise ValueError("The webpage could not be opened.")
 
 
 CHAT_TOOLS = [
@@ -53,12 +187,15 @@ CHAT_TOOLS = [
         "function": {
             "name": "web_search",
             "description": "Search the live web for current facts, sources, prices, documentation, or anything the user asks to research. Return sourced results, not guesses.",
-            "parameters": {
-                "type": "object",
-                "properties": {"query": {"type": "string", "description": "A concise search query."}},
-                "required": ["query"],
-                "additionalProperties": False,
-            },
+            "parameters": {"type": "object", "properties": {"query": {"type": "string", "description": "A concise search query."}}, "required": ["query"], "additionalProperties": False},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "open_webpage",
+            "description": "Open and read a public webpage when search snippets are insufficient. Use the URL from a search result. Returns page title, readable text, and links. Only public HTML/text pages are supported.",
+            "parameters": {"type": "object", "properties": {"url": {"type": "string", "description": "A public HTTP or HTTPS webpage URL."}}, "required": ["url"], "additionalProperties": False},
         },
     },
     {
@@ -66,12 +203,7 @@ CHAT_TOOLS = [
         "function": {
             "name": "calculator",
             "description": "Calculate arithmetic accurately. Use for non-trivial calculations instead of mental arithmetic.",
-            "parameters": {
-                "type": "object",
-                "properties": {"expression": {"type": "string", "description": "Arithmetic expression using numbers and + - * / // % ** and parentheses."}},
-                "required": ["expression"],
-                "additionalProperties": False,
-            },
+            "parameters": {"type": "object", "properties": {"expression": {"type": "string", "description": "Arithmetic expression using numbers and + - * / // % ** and parentheses."}}, "required": ["expression"], "additionalProperties": False},
         },
     },
 ]
@@ -105,4 +237,9 @@ async def execute_chat_tool(
                 for item in results[:8]
             ],
         }
+    if name == "open_webpage":
+        url = arguments.get("url")
+        if not isinstance(url, str):
+            raise ValueError("url must be a string")
+        return await open_webpage(url)
     raise ValueError("Unknown tool.")
