@@ -312,6 +312,22 @@ def build_file(fmt: str, title: str, content: str, rows: list, page_count: int =
         import json
         return json.dumps({"title": title, "content": content, "rows": rows}, ensure_ascii=False, indent=2).encode("utf-8")
     if fmt == "html":
-        from html import escape as html_escape
-        return ("<!doctype html><html lang='ar'><meta charset='utf-8'><title>" + html_escape(title) + "</title><main dir='auto'><h1>" + html_escape(title) + "</h1><pre>" + html_escape(content) + "</pre></main></html>").encode("utf-8")
+        source = _strip_source_fence(content)
+        if re.search(r"(?is)<!doctype\s+html|<html(?:\s|>)", source):
+            return source.encode("utf-8")
+        return (
+            "<!doctype html>\n<html lang='ar'>\n<head>\n"
+            "<meta charset='utf-8'>\n<meta name='viewport' content='width=device-width, initial-scale=1'>\n"
+            "<title>" + escape(title) + "</title>\n</head>\n"
+            "<body>\n" + source + "\n</body>\n</html>\n"
+        ).encode("utf-8")
+    if fmt in ("css", "js", "ts", "py", "sql", "sh"):
+        return _strip_source_fence(content).encode("utf-8")
     raise ValueError("Unsupported file format")
+
+
+def _strip_source_fence(source: str) -> str:
+    """Remove a single outer Markdown code fence without altering source inside it."""
+    value = str(source or "").strip()
+    match = re.match(r"^\s*```(?:[a-zA-Z0-9_+.-]+)?\s*\n([\s\S]*?)\n```\s*$", value)
+    return match.group(1) if match else value

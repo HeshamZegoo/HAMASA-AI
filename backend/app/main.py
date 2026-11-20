@@ -274,7 +274,7 @@ def _requested_pdf_page_count(prompt: str) -> int:
 
 class FileCreateRequest(BaseModel):
     prompt: str = Field(min_length=2, max_length=12000)
-    format: Literal["docx", "pdf", "xlsx", "pptx", "csv", "txt", "md", "json", "html"]
+    format: Literal["docx", "pdf", "xlsx", "pptx", "csv", "txt", "md", "json", "html", "css", "js", "ts", "py", "sql", "sh"]
     messages: list[Message] = Field(default_factory=list, max_length=20)
     attachments: list[AttachmentInput] = Field(default_factory=list, max_length=8)
 
@@ -978,7 +978,7 @@ def readiness():
 async def generate_file(body: FileCreateRequest):
     if not API_KEY:
         raise HTTPException(status_code=503, detail="File generation is temporarily unavailable.")
-    format_names = {"docx": "Microsoft Word document", "pdf": "PDF document", "xlsx": "Excel spreadsheet", "pptx": "PowerPoint presentation", "csv": "CSV file", "txt": "text file", "md": "Markdown document", "json": "JSON file", "html": "HTML document"}
+    format_names = {"docx": "Microsoft Word document", "pdf": "PDF document", "xlsx": "Excel spreadsheet", "pptx": "PowerPoint presentation", "csv": "CSV file", "txt": "text file", "md": "Markdown document", "json": "JSON file", "html": "HTML webpage/source file", "css": "CSS stylesheet", "js": "JavaScript source file", "ts": "TypeScript source file", "py": "Python source file", "sql": "SQL script", "sh": "shell script"}
     requested_pages = _requested_pdf_page_count(body.prompt) if body.format == "pdf" else 0
     system = (
         "You create useful, complete downloadable files. Return ONLY valid JSON with keys "
@@ -993,7 +993,7 @@ async def generate_file(body: FileCreateRequest):
         "For spreadsheets, put column headers and data in rows, each row an array of cell values; content may contain a short description. "
         "For PowerPoint, structure content into slide sections using one Markdown # heading per slide; keep each slide focused and concise. "
         "For CSV, provide clean tabular data in rows. For JSON, provide structured rows and content. "
-        "For Markdown, use semantic headings, lists, and tables. For HTML, provide clean semantic content without scripts. "
+        "For Markdown, use semantic headings, lists, and tables. For HTML, create a complete usable webpage with semantic HTML, responsive CSS, accessible controls, and JavaScript when the requested behavior needs it. Return actual source code, not an escaped code sample. For CSS, JS, TS, Python, SQL, and shell files, return complete runnable source code with imports, error handling, and brief useful comments; never wrap source code in Markdown fences. "
         "Always plan the document before writing: identify audience, language, purpose, sections, and requested format. "
         "Use the full requested scope, meaningful examples, accurate facts, consistent terminology, and a clear conclusion. "
         "Never claim a file was created unless the renderer returns valid bytes. "
@@ -1015,7 +1015,13 @@ async def generate_file(body: FileCreateRequest):
         "pptx": "Structure the presentation with one # heading per slide, followed by concise bullets or short paragraphs. Keep each slide focused and avoid overflowing it.",
         "csv": "Return rows as a two-dimensional JSON array with the header row first. Use consistent columns and no prose outside the rows.",
         "json": "Return valid structured JSON-compatible data in the rows field when appropriate; content may be a short description.",
-        "html": "Return semantic, well-structured content; the renderer escapes user/model text and wraps it in a safe HTML document.",
+        "html": "Return a complete HTML5 document when appropriate, including doctype, html, head, charset, viewport, title, and body. Implement the requested page and interactions, with responsive accessible CSS and JavaScript if needed. Return real HTML source, not escaped text or Markdown fences.",
+        "css": "Return complete valid CSS for the requested interface. Include responsive states, accessible focus styles, and comments only where helpful. No Markdown fences.",
+        "js": "Return complete modern JavaScript source with safe DOM handling, input validation, and clear error states. No Markdown fences.",
+        "ts": "Return complete TypeScript source with explicit useful types and safe error handling. No Markdown fences.",
+        "py": "Return a complete Python source file with imports, executable entry point when appropriate, validation, and useful error handling. No Markdown fences.",
+        "sql": "Return a complete SQL script with clear schema/query structure and safe parameterization guidance. No Markdown fences.",
+        "sh": "Return a complete POSIX shell script with safe quoting, error handling, and a shebang when appropriate. No Markdown fences.",
         "md": "Use a clear Markdown document with headings, lists, and tables when appropriate.",
         "txt": "Use clean plain text with clear section labels and no Markdown syntax."
     }[body.format]
@@ -1103,7 +1109,10 @@ async def generate_file(body: FileCreateRequest):
             "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
             "csv": "text/csv", "txt": "text/plain", "md": "text/markdown",
-            "json": "application/json", "html": "text/html",
+            "json": "application/json", "html": "text/html; charset=utf-8", "css": "text/css; charset=utf-8",
+            "js": "text/javascript; charset=utf-8", "ts": "text/plain; charset=utf-8",
+            "py": "text/x-python; charset=utf-8", "sql": "application/sql; charset=utf-8",
+            "sh": "text/x-shellscript; charset=utf-8",
         }[body.format]
         return {"message": message, "filename": filename, "mime_type": mime,
                 "data": base64.b64encode(file_bytes).decode("ascii")}
