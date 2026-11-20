@@ -153,6 +153,9 @@ class ChatToolRoutingTests(unittest.IsolatedAsyncioTestCase):
 
 
 class LegacyConversationContextRoutingTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        FakeProviderClient.payloads = []
+
     async def test_chat_filters_unrelated_legacy_context_before_provider_inference(self):
         body = main.ChatRequest(
             messages=[main.Message(role="user", content="صلح HAMASA FastAPI backend")],
