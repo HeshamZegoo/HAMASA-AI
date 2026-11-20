@@ -347,7 +347,7 @@ async def run_isolated_code(language: Any, code: Any) -> dict[str, Any]:
             return {"ok": False, "error": "The isolated code runner returned an invalid response."}
         return result
     except httpx.TimeoutException:
-        return {"ok": False, "error": "The isolated code runner did not respond before the 45-second deadline."}
+        return {"ok": False, "error": "The isolated code runner timed out before returning a result."}
     except httpx.RequestError:
         return {"ok": False, "error": "The isolated code runner is temporarily unreachable."}
 

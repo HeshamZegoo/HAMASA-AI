@@ -1485,6 +1485,12 @@ async def chat(body: ChatRequest):
                         break
                     tool_calls = assistant_message.get("tool_calls") or []
                     if not tool_calls:
+                        if force_code_execution:
+                            logger.error("Provider omitted the required run_code tool call.")
+                            raise HTTPException(
+                                status_code=502,
+                                detail="The AI provider did not start code execution. No code was run.",
+                            )
                         break
                     assistant_message = dict(assistant_message)
                     assistant_message["tool_calls"] = tool_calls[:1] if force_code_execution else tool_calls[:4]
@@ -1518,6 +1524,29 @@ async def chat(body: ChatRequest):
                             "tool_call_id": call_id,
                             "content": json.dumps(tool_result, ensure_ascii=False)[:12000],
                         })
+                    if force_code_execution:
+                        # The run_code result is final tool context. Ask the model for
+                        # its user-facing answer without exposing tools again; this avoids
+                        # an unnecessary second forced tool-call round trip.
+                        final_messages = [
+                            *context_messages,
+                            {
+                                "role": "system",
+                                "content": (
+                                    "The run_code tool has already been executed exactly once. "
+                                    "Do not call any tool again. Report the actual stdout, stderr, "
+                                    "exit code, and timeout status from the tool result above. "
+                                    "If it succeeded, state its actual output; if it failed, "
+                                    "explain the actual failure without guessing."
+                                ),
+                            },
+                        ]
+                        response = await client.post(
+                            f"{BASE_URL}/chat/completions",
+                            headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"},
+                            json={**payload, "messages": final_messages},
+                        )
+                        break
                     active_payload["messages"] = context_messages
                     response = await client.post(
                         f"{BASE_URL}/chat/completions",
