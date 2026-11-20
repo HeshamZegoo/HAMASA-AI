@@ -97,3 +97,28 @@ html[dir="ltr"] .message{direction:ltr}
  .composer-wrap{max-width:100vw}
  .composer{width:100%;max-width:100%}
 }
+
+
+/* Optional tool dialogs: local code workspace and image generation/editing. */
+.hamasa-tool-dialog{width:min(900px,calc(100vw - 24px));max-width:900px;max-height:88dvh;overflow:auto;border:1px solid var(--line);border-radius:18px;padding:18px;background:var(--bg);color:var(--fg);box-shadow:0 24px 80px #0005}
+.hamasa-tool-dialog::backdrop{background:#0008;backdrop-filter:blur(3px)}
+.tool-dialog-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.tool-dialog-head h2{margin:0;font-size:18px}
+.hamasa-tool-dialog label{display:block;margin:12px 0 6px;font-size:13px;color:var(--mut)}
+.hamasa-tool-dialog textarea,.hamasa-tool-dialog input,.hamasa-tool-dialog select{box-sizing:border-box;width:100%;border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--glass);color:var(--fg);font:inherit}
+.workspace-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin:8px 0}
+.workspace-toolbar button,.hamasa-tool-dialog>button,.workspace-tabs button{border:1px solid var(--line);border-radius:9px;padding:7px 10px;background:var(--glass);color:var(--fg);font:inherit;font-size:12px}
+.workspace-toolbar input{flex:1;min-width:120px;width:auto}
+.workspace-toolbar select{width:auto;min-width:120px}
+.workspace-tabs{display:flex;gap:5px;overflow-x:auto;padding:5px 0}
+.workspace-tabs button{white-space:nowrap}
+.workspace-tabs button.active{border-color:var(--acc);background:var(--glass2)}
+.workspace-editor{display:block;min-height:260px;resize:vertical;direction:ltr;text-align:left;white-space:pre;tab-size:2;font:13px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace!important}
+.workspace-preview{display:block;width:100%;height:340px;border:1px solid var(--line);border-radius:10px;background:white;margin:10px 0}
+.workspace-preview[hidden]{display:none}
+.workspace-output{white-space:pre-wrap;overflow-wrap:anywhere;max-height:240px;overflow:auto;min-height:40px;padding:10px;border-radius:10px;background:var(--glass2);border:1px solid var(--line);font:12px/1.6 ui-monospace,monospace}
+.tool-dialog-note{font-size:12px;line-height:1.6;color:var(--mut)}
+#imageResult{display:block;max-width:100%;max-height:55dvh;object-fit:contain;margin:12px auto;border-radius:12px}
+#imageDownload{display:inline-block;margin:8px 0;color:var(--acc);text-decoration:underline}
+#imageDownload[hidden]{display:none}
+@media(max-width:600px){.hamasa-tool-dialog{padding:12px;max-height:92dvh}.workspace-editor{min-height:220px}.workspace-toolbar input{min-width:100px}}
