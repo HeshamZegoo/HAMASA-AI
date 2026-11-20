@@ -401,7 +401,12 @@ function buildChatRequest(messages) {
   if (!chatMessages.length) {
     throw new Error(lang === "ar" ? "اكتب رسالة الأول قبل الإرسال." : "Please enter a message before sending.");
   }
-  if (chatMessages.some(m => m.content.length > MAX_CHAT_MESSAGE_CHARS)) {
+  chatMessages.forEach((message, index) => {
+    if (index < chatMessages.length - 1 && message.content.length > MAX_CHAT_MESSAGE_CHARS) {
+      message.content = message.content.slice(-MAX_CHAT_MESSAGE_CHARS);
+    }
+  });
+  if (chatMessages[chatMessages.length - 1].content.length > MAX_CHAT_MESSAGE_CHARS) {
     throw new Error(lang === "ar"
       ? "الرسالة طويلة جدًا. الحد الأقصى 12,000 حرف للرسالة الواحدة. قسّمها على رسائل أصغر."
       : "This message is too long. The limit is 12,000 characters per message. Please split it into smaller messages.");

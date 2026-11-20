@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import patch, AsyncMock
 
 from fastapi import HTTPException
+from pydantic import ValidationError
 
 from backend.app import main
 
@@ -25,6 +26,30 @@ class FakeProviderClient:
     async def post(self, url, headers=None, json=None):
         self.payloads.append(json)
         return FakeResponse()
+
+
+class ChatRequestHistoryNormalizationTests(unittest.TestCase):
+    def test_trims_oversized_historical_message_but_preserves_current_message(self):
+        messages = [{"role": "user", "content": "old"} for _ in range(33)]
+        messages.append({"role": "assistant", "content": "x" * 12_001})
+        messages.append({"role": "user", "content": "current request"})
+
+        request = main.ChatRequest(messages=messages)
+
+        self.assertEqual(len(request.messages), 35)
+        self.assertEqual(len(request.messages[33].content), 12_000)
+        self.assertEqual(request.messages[-1].content, "current request")
+
+    def test_still_rejects_oversized_current_message(self):
+        with self.assertRaises(ValidationError):
+            main.ChatRequest(messages=[{"role": "user", "content": "x" * 12_001}])
+
+    def test_keeps_only_the_latest_40_messages_for_legacy_clients(self):
+        messages = [{"role": "user", "content": f"message-{index}"} for index in range(41)]
+        request = main.ChatRequest(messages=messages)
+        self.assertEqual(len(request.messages), 40)
+        self.assertEqual(request.messages[0].content, "message-1")
+        self.assertEqual(request.messages[-1].content, "message-40")
 
 
 class ChatToolRoutingTests(unittest.IsolatedAsyncioTestCase):

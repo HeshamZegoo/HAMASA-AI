@@ -24,7 +24,7 @@ from fastapi import FastAPI, HTTPException, Header, Request, Cookie, Response, D
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from cryptography.fernet import Fernet, InvalidToken
 from .attachments import prepare_messages, AttachmentInput
 from .file_generation import build_file
@@ -251,6 +251,25 @@ class ChatRequest(BaseModel):
     memory: str = Field(default="", max_length=6000)
     saved_memories: list[MemoryContextItem] = Field(default_factory=list, max_length=40)
     attachments: list[AttachmentInput] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_legacy_chat_history(cls, value):
+        """Trim oversized historical turns from stale clients, never the current turn."""
+        if not isinstance(value, dict):
+            return value
+        messages = value.get("messages")
+        if not isinstance(messages, list):
+            return value
+        messages = messages[-40:]
+        normalized = []
+        for index, message in enumerate(messages):
+            if isinstance(message, dict):
+                content = message.get("content")
+                if isinstance(content, str) and len(content) > 12_000 and index < len(messages) - 1:
+                    message = {**message, "content": content[-12_000:]}
+            normalized.append(message)
+        return {**value, "messages": normalized}
 
 class AuthRequest(BaseModel):
     email: str = Field(min_length=5, max_length=254)
