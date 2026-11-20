@@ -102,7 +102,7 @@
   mic.addEventListener("click",async() => {
     if (busy) return;
     if (recorder?.state === "recording") { busy = true; mic.disabled = true; setStatus("بجهّز التسجيل…","thinking"); recorder.stop(); return; }
-    try { busy = true; listen.disabled = true; await beginRecording(); }
+    try { busy = true; listen.disabled = true; await beginRecording(); busy = false; }
     catch(error) { stopTracks(); recorder = null; busy = false; mic.disabled = false; setStatus(error.name === "NotAllowedError" ? "اسمح للمتصفح باستخدام الميكروفون من إعدادات الموقع." : (error.message || "تعذر بدء التسجيل.")); }
   });
   listen.addEventListener("click",async() => {
