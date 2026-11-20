@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 INDEX = ROOT / "index.html"
 CONFIG = ROOT / "config.js"
 BACKEND = ROOT / "backend"
+SANDBOX_SERVICE = ROOT / "sandbox-service"
 
 
 class LocalAssetParser(HTMLParser):
@@ -62,6 +63,14 @@ def main() -> None:
     ATTACHMENTS = ROOT / "attachments.js"
     if not INDEX.is_file() or not CONFIG.is_file() or not ATTACHMENTS.is_file():
         fail("index.html, config.js, or attachments.js is missing")
+    sandbox_files = ("package.json", "server.mjs", "server.test.mjs", "README.md")
+    for name in sandbox_files:
+        if not (SANDBOX_SERVICE / name).is_file():
+            fail(f"isolated sandbox service file is missing: {name}")
+    sandbox_source = (SANDBOX_SERVICE / "server.mjs").read_text(encoding="utf-8")
+    for required in ("networkIsolation: \"ISOLATED\"", "timeoutSec: EXECUTION_TIMEOUT_SECONDS", "await sandbox.destroy()", "timingSafeEqual"):
+        if required not in sandbox_source:
+            fail(f"isolated sandbox security contract is missing: {required}")
 
     html = INDEX.read_text(encoding="utf-8")
     config = CONFIG.read_text(encoding="utf-8")
@@ -150,6 +159,15 @@ def main() -> None:
         )
     except subprocess.CalledProcessError:
         fail("attachment JavaScript syntax check failed")
+    try:
+        subprocess.run(
+            ["node", "--check", str(SANDBOX_SERVICE / "server.mjs")],
+            text=True,
+            check=True,
+            cwd=ROOT,
+        )
+    except subprocess.CalledProcessError:
+        fail("isolated sandbox service JavaScript syntax check failed")
 
     if not compileall.compile_dir(str(BACKEND), quiet=1, force=True):
         fail("Python backend compilation failed")

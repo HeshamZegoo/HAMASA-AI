@@ -3,6 +3,7 @@ import ast
 import asyncio
 import ipaddress
 import operator
+import os
 import socket
 from html.parser import HTMLParser
 from typing import Any, Awaitable, Callable
@@ -221,6 +222,22 @@ CHAT_TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "run_code",
+            "description": "Execute a Python or JavaScript program in a fresh isolated Linux VM when the user asks to run, test, or verify code. Returns actual stdout, stderr, exit code, and timeout status. Only Python and JavaScript are supported; source is limited to 50,000 bytes and execution to 20 seconds.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "language": {"type": "string", "enum": ["python", "javascript"]},
+                    "code": {"type": "string", "description": "Complete source code to execute."}
+                },
+                "required": ["language", "code"],
+                "additionalProperties": False
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "calculator",
             "description": "Calculate arithmetic accurately. Use for non-trivial calculations instead of mental arithmetic.",
             "parameters": {"type": "object", "properties": {"expression": {"type": "string", "description": "Arithmetic expression using numbers and + - * / // % ** and parentheses."}}, "required": ["expression"], "additionalProperties": False},
@@ -229,12 +246,81 @@ CHAT_TOOLS = [
 ]
 
 
+def code_execution_available() -> bool:
+    """Expose code execution only after the private runner and both auth settings are configured."""
+    return (
+        os.getenv("HAMASA_EXECUTOR_ENABLED", "").strip().lower() == "true"
+        and bool(os.getenv("HAMASA_EXECUTOR_URL", "").strip())
+        and bool(os.getenv("HAMASA_EXECUTOR_TOKEN", "").strip())
+    )
+
+
+def get_chat_tools() -> list[dict[str, Any]]:
+    """Return only tools backed by configured runtime integrations."""
+    return [
+        tool for tool in CHAT_TOOLS
+        if tool["function"]["name"] != "run_code" or code_execution_available()
+    ]
+
+
+def validate_code_request(language: Any, code: Any) -> tuple[str, str]:
+    if not isinstance(language, str) or language not in {"python", "javascript"}:
+        raise ValueError("Only Python and JavaScript execution are supported.")
+    if not isinstance(code, str) or not code.strip():
+        raise ValueError("Code must be a non-empty string.")
+    if len(code.encode("utf-8")) > 50_000:
+        raise ValueError("Code exceeds the 50,000-byte limit.")
+    return language, code
+
+
+async def run_isolated_code(language: Any, code: Any) -> dict[str, Any]:
+    """Forward source to the private executor; never execute it in this API process."""
+    language, code = validate_code_request(language, code)
+    if not code_execution_available():
+        return {"ok": False, "available": False, "error": "Isolated code execution is not configured."}
+
+    base_url = os.getenv("HAMASA_EXECUTOR_URL", "").strip().rstrip("/")
+    token = os.getenv("HAMASA_EXECUTOR_TOKEN", "").strip()
+    try:
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(45.0, connect=5.0),
+            follow_redirects=False,
+            trust_env=False,
+        ) as client:
+            response = await client.post(
+                base_url + "/execute",
+                headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"},
+                json={"language": language, "code": code},
+            )
+        try:
+            result = response.json()
+        except ValueError:
+            result = {}
+        if not isinstance(result, dict):
+            result = {}
+        if response.status_code >= 400:
+            return {
+                "ok": False,
+                "error": str(result.get("error") or "The isolated code runner rejected the request.")[:240],
+                "status_code": response.status_code,
+            }
+        if not isinstance(result, dict):
+            return {"ok": False, "error": "The isolated code runner returned an invalid response."}
+        return result
+    except httpx.TimeoutException:
+        return {"ok": False, "error": "The isolated code runner did not respond before the 45-second deadline."}
+    except httpx.RequestError:
+        return {"ok": False, "error": "The isolated code runner is temporarily unreachable."}
+
+
 async def execute_chat_tool(
     name: str,
     arguments: dict[str, Any],
     search: Callable[[str], Awaitable[list[dict[str, Any]]]],
 ) -> dict[str, Any]:
     """Execute only known tools with validated arguments."""
+    if name == "run_code":
+        return await run_isolated_code(arguments.get("language"), arguments.get("code"))
     if name == "calculator":
         expression = arguments.get("expression")
         if not isinstance(expression, str):

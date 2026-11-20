@@ -32,7 +32,7 @@ from .quality import coding_instructions_for
 from .research import latest_user_text, should_search_web, format_search_context, rank_search_results
 from .tooling import build_tool_capabilities_prompt
 from .memory_retrieval import select_relevant_memories
-from .agent_tools import CHAT_TOOLS, execute_chat_tool
+from .agent_tools import code_execution_available, execute_chat_tool, get_chat_tools
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper())
 logger = logging.getLogger("hamasa.provider")
@@ -87,6 +87,7 @@ def _runtime_tool_status() -> dict[str, bool]:
         "speech": bool(_nvidia_speech_key()),
         "memory": bool(has_valid_memory_key and has_database),
         "accounts": bool(len(JWT_SECRET) >= 32 and has_database),
+        "code_execution": code_execution_available(),
     }
 
 app = FastAPI(
@@ -1416,7 +1417,7 @@ async def chat(body: ChatRequest):
             # they are useful. Images keep the existing vision-only route.
             active_payload = dict(payload)
             if not has_images:
-                active_payload["tools"] = CHAT_TOOLS
+                active_payload["tools"] = get_chat_tools()
                 active_payload["tool_choice"] = "auto"
             response = await client.post(
                 f"{BASE_URL}/chat/completions",

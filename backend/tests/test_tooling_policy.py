@@ -12,6 +12,7 @@ class ToolCapabilityPolicyTests(unittest.TestCase):
             "VOICE AND AUDIO",
             "SAVED MEMORY AND CONVERSATIONS",
             "CODING AND TECHNICAL HELP",
+            "ISOLATED CODE EXECUTION",
         ):
             with self.subTest(capability=capability):
                 self.assertIn(capability, TOOL_CAPABILITIES_PROMPT)
@@ -22,6 +23,8 @@ class ToolCapabilityPolicyTests(unittest.TestCase):
     def test_unavailable_actions_are_not_claimed(self):
         self.assertIn("You do not have a general-purpose shell", TOOL_CAPABILITIES_PROMPT)
         self.assertIn("Do not claim to execute code", TOOL_CAPABILITIES_PROMPT)
+        self.assertIn("fresh Railway Linux VM", TOOL_CAPABILITIES_PROMPT)
+        self.assertIn("outbound public internet access", TOOL_CAPABILITIES_PROMPT)
         self.assertIn("Never claim audio was recorded", TOOL_CAPABILITIES_PROMPT)
 
     def test_runtime_status_is_explicit_and_non_secret(self):
