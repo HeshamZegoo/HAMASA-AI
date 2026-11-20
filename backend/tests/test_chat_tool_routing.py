@@ -157,8 +157,8 @@ class LegacyConversationContextRoutingTests(unittest.IsolatedAsyncioTestCase):
         body = main.ChatRequest(
             messages=[main.Message(role="user", content="صلح HAMASA FastAPI backend")],
             memory=(
-                "سياق أقدم من المحادثة الحالية:\\n"
-                "المستخدم: ZEGO Disk Health OS uses Debian live-build.\\n"
+                "سياق أقدم من المحادثة الحالية:\n"
+                "المستخدم: ZEGO Disk Health OS uses Debian live-build.\n"
                 "المستخدم: HAMASA AI backend uses FastAPI and Railway."
             ),
         )
