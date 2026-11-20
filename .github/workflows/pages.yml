@@ -26,7 +26,7 @@ jobs:
       - name: Prepare GitHub Pages artifact
         run: |
           mkdir -p dist
-          cp index.html config.js attachments.js dist/
+          cp index.html ./*.js ./*.css dist/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
