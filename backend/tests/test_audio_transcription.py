@@ -76,6 +76,33 @@ class AudioTranscriptionTests(unittest.IsolatedAsyncioTestCase):
                     await main.transcribe_audio(body)
         self.assertEqual(caught.exception.status_code, 400)
 
+
+    async def test_wav_is_normalized_to_mono_16khz_pcm_before_nvidia_upload(self):
+        import io
+        import wave
+        source = io.BytesIO()
+        with wave.open(source, "wb") as wav:
+            wav.setnchannels(2)
+            wav.setsampwidth(2)
+            wav.setframerate(22050)
+            wav.writeframes((b"\\x01\\x00\\x02\\x00") * 2205)
+        normalized = main._normalize_wav_for_nvidia(source.getvalue())
+        with wave.open(io.BytesIO(normalized), "rb") as wav:
+            self.assertEqual(wav.getnchannels(), 1)
+            self.assertEqual(wav.getsampwidth(), 2)
+            self.assertEqual(wav.getframerate(), 16000)
+            self.assertEqual(wav.getnframes(), 1600)
+
+    async def test_transcription_rejects_unknown_mime_type(self):
+        body = main.TranscriptionRequest(
+            audio=base64.b64encode(b"x" * 2048).decode("ascii"),
+            mime_type="audio/unknown",
+        )
+        with patch.dict(os.environ, {"AI_API_KEY": "shared-provider-test-key"}):
+            with self.assertRaises(HTTPException) as caught:
+                await main.transcribe_audio(body)
+        self.assertEqual(caught.exception.status_code, 415)
+
     async def test_valid_audio_requires_the_shared_provider_key(self):
         body = main.TranscriptionRequest(
             audio=base64.b64encode(b"x" * 2048).decode("ascii"),
