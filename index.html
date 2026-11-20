@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en" dir="ltr" data-theme="light">
 <head>
+<meta name="hamasa-capabilities-endpoint" content="/api/capabilities">
 <meta charset="utf-8">
 <title>HAMASA AI — حماصة</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -318,6 +319,8 @@ dialog{background:var(--bg2)}
 <div class="comp">
  <span id="micStatus" class="mic-status" role="status" aria-live="polite" hidden></span>
  <div class="box">
+  <button class="cb" id="workspaceOpen" type="button" aria-label="Open code workspace" title="Code workspace">⌘</button>
+  <button class="cb" id="imageLab" type="button" aria-label="Generate or edit an image" title="Image lab">✦</button>
   <button class="cb" id="attach" data-a="attach" type="button"><svg viewBox="0 0 24 24"><path d="M21 11.5l-8.6 8.6a5 5 0 0 1-7-7l8.6-8.6a3.3 3.3 0 0 1 4.7 4.7l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9"/></svg></button>
   <button class="cb mic" id="micBtn" data-a="recordVoice" type="button" aria-pressed="false"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M8 21h8"/></svg></button>
   <textarea id="inp" rows="1" enterkeyhint="send" data-p="placeholder" aria-label="Message"></textarea>
@@ -326,6 +329,35 @@ dialog{background:var(--bg2)}
 </div>
 </div>
 
+<dialog id="workspaceDlg" class="hamasa-tool-dialog" aria-labelledby="workspaceTitle">
+ <div class="tool-dialog-head"><h2 id="workspaceTitle">مساحة عمل حماصة</h2><button class="ib" id="workspaceClose" type="button" aria-label="إغلاق">×</button></div>
+ <div class="workspace-toolbar">
+  <button id="workspaceAdd" type="button">ملف جديد</button>
+  <button id="workspaceDelete" type="button">حذف الملف</button>
+  <button id="workspaceDownload" type="button">تنزيل الملف</button>
+  <input id="workspaceFilename" aria-label="اسم الملف" value="index.html">
+  <select id="workspaceLanguage" aria-label="لغة الملف"><option value="html">HTML</option><option value="javascript">JavaScript</option><option value="python">Python</option><option value="css">CSS</option><option value="markdown">Markdown</option><option value="json">JSON</option><option value="text">Text</option></select>
+ </div>
+ <div id="workspaceTabs" class="workspace-tabs"></div>
+ <textarea id="workspaceEditor" class="workspace-editor" spellcheck="false" aria-label="Code editor"></textarea>
+ <div class="workspace-toolbar"><button id="workspaceRun" type="button">تشغيل / معاينة</button></div>
+ <iframe id="workspacePreview" class="workspace-preview" title="HTML preview" sandbox="allow-scripts" hidden></iframe>
+ <pre id="workspaceOutput" class="workspace-output" role="status" aria-live="polite"></pre>
+ <p class="tool-dialog-note">الملفات محفوظة محلياً في المتصفح. تشغيل Python وJavaScript يتطلب تفعيل المشغّل المعزول على الخادم.</p>
+</dialog>
+<dialog id="imageDlg" class="hamasa-tool-dialog" aria-labelledby="imageTitle">
+ <div class="tool-dialog-head"><h2 id="imageTitle">معمل الصور</h2><button class="ib" id="imageClose" type="button" aria-label="إغلاق">×</button></div>
+ <label for="imagePrompt">وصف الصورة أو التعديل المطلوب</label>
+ <textarea id="imagePrompt" rows="4" maxlength="4000" placeholder="مثلاً: صمّم مشهداً كرتونياً لطفل يقرأ كتاباً تحت شجرة..."></textarea>
+ <label for="imageReference">صورة مرجعية للتعديل (اختياري)</label>
+ <input id="imageReference" type="file" accept="image/png,image/jpeg,image/webp">
+ <label for="imageSize">المقاس</label>
+ <select id="imageSize"><option value="1024x1024">مربع 1024 × 1024</option><option value="1536x1024">أفقي 1536 × 1024</option><option value="1024x1536">رأسي 1024 × 1536</option></select>
+ <button id="imageGenerate" type="button">إنشاء / تعديل الصورة</button>
+ <p id="imageStatus" class="tool-dialog-note" role="status" aria-live="polite"></p>
+ <img id="imageResult" alt="Generated image" hidden>
+ <a id="imageDownload" hidden>تنزيل الصورة</a>
+</dialog>
 <dialog id="dlg" aria-labelledby="dT">
  <h2><span id="dT" data-i="settings"></span><button class="ib" id="dX" data-a="close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></h2>
  <div class="row"><span data-i="language"></span><div class="seg"><button data-lang="en" type="button">English</button><button data-lang="ar" type="button">عربي</button></div></div>
@@ -441,29 +473,62 @@ async function checkBackend() {
   }
   updStatus();
 }
-async function chatAdapter(messages) {
+async function chatAdapter(messages, onDelta = () => {}) {
   const basePayload = buildChatRequest(messages);
   const payload = window.HAMASA_ATTACHMENTS
     ? await window.HAMASA_ATTACHMENTS.addToPayload(basePayload)
     : basePayload;
-  const response = await apiFetch(HAMASA_CONFIG.chatUrl, {
+  const response = await apiFetch(API_BASE + "/api/chat/stream", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
-    signal: AbortSignal.timeout ? AbortSignal.timeout(95000) : undefined
+    signal: AbortSignal.timeout ? AbortSignal.timeout(185000) : undefined
   });
   if (!response.ok) {
     let detail = "HTTP " + response.status;
     try { detail = (await response.json()).detail || detail; } catch {}
     throw new Error(detail);
   }
-  const data = await response.json();
-  window.HAMASA_ATTACHMENTS?.clear();
-  return {
-    text: parseChatResponse(data),
-    demo: false,
-    sources: Array.isArray(data.sources) ? data.sources.slice(0, 10) : []
+  if (!response.body?.getReader) throw new Error("This browser cannot read streamed responses. Please update the browser.");
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "", text = "", sources = [], completed = false;
+  const consume = frame => {
+    const dataLine = frame.split(/\r?\n/).find(line => line.startsWith("data:"));
+    if (!dataLine) return;
+    let event;
+    try { event = JSON.parse(dataLine.slice(5).trim()); } catch { return; }
+    if (event.type === "delta" && typeof event.content === "string") {
+      text += event.content;
+      onDelta(text);
+    } else if (event.type === "done") {
+      sources = Array.isArray(event.sources) ? event.sources.slice(0, 10) : [];
+      completed = true;
+    } else if (event.type === "error") {
+      throw new Error(event.message || "The streamed response failed.");
+    }
   };
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
+      let boundary;
+      while ((boundary = buffer.indexOf("\n\n")) >= 0) {
+        const frame = buffer.slice(0, boundary);
+        buffer = buffer.slice(boundary + 2);
+        consume(frame);
+      }
+    }
+    buffer += decoder.decode();
+    if (buffer.trim()) consume(buffer);
+  } catch (error) {
+    try { await reader.cancel(); } catch {}
+    throw error;
+  }
+  if (!completed || !text.trim()) throw new Error("The AI stream ended before a complete answer arrived.");
+  window.HAMASA_ATTACHMENTS?.clear();
+  return { text: text.trim(), demo: false, sources };
 }
 
 /* =====================================================================
@@ -1208,7 +1273,10 @@ async function respond() {
       cur.messages.push(m);
       msgs.append(bubble(m)); save(); scrollEnd(); setBusy(false); return m.text;
     }
-    const r = await chatAdapter(cur.messages);
+    const r = await chatAdapter(cur.messages, streamedText => {
+      const liveBubble = $('#typing .bub');
+      if (liveBubble) { liveBubble.textContent = streamedText; scrollEnd(); }
+    });
     $('#typing')?.remove(); const m = { role: 'bot', text: r.text, demo: r.demo, sources: r.sources || [] }; cur.messages.push(m); msgs.append(bubble(m)); save();
     scrollEnd(); setBusy(false); return r.text;
   } catch (e) { console.error(e); $('#typing')?.remove(); errorRow(e); setBusy(false); return null; }
@@ -1501,5 +1569,7 @@ setInterval(async () => {
 }, 30000);
 </script>
 <script src="./attachments.js?v=20261119-3"></script>
+<script src="./workspace.js?v=20261120-1"></script>
+<script src="./media.js?v=20261120-1"></script>
 </body>
 </html>

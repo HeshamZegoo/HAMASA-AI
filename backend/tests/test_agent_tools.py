@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock
 
 from backend.app.agent_tools import (
     calculate,
@@ -7,6 +7,8 @@ from backend.app.agent_tools import (
     get_chat_tools,
     validate_code_request,
     run_isolated_code,
+    execute_chat_tool,
+    CHAT_TOOLS,
 )
 
 
@@ -113,6 +115,27 @@ class IsolatedCodeRunnerClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(captured["json"], {"language": "python", "code": "print(1 + 1)"})
         self.assertNotIn("private-test-token", str(captured["json"]))
 
+
+
+class DeepResearchToolTests(unittest.IsolatedAsyncioTestCase):
+    async def test_deep_research_opens_multiple_sources_and_returns_provenance(self):
+        search = AsyncMock(return_value=[
+            {"title": "Official A", "url": "https://example.com/a", "published_date": "2026-11-20", "content": "snippet A"},
+            {"title": "Official B", "url": "https://example.org/b", "content": "snippet B"},
+        ])
+        async def open_page(url):
+            return {"ok": True, "url": url, "title": "Opened " + url, "content": "Full readable page content"}
+        with patch("backend.app.agent_tools.open_webpage", side_effect=open_page):
+            result = await execute_chat_tool("deep_research", {"query": "compare two standards"}, search)
+        search.assert_awaited_once_with("compare two standards")
+        self.assertTrue(result["ok"])
+        self.assertEqual(len(result["sources"]), 2)
+        self.assertTrue(all(item["page_opened"] for item in result["sources"]))
+        self.assertIn("Full readable page content", result["sources"][0]["content"])
+
+    def test_deep_research_is_available_as_a_chat_tool(self):
+        names = [tool["function"]["name"] for tool in CHAT_TOOLS]
+        self.assertIn("deep_research", names)
 
 
 if __name__ == "__main__":
