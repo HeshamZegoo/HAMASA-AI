@@ -111,6 +111,17 @@ class FileGenerationTests(unittest.TestCase):
         self.assertIn("<b>hello</b>", html_raw.decode("utf-8"))
         self.assertNotIn("&lt;b&gt;hello", html_raw.decode("utf-8"))
 
+    def test_html_fragment_is_wrapped_as_real_document(self):
+        html = build_file("html", "Demo", "<main><h1>Hello</h1></main>", []).decode("utf-8")
+        self.assertIn("name=", html)
+        self.assertIn("<title>Demo</title>", html)
+        self.assertIn("<main><h1>Hello</h1></main>", html)
+
+    def test_source_code_formats_preserve_source(self):
+        self.assertEqual(build_file("css", "CSS", "body { margin: 0; }", []).decode("utf-8"), "body { margin: 0; }")
+        self.assertEqual(build_file("js", "JS", "const answer = 42;", []).decode("utf-8"), "const answer = 42;")
+        self.assertEqual(build_file("py", "Python", "print(42)", []).decode("utf-8"), "print(42)")
+        self.assertEqual(build_file("sql", "SQL", "SELECT 1;", []).decode("utf-8"), "SELECT 1;")
     def test_unsupported_format_is_rejected(self):
         with self.assertRaises(ValueError):
             build_file("exe", "Title", "Body", [])
