@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock
 
 from backend.app.agent_tools import (
     calculate,
