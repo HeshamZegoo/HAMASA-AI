@@ -247,7 +247,7 @@ CHAT_TOOLS = [
 
 
 def explicit_code_execution_request(text: str) -> bool:
-    """Detect clear user instructions to execute supplied code, not merely explain it."""
+    """Detect clear execution instructions or messages consisting of source code."""
     if not isinstance(text, str):
         return False
     normalized = " ".join(text.casefold().replace("ّ", "").split())
@@ -259,14 +259,47 @@ def explicit_code_execution_request(text: str) -> bool:
     )
     if any(phrase in normalized for phrase in phrases):
         return True
-    # A message consisting only of a fenced program or simple print/log statement
-    # is a common mobile workflow; treat it as an execution request rather than guessing.
+
+    # Standalone fenced source is an explicit execution request in this UI.
     stripped = text.strip()
     if stripped.startswith("```") and stripped.endswith("```") and len(stripped) > 6:
         return True
-    import re
-    return bool(re.fullmatch(r"(?:print|console\.log)\s*\([\s\S]*\)\s*;?", stripped))
 
+    import re
+    if re.fullmatch(r"(?:print|console\\.log)\\s*\\([\\s\\S]*\\)\\s*;?", stripped):
+        return True
+
+    # Parse Python instead of relying on a single-line print() regex. This
+    # catches realistic snippets such as import + assignment + output while
+    # avoiding prose that only asks what a code fragment means.
+    try:
+        python_tree = ast.parse(stripped, mode="exec")
+    except (SyntaxError, ValueError, TypeError):
+        python_tree = None
+    if python_tree is not None:
+        executable_nodes = (
+            ast.Import, ast.ImportFrom, ast.Assign, ast.AnnAssign,
+            ast.AugAssign, ast.Expr, ast.If, ast.For, ast.AsyncFor,
+            ast.While, ast.With, ast.AsyncWith, ast.FunctionDef,
+            ast.AsyncFunctionDef, ast.ClassDef, ast.Try, ast.Assert,
+        )
+        if any(isinstance(node, executable_nodes) for node in python_tree.body):
+            return True
+
+    # JavaScript lacks a parser in this module. Require recognizable
+    # statement-level syntax, not arbitrary words or explanatory prose.
+    javascript_statement = re.compile(
+        r"(?im)^\\s*(?:"
+        r"(?:const|let|var)\\s+[A-Za-z_$][\\w$]*\\s*(?:=|;)|"
+        r"import\\s+.+\\s+from\\s+['\\\"]|"
+        r"export\\s+(?:default|const|function|class)|"
+        r"(?:async\\s+)?function\\s+[A-Za-z_$][\\w$]*\\s*\\(|"
+        r"class\\s+[A-Za-z_$][\\w$]*|"
+        r"console\\.(?:log|error|warn|info)\\s*\\(|"
+        r"(?:if|for|while|switch|try)\\s*\\("
+        r")"
+    )
+    return bool(javascript_statement.search(stripped))
 
 def code_execution_available() -> bool:
     """Expose code execution only after the private runner and both auth settings are configured."""
