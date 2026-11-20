@@ -265,7 +265,7 @@ def explicit_code_execution_request(text: str) -> bool:
     if stripped.startswith("```") and stripped.endswith("```") and len(stripped) > 6:
         return True
     import re
-    return bool(re.fullmatch(r"(?:print|console\\.log)\\s*\\([\\s\\S]*\\)\\s*;?", stripped))
+    return bool(re.fullmatch(r"(?:print|console\.log)\s*\([\s\S]*\)\s*;?", stripped))
 
 
 def code_execution_available() -> bool:
