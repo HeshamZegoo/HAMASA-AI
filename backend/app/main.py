@@ -446,6 +446,69 @@ def _tts_clean(text: str) -> str:
     text = re.sub(r"\s+", " ", text)
     return text.strip()
 
+
+def _normalize_wav_for_nvidia(audio_bytes: bytes) -> bytes:
+    """Normalize PCM WAV uploads to Whisper's mono, 16-bit, 16 kHz input."""
+    import array
+    import io
+    import wave
+
+    if not audio_bytes.startswith(b"RIFF") or audio_bytes[8:12] != b"WAVE":
+        return audio_bytes
+    try:
+        with wave.open(io.BytesIO(audio_bytes), "rb") as source:
+            channels = source.getnchannels()
+            width = source.getsampwidth()
+            rate = source.getframerate()
+            if source.getcomptype() != "NONE" or channels not in (1, 2) or width not in (1, 2, 3, 4):
+                return audio_bytes
+            frames = source.readframes(source.getnframes())
+        if width == 1:
+            samples = array.array("h", ((v - 128) << 8 for v in frames))
+        elif width == 2:
+            samples = array.array("h")
+            samples.frombytes(frames[:len(frames) - len(frames) % 2])
+        elif width == 3:
+            samples = array.array("h", (
+                max(-32768, min(32767, int.from_bytes(frames[i:i+3], "little", signed=True) >> 8))
+                for i in range(0, len(frames) - 2, 3)
+            ))
+        else:
+            values = array.array("i")
+            values.frombytes(frames[:len(frames) - len(frames) % 4])
+            samples = array.array("h", (max(-32768, min(32767, v >> 16)) for v in values))
+        if channels == 2:
+            mono = array.array("h", (
+                max(-32768, min(32767, (samples[i] + samples[i+1]) // 2))
+                for i in range(0, len(samples) - 1, 2)
+            ))
+        else:
+            mono = samples
+        if rate <= 0 or not mono:
+            return audio_bytes
+        target_rate = 16000
+        if rate != target_rate:
+            count = max(1, round(len(mono) * target_rate / rate))
+            converted = array.array("h")
+            scale = rate / target_rate
+            last = len(mono) - 1
+            for i in range(count):
+                pos = min(last, i * scale)
+                left = int(pos)
+                right = min(last, left + 1)
+                fraction = pos - left
+                converted.append(max(-32768, min(32767, round(mono[left] * (1-fraction) + mono[right] * fraction))))
+            mono = converted
+        output = io.BytesIO()
+        with wave.open(output, "wb") as target:
+            target.setnchannels(1)
+            target.setsampwidth(2)
+            target.setframerate(target_rate)
+            target.writeframes(mono.tobytes())
+        return output.getvalue()
+    except (wave.Error, EOFError, ValueError, OverflowError):
+        return audio_bytes
+
 @app.post("/api/transcribe")
 async def transcribe_audio(body: TranscriptionRequest):
     # Validate the payload before checking provider configuration so malformed
@@ -463,13 +526,20 @@ async def transcribe_audio(body: TranscriptionRequest):
         raise HTTPException(status_code=503, detail="Audio transcription is temporarily unavailable.")
 
     mime_to_ext = {
-        "audio/wav": "wav", "audio/x-wav": "wav", "audio/ogg": "ogg",
-        "audio/opus": "opus", "audio/flac": "flac", "audio/mpeg": "mp3",
-        "audio/mp3": "mp3", "audio/mp4": "m4a", "audio/aac": "aac",
+        "audio/wav": "wav", "audio/x-wav": "wav", "audio/wave": "wav",
+        "audio/vnd.wave": "wav", "audio/ogg": "ogg", "audio/opus": "opus",
+        "audio/flac": "flac", "audio/mpeg": "mp3", "audio/mp3": "mp3",
+        "audio/mp4": "m4a", "audio/x-m4a": "m4a", "audio/aac": "aac",
         "audio/webm": "webm",
     }
     mime_type = body.mime_type.split(";", 1)[0].strip().lower()
-    extension = mime_to_ext.get(mime_type, "audio")
+    extension = mime_to_ext.get(mime_type)
+    if not extension:
+        raise HTTPException(status_code=415, detail="Audio format is not supported. Use WAV, OPUS, or FLAC.")
+    if extension == "wav":
+        audio_bytes = _normalize_wav_for_nvidia(audio_bytes)
+        mime_type = "audio/wav"
+        extension = "wav"
     endpoint = (
         "https://b702f636-f60c-4a3d-a6f4-f3568c13bd7d."
         "invocation.api.nvcf.nvidia.com/v1/audio/transcriptions"
