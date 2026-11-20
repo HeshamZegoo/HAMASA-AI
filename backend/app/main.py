@@ -1556,7 +1556,7 @@ async def chat(body: ChatRequest):
                                 reply_lines.append("لم يُرجع المشغّل تفاصيل إضافية.")
                         if tool_result.get("truncated"):
                             reply_lines.append("ملاحظة: تم اختصار جزء من المخرجات.")
-                        return {"reply": "\\n".join(reply_lines), "sources": []}
+                        return {"reply": "\n".join(reply_lines), "sources": []}
                     active_payload["messages"] = context_messages
                     response = await client.post(
                         f"{BASE_URL}/chat/completions",
