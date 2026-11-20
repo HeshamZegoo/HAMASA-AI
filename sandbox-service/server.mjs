@@ -82,7 +82,9 @@ export function createServer({ sandboxCreate = createRailwaySandbox } = {}) {
 
     if (request.method === "GET" && pathname === "/health") {
       const configured = Boolean(
-        process.env.RAILWAY_TOKEN && process.env.HAMASA_EXECUTOR_TOKEN
+        process.env.RAILWAY_TOKEN
+        && process.env.RAILWAY_ENVIRONMENT_ID
+        && process.env.HAMASA_EXECUTOR_TOKEN
       );
       return sendJson(response, 200, { status: "ok", configured });
     }
