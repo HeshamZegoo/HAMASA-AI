@@ -107,7 +107,7 @@ def _validation_detail(path: str, errors: list[dict]) -> str:
             and tuple(error.get("loc", ()))[-1:] == ("content",)
             for error in errors
         ):
-            return "A chat message is too long. Please keep each message under 12,000 characters."
+            return "A chat message is too long. Please keep each message under 100,000 characters."
         if any(
             error.get("type") == "string_too_short"
             and tuple(error.get("loc", ()))[-1:] == ("content",)
@@ -300,7 +300,7 @@ class ConversationFile(BaseModel):
 
 class ConversationMessage(BaseModel):
     role: Literal["user", "bot"]
-    text: str = Field(min_length=1, max_length=12000)
+    text: str = Field(min_length=1, max_length=100000)
     demo: bool = False
     sources: list[ConversationSource] = Field(default_factory=list, max_length=10)
     file: ConversationFile | None = None
@@ -309,6 +309,19 @@ class ConversationSaveRequest(BaseModel):
     title: str = Field(min_length=1, max_length=120)
     messages: list[ConversationMessage] = Field(min_length=1, max_length=500)
     updated_at: int = Field(default_factory=lambda: int(time.time()))
+
+def _requested_spreadsheet_sheet_name(prompt: str) -> str | None:
+    """Extract an explicitly requested Excel worksheet name from the user's prompt."""
+    match = re.search(
+        r"(?:ورقة(?:\s+عمل)?\s+(?:باسم|اسمها)\s+|(?:worksheet|sheet)\s+(?:named|called)\s+)[\"'“”]?([^\"'“”\\n,؛.]{1,31})",
+        prompt,
+        re.IGNORECASE,
+    )
+    if not match:
+        return None
+    name = re.sub(r"[\\\\/*?:\\[\\]]", "_", match.group(1).strip())[:31]
+    return name or None
+
 
 def _requested_pdf_page_count(prompt: str) -> int:
     """Read numeric and common written page counts in Arabic or English requests."""
@@ -1177,7 +1190,7 @@ async def generate_file(body: FileCreateRequest):
         data = json.loads(raw)
         title = str(data.get("title") or "Hamasa document")[:120]
         message = str(data.get("message") or "جهزتلك الملف.")[:500]
-        file_bytes = build_file(body.format, title, str(data.get("content") or ""), data.get("rows") or [], requested_pages if body.format == "pdf" else 0)
+        file_bytes = build_file(body.format, title, str(data.get("content") or ""), data.get("rows") or [], requested_pages if body.format == "pdf" else 0, _requested_spreadsheet_sheet_name(body.prompt) if body.format == "xlsx" else None)
         safe_title = "".join(c for c in title if c.isalnum() or c in " _-").strip()[:70] or "hamasa-file"
         filename = safe_title + "." + body.format
         mime = {
