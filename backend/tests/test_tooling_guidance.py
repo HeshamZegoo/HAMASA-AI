@@ -2,6 +2,7 @@ import unittest
 
 from backend.app.tooling import (
     RELIABILITY_AND_TASK_EXECUTION_GUIDANCE,
+    TOOL_CAPABILITIES_PROMPT,
     build_tool_capabilities_prompt,
 )
 
@@ -47,7 +48,7 @@ class AssistantBehaviorGuidanceTests(unittest.TestCase):
         self.assertIn("latest user's language and dialect", RELIABILITY_AND_TASK_EXECUTION_GUIDANCE)
 
     def test_guidance_describes_real_github_read_and_external_tool_boundaries(self):
-        guidance = RELIABILITY_AND_TASK_EXECUTION_GUIDANCE
+        guidance = RELIABILITY_AND_TASK_EXECUTION_GUIDANCE + TOOL_CAPABILITIES_PROMPT
         self.assertIn("isolated code-execution sandbox", guidance)
         self.assertIn("interactive browser automation", guidance)
         self.assertIn("github_read_file", guidance)
