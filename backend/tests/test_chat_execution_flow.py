@@ -62,7 +62,7 @@ class CodeExecutionChatFlowTests(unittest.IsolatedAsyncioTestCase):
         execute = AsyncMock(return_value={
             "ok": True,
             "language": "python",
-            "stdout": "2\n",
+            "stdout": "HAMASA-RUN: 123456\n",
             "stderr": "",
             "exit_code": 0,
             "timed_out": False,
@@ -77,7 +77,7 @@ class CodeExecutionChatFlowTests(unittest.IsolatedAsyncioTestCase):
                         "name": "run_code",
                         "arguments": json.dumps({
                             "language": "python",
-                            "code": "print(1 + 1)",
+                            "code": "import random print(f'HAMASA-RUN: {random.randint(100000, 999999)}')",
                         }),
                     },
                 }],
@@ -88,11 +88,18 @@ class CodeExecutionChatFlowTests(unittest.IsolatedAsyncioTestCase):
             for context in self._patches(execute):
                 stack.enter_context(context)
             result = await main.chat(main.ChatRequest(messages=[
-                main.Message(role="user", content="print(1 + 1)")
+                main.Message(role="user", content="import random\nprint(f'HAMASA-RUN: {random.randint(100000, 999999)}')")
             ]))
 
         self.assertIn("Output:", result["reply"])
-        self.assertTrue(result["reply"].endswith("2"))
+        self.assertTrue(result["reply"].endswith("123456"))
+        self.assertEqual(
+            execute.await_args.args[1],
+            {
+                "language": "python",
+                "code": "import random\nprint(f'HAMASA-RUN: {random.randint(100000, 999999)}')",
+            },
+        )
         execute.assert_awaited_once()
         self.assertEqual(len(FakeProviderClient.calls), 1)
         self.assertEqual(
