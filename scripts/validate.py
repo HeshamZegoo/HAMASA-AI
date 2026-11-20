@@ -80,8 +80,10 @@ def main() -> None:
     attachments = ATTACHMENTS.read_text(encoding="utf-8")
     if '<script src="./config.js"></script>' not in html:
         fail("index.html must load config.js before the inline application script")
-    if any(term in html.lower() for term in ("getusermedia", "microphone", "micbtn", "id=\"mic\"", "/api/live", "voicemode")):
-        fail("microphone/live voice code or UI is still present in index.html")
+    if any(term in html.lower() for term in ("/api/live", "voicemode")):
+        fail("unimplemented live voice streaming code is still present in index.html")
+    if 'id="micBtn"' not in html or "MediaRecorder" not in html or "getUserMedia" not in html:
+        fail("the user-initiated microphone recording flow is incomplete")
     if "voiceUrl" in config or "/api/live" in config:
         fail("live voice endpoint is still present in config.js")
     if "response.status === 401" not in html or "keeping it for the next retry" not in html:
@@ -124,6 +126,8 @@ def main() -> None:
         fail("chat requests must validate the current message and send normalized non-empty messages")
     if "request_validation_error_handler" not in backend_source or "_validation_detail" not in backend_source:
         fail("backend must return safe, actionable request-validation errors")
+    if 'id="micBtn"' not in html or "MediaRecorder" not in html or "getUserMedia" not in html or "/api/transcribe" not in html:
+        fail("mobile microphone recording must use the existing server-side transcription endpoint")
 
     for extension in ("mp3", "wav", "m4a", "aac", "ogg", "webm"):
         if f'"{extension}"' not in attachments or f".{extension}" not in attachments:
