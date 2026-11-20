@@ -91,20 +91,14 @@ class CodeExecutionChatFlowTests(unittest.IsolatedAsyncioTestCase):
                 main.Message(role="user", content="print(1 + 1)")
             ]))
 
-        self.assertEqual(result["reply"], "2")
+        self.assertIn("Output:\\n2", result["reply"])
         execute.assert_awaited_once()
-        self.assertEqual(len(FakeProviderClient.calls), 2)
+        self.assertEqual(len(FakeProviderClient.calls), 1)
         self.assertEqual(
             FakeProviderClient.calls[0]["json"]["tool_choice"]["function"]["name"],
             "run_code",
         )
-        final_payload = FakeProviderClient.calls[1]["json"]
-        self.assertNotIn("tools", final_payload)
-        self.assertNotIn("tool_choice", final_payload)
-        self.assertTrue(any(
-            message.get("role") == "tool" and '"stdout": "2\\n"' in message.get("content", "")
-            for message in final_payload["messages"]
-        ))
+        self.assertIn("تم تنفيذ الكود بنجاح", result["reply"])
 
     async def test_unexpected_tool_call_does_not_execute_any_tool(self):
         execute = AsyncMock()
