@@ -1464,7 +1464,21 @@ async function send(text) {
   const m = { role: 'user', text }; cur.messages.push(m); msgs.append(bubble(m)); save(); renderHist();
   inp.value = ''; grow(); return respond();
 }
-window.HAMASA_VOICE_BRIDGE = Object.freeze({ send: (text) => send(text), speak: (text, button) => readMessageAloud(text, button), language: () => lang });
+window.HAMASA_VOICE_BRIDGE = Object.freeze({
+  send: (text) => send(text),
+  speak: (text, button) => readMessageAloud(text, button),
+  speakAndWait: async (text, button) => {
+    await readMessageAloud(text, button);
+    while (activeSpeechButton === button && activeSpeech) {
+      const current = activeSpeech;
+      await new Promise(resolve => {
+        current.addEventListener('ended', resolve, { once: true });
+        current.addEventListener('error', resolve, { once: true });
+      });
+    }
+  },
+  language: () => lang
+});
 
 function grow() {
   inp.style.height = '42px';
