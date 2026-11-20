@@ -77,7 +77,7 @@ class AudioTranscriptionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(caught.exception.status_code, 400)
 
 
-    async def test_wav_is_normalized_to_mono_16khz_pcm_before_nvidia_upload(self):
+    async def test_wav_is_normalized_to_mono_16khz_pcm_before_nvidia_upload(self):  # regression: TTS-generated WAV
         import io
         import wave
         source = io.BytesIO()
