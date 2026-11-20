@@ -223,7 +223,7 @@ CHAT_TOOLS = [
         "type": "function",
         "function": {
             "name": "run_code",
-            "description": "Execute a Python or JavaScript program in a fresh isolated Linux VM when the user asks to run, test, or verify code. Returns actual stdout, stderr, exit code, and timeout status. Only Python and JavaScript are supported; source is limited to 50,000 bytes and execution to 20 seconds.",
+            "description": "Execute the complete Python or JavaScript source exactly as supplied in the code argument in a fresh isolated Linux VM. Preserve every newline and indentation level; never concatenate separate statements onto one line. For example, keep `import random` and `print(random.randint(1, 9))` on separate lines in the code string. Returns actual stdout, stderr, exit code, and timeout status. Only Python and JavaScript are supported; source is limited to 50,000 bytes and execution to 20 seconds.",
             "parameters": {
                 "type": "object",
                 "properties": {

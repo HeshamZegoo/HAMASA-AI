@@ -43,6 +43,20 @@ class CalculatorToolTests(unittest.TestCase):
             self.assertTrue(code_execution_available())
             self.assertIn("run_code", [tool["function"]["name"] for tool in get_chat_tools()])
 
+    def test_run_code_tool_requires_exact_multiline_source_preservation(self):
+        with patch.dict("os.environ", {
+            "HAMASA_EXECUTOR_ENABLED": "true",
+            "HAMASA_EXECUTOR_URL": "http://hamasa-code-sandbox.railway.internal:3000",
+            "HAMASA_EXECUTOR_TOKEN": "test-token",
+        }, clear=True):
+            tool = next(
+                item for item in get_chat_tools()
+                if item["function"]["name"] == "run_code"
+            )
+        description = tool["function"]["description"]
+        self.assertIn("Preserve every newline", description)
+        self.assertIn("never concatenate separate statements", description)
+
     def test_code_request_accepts_python_and_javascript_only(self):
         self.assertEqual(validate_code_request("python", "print(1)"), ("python", "print(1)"))
         self.assertEqual(validate_code_request("javascript", "console.log(1)")[0], "javascript")
