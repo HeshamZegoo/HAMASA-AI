@@ -283,7 +283,7 @@ async def run_isolated_code(language: Any, code: Any) -> dict[str, Any]:
     token = os.getenv("HAMASA_EXECUTOR_TOKEN", "").strip()
     try:
         async with httpx.AsyncClient(
-            timeout=httpx.Timeout(45.0, connect=5.0),
+            timeout=httpx.Timeout(300.0, connect=8.0),
             follow_redirects=False,
             trust_env=False,
         ) as client:
@@ -295,13 +295,15 @@ async def run_isolated_code(language: Any, code: Any) -> dict[str, Any]:
         try:
             result = response.json()
         except ValueError:
-            result = {}
-        if not isinstance(result, dict):
-            result = {}
+            if response.status_code >= 400:
+                result = {}
+            else:
+                return {"ok": False, "error": "The isolated code runner returned an invalid response."}
         if response.status_code >= 400:
+            error = result.get("error") if isinstance(result, dict) else None
             return {
                 "ok": False,
-                "error": str(result.get("error") or "The isolated code runner rejected the request.")[:240],
+                "error": str(error or "The isolated code runner rejected the request.")[:240],
                 "status_code": response.status_code,
             }
         if not isinstance(result, dict):
