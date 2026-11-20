@@ -85,7 +85,7 @@ header{display:flex;align-items:center;gap:8px;padding:calc(10px + env(safe-area
 .cb:hover{background:var(--glass2);color:var(--fg)}
 .cb.recording{background:#d83a4a;color:#fff;box-shadow:0 0 0 5px rgba(216,58,74,.14);animation:micPulse 1.2s infinite}
 @keyframes micPulse{50%{box-shadow:0 0 0 8px rgba(216,58,74,.05)}}
-.mic-status{max-width:760px;margin:0 auto 6px;padding:0 8px;color:var(--mut);font-size:12px;line-height:1.4}
+.mic-status{display:block;max-width:760px;margin:0 auto 6px;padding:0 8px;color:var(--mut);font-size:12px;line-height:1.4}
 .cb svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .send{background:linear-gradient(135deg,var(--acc),#6a1bd6);color:#fff;box-shadow:0 8px 22px rgba(209,0,209,.4)}
 .send:hover{color:#fff;background:linear-gradient(135deg,var(--acc),#6a1bd6)}
@@ -1182,8 +1182,15 @@ const micButton = $('#micBtn');
 const micStatus = $('#micStatus');
 function setMicStatus(key) {
   if (!micStatus) return;
-  micStatus.textContent = key ? t(key) : '';
-  micStatus.hidden = !key;
+  if (key) {
+    micStatus.dataset.i = key;
+    micStatus.textContent = t(key);
+    micStatus.hidden = false;
+  } else {
+    delete micStatus.dataset.i;
+    micStatus.textContent = '';
+    micStatus.hidden = true;
+  }
 }
 function resetMicButton() {
   if (!micButton) return;
