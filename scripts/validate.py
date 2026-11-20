@@ -84,6 +84,8 @@ def main() -> None:
         fail("unimplemented live voice streaming code is still present in index.html")
     if 'id="micBtn"' not in html or "MediaRecorder" not in html or "getUserMedia" not in html:
         fail("the user-initiated microphone recording flow is incomplete")
+    if "sendBtn.disabled = busy || voiceTranscribing || voiceRecorder?.state === 'recording'" not in html:
+        fail("chat sending must remain disabled while microphone recording or transcription is active")
     if "voiceUrl" in config or "/api/live" in config:
         fail("live voice endpoint is still present in config.js")
     if "response.status === 401" not in html or "keeping it for the next retry" not in html:
