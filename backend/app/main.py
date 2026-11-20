@@ -1531,28 +1531,32 @@ async def chat(body: ChatRequest):
                             "content": json.dumps(tool_result, ensure_ascii=False)[:12000],
                         })
                     if force_code_execution:
-                        # The run_code result is final tool context. Ask the model for
-                        # its user-facing answer without exposing tools again; this avoids
-                        # an unnecessary second forced tool-call round trip.
-                        final_messages = [
-                            *context_messages,
-                            {
-                                "role": "system",
-                                "content": (
-                                    "The run_code tool has already been executed exactly once. "
-                                    "Do not call any tool again. Report the actual stdout, stderr, "
-                                    "exit code, and timeout status from the tool result above. "
-                                    "If it succeeded, state its actual output; if it failed, "
-                                    "explain the actual failure without guessing."
-                                ),
-                            },
-                        ]
-                        response = await client.post(
-                            f"{BASE_URL}/chat/completions",
-                            headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"},
-                            json={**payload, "messages": final_messages},
-                        )
-                        break
+                        # Return the executor's real result directly. A second LLM
+                        # response can misstate a SyntaxError or invent a successful
+                        # output; execution diagnostics must remain authoritative.
+                        execution_ok = bool(tool_result.get("ok"))
+                        stdout = str(tool_result.get("stdout") or "").strip()
+                        stderr = str(tool_result.get("stderr") or "").strip()
+                        exit_code = tool_result.get("exit_code")
+                        timed_out = bool(tool_result.get("timed_out"))
+                        if execution_ok:
+                            reply_lines = ["تم تنفيذ الكود بنجاح.", f"Exit code: {exit_code}"]
+                            if stdout:
+                                reply_lines.extend(["Output:", stdout])
+                            else:
+                                reply_lines.append("لم ينتج الكود أي مخرجات.")
+                        else:
+                            reply_lines = ["فشل تنفيذ الكود.", f"Exit code: {exit_code}"]
+                            if timed_out:
+                                reply_lines.append("انتهت مهلة التنفيذ.")
+                            diagnostic = stderr or stdout or str(tool_result.get("error") or "")
+                            if diagnostic:
+                                reply_lines.extend(["تفاصيل الخطأ:", diagnostic[:8000]])
+                            else:
+                                reply_lines.append("لم يُرجع المشغّل تفاصيل إضافية.")
+                        if tool_result.get("truncated"):
+                            reply_lines.append("ملاحظة: تم اختصار جزء من المخرجات.")
+                        return {"reply": "\\n".join(reply_lines), "sources": []}
                     active_payload["messages"] = context_messages
                     response = await client.post(
                         f"{BASE_URL}/chat/completions",
