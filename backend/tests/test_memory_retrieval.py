@@ -60,6 +60,18 @@ class RelevantMemoryRetrievalTests(unittest.TestCase):
         self.assertEqual(selected, [])
 
 
+    def test_generic_single_word_overlap_does_not_pull_in_another_project(self):
+        memories = [
+            {"category": "project", "text": "HAMASA backend uses FastAPI."},
+            {"category": "project", "text": "ZEGO project uses Debian live-build."},
+        ]
+        selected = select_relevant_memories(
+            memories,
+            "Fix the HAMASA project FastAPI backend",
+        )
+        self.assertEqual([item["text"] for item in selected], [memories[0]["text"]])
+
+
 class LegacyMemoryContextTests(unittest.TestCase):
     def test_legacy_context_keeps_only_statements_related_to_the_latest_turn(self):
         legacy = (
