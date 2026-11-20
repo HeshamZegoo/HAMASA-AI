@@ -88,6 +88,7 @@ def _runtime_tool_status() -> dict[str, bool]:
         "memory": bool(has_valid_memory_key and has_database),
         "accounts": bool(len(JWT_SECRET) >= 32 and has_database),
         "code_execution": code_execution_available(),
+        "image_generation": bool(API_KEY and os.getenv("AI_IMAGE_MODEL", "").strip()),
     }
 
 app = FastAPI(
@@ -1545,7 +1546,7 @@ async def chat(body: ChatRequest):
                                         "code": original_source[1],
                                     }
                             tool_result = await execute_chat_tool(name, arguments, _live_web_search)
-                            if name == "web_search" and isinstance(tool_result, dict):
+                            if name in {"web_search", "deep_research"} and isinstance(tool_result, dict):
                                 web_sources.extend(tool_result.get("sources") or [])
                             elif name == "open_webpage" and isinstance(tool_result, dict) and tool_result.get("ok"):
                                 # Preserve opened-page provenance so the final chat response
