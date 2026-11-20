@@ -1072,7 +1072,7 @@ def capabilities():
 async def generate_image(body: ImageCreateRequest):
     """Generate or edit an image through an explicitly configured image-capable provider."""
     image_model = os.getenv("AI_IMAGE_MODEL", "").strip()
-    image_base_url = os.getenv("AI_IMAGE_BASE_URL", BASE_URL).strip().rstrip("/")
+    image_base_url = (os.getenv("AI_IMAGE_BASE_URL", "").strip() or BASE_URL).rstrip("/")
     if not API_KEY or not image_model:
         raise HTTPException(status_code=503, detail="Image generation is not configured for this provider.")
     payload = {"model": image_model, "prompt": body.prompt, "size": body.size, "n": 1}
