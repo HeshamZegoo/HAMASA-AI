@@ -991,7 +991,7 @@ function errorRow(error) {
 function setBusy(v) { busy = v; sendBtn.disabled = v || !inp.value.trim(); }
 function requestedFileFormat(text) {
   const s = String(text || '').toLowerCase().trim();
-  const formatMention = /\b(pdf|xlsx|excel|spreadsheet|docx|word|pptx|powerpoint|slides|presentation|csv|json|html|markdown|md|txt)\b|\.pdf|بي\s*دي\s*اف|بي دي اف|اكسل|إكسل|اكسيل|وورد|باوربوينت|عرض تقديمي|شرائح|ملف نصي/.test(s);
+  const formatMention = /\b(pdf|xlsx|excel|spreadsheet|docx|word|pptx|powerpoint|slides|presentation|csv|json|html|markdown|md|txt|css|javascript|js|typescript|ts|python|py|sql|shell|sh)\b|\.(pdf|html?|css|js|ts|py|sql|sh)\b|بي\s*دي\s*اف|بي دي اف|اكسل|إكسل|اكسيل|وورد|باوربوينت|عرض تقديمي|شرائح|ملف نصي|ملف كود|ملف برمجي/.test(s);
   const action = /(اعمل|اعملي|اعمله|اعملهولي|اعمللي|اعمليلي|أنشئ|انشئ|انشأ|جهز|جهزي|جهزلي|حضّر|حضر|حوّل|حول|صدّر|صدر|اكتب|اكتبلي|نزّل|نزل|حمّل|حمل|احفظ|جهّز|generate|create|make|export|download|save|please|can you|could you|i need|i want)/.test(s) ||
     /(عايز|عاوز|عايزة|عاوزة|محتاج|محتاجة).{0,30}(ملف|مستند|تقرير|pdf|وورد|word|excel|اكسل|إكسل)/.test(s) ||
     /ممكن.{0,15}(تعمل|تعملي|تجهز|تنشئ|تطلع|تحول)/.test(s);
@@ -1002,7 +1002,13 @@ function requestedFileFormat(text) {
   if (/\b(pptx|powerpoint|slides|presentation)\b|باوربوينت|عرض تقديمي|شرائح/.test(s)) return 'pptx';
   if (/\b(csv)\b/.test(s)) return 'csv';
   if (/\b(json)\b/.test(s)) return 'json';
-  if (/\b(html)\b/.test(s)) return 'html';
+  if (/\b(html)\b|\.html?\b/.test(s)) return 'html';
+  if (/\b(css)\b|\.css\b/.test(s)) return 'css';
+  if (/\b(javascript|js)\b|\.js\b/.test(s)) return 'js';
+  if (/\b(typescript|ts)\b|\.ts\b/.test(s)) return 'ts';
+  if (/\b(python|py)\b|\.py\b|بايثون/.test(s)) return 'py';
+  if (/\b(sql)\b|\.sql\b/.test(s)) return 'sql';
+  if (/\b(shell|bash|sh)\b|\.sh\b/.test(s)) return 'sh';
   if (/\b(markdown|md)\b/.test(s)) return 'md';
   if (/\b(txt|text file)\b|ملف نصي/.test(s)) return 'txt';
   if (/\b(docx|word)\b|وورد/.test(s)) return 'docx';
