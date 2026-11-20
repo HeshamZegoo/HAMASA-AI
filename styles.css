@@ -122,3 +122,42 @@ html[dir="ltr"] .message{direction:ltr}
 #imageDownload{display:inline-block;margin:8px 0;color:var(--acc);text-decoration:underline}
 #imageDownload[hidden]{display:none}
 @media(max-width:600px){.hamasa-tool-dialog{padding:12px;max-height:92dvh}.workspace-editor{min-height:220px}.workspace-toolbar input{min-width:100px}}
+
+/* Regression follow-up: keep the composer usable and the workspace genuinely editable on phones. */
+@media(max-width:600px){
+ .hamasa-tool-dialog#workspaceDlg{
+   box-sizing:border-box;
+   width:calc(100vw - 16px);
+   max-width:calc(100vw - 16px);
+   min-width:0;
+   max-height:94dvh;
+   padding:12px;
+   margin:auto;
+ }
+ #workspaceDlg .workspace-toolbar{gap:6px}
+ #workspaceDlg .workspace-toolbar button{flex:0 0 auto;min-height:36px}
+ #workspaceDlg .workspace-toolbar input{flex:1 1 130px;min-width:0}
+ #workspaceDlg .workspace-toolbar select{flex:1 1 120px;min-width:0}
+ #workspaceDlg .workspace-editor{
+   box-sizing:border-box;
+   width:100%;
+   min-width:0;
+   min-height:48dvh;
+   max-height:62dvh;
+   resize:vertical;
+   font-size:12px!important;
+   line-height:1.55;
+   padding:10px;
+ }
+ #workspaceDlg .workspace-preview{height:42dvh}
+ #workspaceDlg .workspace-output{max-height:20dvh}
+ .composer{gap:5px;padding:8px}
+ .composer textarea{box-sizing:border-box;min-width:0;width:0;flex:1 1 0;padding:6px 3px;font-size:13px}
+ .composer .send-button,.composer .mic-inline{width:34px;height:34px;flex:0 0 34px}
+ .composer-wrap{padding-inline:8px}
+}
+@media(max-width:380px){
+ .composer{gap:3px;padding:7px}
+ .composer .send-button,.composer .mic-inline{width:31px;height:33px;flex-basis:31px}
+ .composer textarea{font-size:12px}
+}
