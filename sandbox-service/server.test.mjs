@@ -32,6 +32,26 @@ test("health endpoint reports provider configuration without exposing secrets", 
   }
 });
 
+test("health reports configured only when all provider credentials are present", async () => {
+  process.env.RAILWAY_TOKEN = "railway-test-token";
+  process.env.HAMASA_EXECUTOR_TOKEN = "test-shared-token";
+  delete process.env.RAILWAY_ENVIRONMENT_ID;
+  const server = createServer({ sandboxCreate: async () => { throw new Error("must not run"); } });
+  try {
+    await withServer(server, async (base) => {
+      const missingEnvironment = await (await fetch(base + "/health")).json();
+      assert.equal(missingEnvironment.configured, false);
+      process.env.RAILWAY_ENVIRONMENT_ID = "production-environment-id";
+      const ready = await (await fetch(base + "/health")).json();
+      assert.equal(ready.configured, true);
+    });
+  } finally {
+    delete process.env.RAILWAY_TOKEN;
+    delete process.env.RAILWAY_ENVIRONMENT_ID;
+    delete process.env.HAMASA_EXECUTOR_TOKEN;
+  }
+});
+
 test("execution requires the internal bearer token", async () => {
   process.env.RAILWAY_TOKEN = "railway-test-token";
   process.env.HAMASA_EXECUTOR_TOKEN = "test-shared-token";
