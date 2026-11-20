@@ -23,6 +23,12 @@ class CodingGuidanceTests(unittest.TestCase):
         self.assertIn("صفحة أو تطبيق ويب", self.guidance("عايز تعمللي صفحة ويب"))
         self.assertTrue(self.guidance("Create a website for my portfolio"))
 
+    def test_ecommerce_and_marketplace_requests_get_full_project_guidance(self):
+        result = self.guidance("اعمل متجر إلكتروني زي جوميا")
+        self.assertIn("لا ترفض بناء مشروع كبير", result)
+        self.assertIn("واجهة + Backend + قاعدة بيانات", result)
+        self.assertTrue(self.guidance("Build an ecommerce marketplace with a shopping cart"))
+
     def test_normal_chat_does_not_get_coding_guidance(self):
         self.assertEqual(self.guidance("عامل إيه النهارده؟"), "")
 
