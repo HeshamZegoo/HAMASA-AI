@@ -9,6 +9,7 @@ on:
       - "index.html"
       - "config.js"
       - "attachments.js"
+      - "voice-mode.js"
       - "scripts/validate.py"
       - "sandbox-service/**"
   pull_request:
@@ -43,6 +44,8 @@ jobs:
           python-version: "3.12"
       - name: Validate frontend and backend contract
         run: python scripts/validate.py
+      - name: Check voice client JavaScript syntax
+        run: node --check voice-mode.js
 
   sandbox-service-tests:
     runs-on: ubuntu-latest
