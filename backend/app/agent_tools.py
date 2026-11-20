@@ -264,7 +264,7 @@ def get_chat_tools() -> list[dict[str, Any]]:
 
 
 def validate_code_request(language: Any, code: Any) -> tuple[str, str]:
-    if language not in {"python", "javascript"}:
+    if not isinstance(language, str) or language not in {"python", "javascript"}:
         raise ValueError("Only Python and JavaScript execution are supported.")
     if not isinstance(code, str) or not code.strip():
         raise ValueError("Code must be a non-empty string.")
@@ -295,6 +295,8 @@ async def run_isolated_code(language: Any, code: Any) -> dict[str, Any]:
         try:
             result = response.json()
         except ValueError:
+            result = {}
+        if not isinstance(result, dict):
             result = {}
         if response.status_code >= 400:
             return {
