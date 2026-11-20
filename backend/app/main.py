@@ -313,7 +313,7 @@ class ConversationSaveRequest(BaseModel):
 def _requested_spreadsheet_sheet_name(prompt: str) -> str | None:
     """Extract an explicitly requested Excel worksheet name from the user's prompt."""
     match = re.search(
-        r"(?:ورقة(?:\s+عمل)?\s+(?:باسم|اسمها)\s+|(?:worksheet|sheet)\s+(?:named|called)\s+)[\"'“”]?([^\"'“”\\n,؛.]{1,31})",
+        r"(?:ورقة(?:\s+عمل)?\s+(?:باسم|اسمها)\s+|(?:worksheet|sheet)\s+(?:named|called)\s+)[\"'“”]?([^,؛.\r\n]{1,31})",
         prompt,
         re.IGNORECASE,
     )
