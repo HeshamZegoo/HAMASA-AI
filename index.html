@@ -701,6 +701,10 @@ const openSet = () => { if (innerWidth < 1024) nav(false); renderMemories(); dlg
 $('#setBtn').onclick = openSet; $('#setSide').onclick = openSet; $('#dX').onclick = () => dlg.close();
 dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
 $('#clearBtn').onclick = async () => {
+  const confirmText = lang === "ar"
+    ? "متأكد إنك عايز تمسح كل المحادثات؟ الحذف نهائي."
+    : "Delete all conversations? This cannot be undone.";
+  if (!window.confirm(confirmText)) return;
   convs = []; cur = null; store.set('hamasa.convs', convs);
   if (authUser && cloudHistoryReady) {
     try { const r = await apiFetch(API_BASE + "/api/chats", { method: "DELETE" }); if (!r.ok) throw new Error("Cloud clear failed"); }
@@ -869,6 +873,8 @@ function renderHist() {
     const b = document.createElement('button'); b.className = 't'; b.textContent = c.title; b.onclick = () => { cur = c; renderChat(); renderHist(); if (innerWidth < 1024) nav(false); };
     const x = document.createElement('button'); x.className = 'x'; x.setAttribute('aria-label', t('del')); x.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 18L6 6"/></svg>';
     x.onclick = async () => {
+      const confirmText = lang === "ar" ? "تمسح المحادثة دي؟" : "Delete this conversation?";
+      if (!window.confirm(confirmText)) return;
       if (authUser && cloudHistoryReady && c.id) {
         try { const response = await apiFetch(API_BASE + "/api/chats/" + encodeURIComponent(c.id), { method: "DELETE" }); if (!response.ok && response.status !== 404) throw new Error("Delete failed"); }
         catch { toast(lang === "ar" ? "تعذر حذف المحادثة من الحساب." : "Could not delete this chat."); return; }
