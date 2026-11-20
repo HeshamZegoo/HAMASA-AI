@@ -146,6 +146,7 @@ _RATE_WINDOWS = {
     "/api/auth/signup": (5, 3600),
     "/api/auth/login": (10, 900),
     "/api/chat": (20, 60),
+    "/api/chat/stream": (20, 60),
     "/api/files/generate": (4, 600),
     "/api/images/generate": (3, 600),
     "/api/transcribe": (8, 60),
@@ -154,6 +155,7 @@ _RATE_WINDOWS = {
 }
 _REQUEST_BODY_LIMITS = {
     "/api/chat": 90 * 1024 * 1024,
+    "/api/chat/stream": 90 * 1024 * 1024,
     "/api/files/generate": 90 * 1024 * 1024,
     "/api/images/generate": 16 * 1024 * 1024,
     "/api/transcribe": 17 * 1024 * 1024,
@@ -1781,7 +1783,7 @@ async def chat_stream(body: ChatRequest):
             context.insert(-len(prepared), {"role": "system", "content": format_search_context(found)})
         else:
             context.insert(-len(prepared), {"role": "system", "content": "Live web search did not return verifiable results; be explicit and do not invent sources."})
-    force_code = explicit_code_execution_request(latest) and code_execution_available()
+    force_code = explicit_code_execution_request(latest) and code_execution_available() and not has_images
     if explicit_code_execution_request(latest) and not code_execution_available():
         context.insert(-len(prepared), {"role": "system", "content": "The isolated code runner is unavailable. Do not claim that code was executed; offer an explanation or static review instead."})
     if force_code:
@@ -1836,7 +1838,8 @@ async def chat_stream(body: ChatRequest):
                             content = delta.get("content")
                             if isinstance(content, str) and content:
                                 emitted = True
-                                yield _sse_event({"type": "delta", "content": content})
+                                if not force_code:
+                                    yield _sse_event({"type": "delta", "content": content})
                             for item in delta.get("tool_calls") or []:
                                 index = int(item.get("index", 0))
                                 call = tool_calls.setdefault(index, {"id": "", "type": "function", "function": {"name": "", "arguments": ""}})
@@ -1848,6 +1851,9 @@ async def chat_stream(body: ChatRequest):
                                 if function.get("arguments"):
                                     call["function"]["arguments"] += function["arguments"]
                     if not tool_calls:
+                        if force_code:
+                            yield _sse_event({"type": "error", "message": "The AI provider did not start code execution. No code was run."})
+                            return
                         if not emitted:
                             yield _sse_event({"type": "error", "message": "AI provider returned an empty response."})
                             return
