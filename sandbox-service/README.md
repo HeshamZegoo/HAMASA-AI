@@ -24,7 +24,7 @@ Create a private service in the existing HAMASA-AI production project:
 - Private network endpoint: `hamasa-code-sandbox`
 - Do not create a public domain.
 
-Set `RAILWAY_TOKEN` on this service to a Railway **project token scoped only to the production environment**. Create it in Project Settings → Tokens. The Railway SDK uses this token to create/destroy sandboxes; it is never passed into the sandbox VM.
+Set `RAILWAY_TOKEN` on this service to a Railway **project token scoped only to the production environment**. Create it in Project Settings → Tokens. Set `RAILWAY_ENVIRONMENT_ID` to the production environment ID. The Railway SDK uses these values to create/destroy sandboxes; neither is ever passed into the sandbox VM.
 
 Set the same randomly generated `HAMASA_EXECUTOR_TOKEN` on this service and the `hamasa-api` service. On the API service also set:
 
