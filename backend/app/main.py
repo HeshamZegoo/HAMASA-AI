@@ -1477,7 +1477,7 @@ async def chat(body: ChatRequest):
             elif response.status_code < 400 and not has_images:
                 # Bounded tool loop: the model can call tools, inspect their real
                 # results, and continue. Never execute arbitrary model-generated code.
-                for _tool_round in range(4):
+                for _tool_round in range(1 if force_code_execution else 4):
                     try:
                         current_data = response.json()
                         assistant_message = current_data["choices"][0]["message"]
@@ -1487,7 +1487,7 @@ async def chat(body: ChatRequest):
                     if not tool_calls:
                         break
                     assistant_message = dict(assistant_message)
-                    assistant_message["tool_calls"] = tool_calls[:4]
+                    assistant_message["tool_calls"] = tool_calls[:1] if force_code_execution else tool_calls[:4]
                     context_messages.append(assistant_message)
                     for tool_call in assistant_message["tool_calls"]:
                         call_id = str(tool_call.get("id") or "")
@@ -1537,7 +1537,7 @@ async def chat(body: ChatRequest):
                     if last_message.get("tool_calls"):
                         final_messages = [
                             *context_messages,
-                            {"role": "system", "content": "The tool-call budget is exhausted. Do not request more tools. Give the best accurate answer from the tool results already present, and clearly state any remaining limitation."},
+                            {"role": "system", "content": ("The run_code tool has already been executed exactly once. Do not call any tool again. Report the actual stdout, stderr, exit code, and timeout status from the tool result above. If it succeeded, state its actual output; if it failed, explain the actual failure without guessing." if force_code_execution else "The tool-call budget is exhausted. Do not request more tools. Give the best accurate answer from the tool results already present, and clearly state any remaining limitation.")},
                         ]
                         response = await client.post(
                             f"{BASE_URL}/chat/completions",
