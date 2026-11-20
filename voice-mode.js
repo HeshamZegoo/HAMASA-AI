@@ -37,12 +37,55 @@
     setStatus("المحادثة اتوقفت.");
   }
   const close=()=>{endSession();dialog.classList.remove("open");};
+  async function toNvidiaWav(blob){
+    if((blob.type||"").toLowerCase().startsWith("audio/wav"))return blob;
+    const AudioCtx=window.AudioContext||window.webkitAudioContext;
+    if(!AudioCtx)throw new Error("المتصفح لا يستطيع تجهيز التسجيل لصيغة NVIDIA المطلوبة.");
+    const context=new AudioCtx();
+    let decoded;
+    try{
+      decoded=await context.decodeAudioData(await blob.arrayBuffer());
+    }catch(error){
+      throw new Error("تعذر تحويل تسجيل الآيفون للصيغة الصوتية المطلوبة. جرّب التسجيل مرة أخرى.");
+    }finally{
+      await context.close().catch(()=>{});
+    }
+    const targetRate=16000, sourceRate=decoded.sampleRate;
+    const outputLength=Math.max(1,Math.ceil(decoded.length*targetRate/sourceRate));
+    const mono=new Float32Array(outputLength);
+    const channels=decoded.numberOfChannels;
+    const input=Array.from({length:channels},(_,i)=>decoded.getChannelData(i));
+    for(let i=0;i<outputLength;i++){
+      const position=i*sourceRate/targetRate;
+      const left=Math.min(decoded.length-1,Math.floor(position));
+      const right=Math.min(decoded.length-1,left+1);
+      const fraction=position-left;
+      let sample=0;
+      for(let channel=0;channel<channels;channel++){
+        const data=input[channel];
+        sample+=(data[left]*(1-fraction)+data[right]*fraction)/channels;
+      }
+      mono[i]=Math.max(-1,Math.min(1,sample));
+    }
+    const buffer=new ArrayBuffer(44+mono.length*2),view=new DataView(buffer);
+    const write=(offset,value)=>{for(let i=0;i<value.length;i++)view.setUint8(offset+i,value.charCodeAt(i));};
+    write(0,"RIFF");view.setUint32(4,36+mono.length*2,true);write(8,"WAVE");write(12,"fmt ");
+    view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,1,true);
+    view.setUint32(24,targetRate,true);view.setUint32(28,targetRate*2,true);
+    view.setUint16(32,2,true);view.setUint16(34,16,true);write(36,"data");view.setUint32(40,mono.length*2,true);
+    for(let i=0;i<mono.length;i++){
+      const sample=mono[i]<0?mono[i]*32768:mono[i]*32767;
+      view.setInt16(44+i*2,Math.round(sample),true);
+    }
+    return new Blob([buffer],{type:"audio/wav"});
+  }
   async function transcribe(blob){
     if(!blob||blob.size<1200)return "";
     if(blob.size>11*1024*1024)throw new Error("التسجيل طويل جدًا؛ حاول تقسم كلامك.");
-    const raw=(blob.type||"audio/webm").split(";")[0].toLowerCase();
-    const mime=raw==="audio/x-m4a"?"audio/mp4":raw;
-    const dataUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(new Error("تعذرت قراءة التسجيل."));reader.onload=()=>resolve(String(reader.result||""));reader.readAsDataURL(blob);});
+    const nvidiaBlob=await toNvidiaWav(blob);
+    if(nvidiaBlob.size>11*1024*1024)throw new Error("التسجيل كبير جدًا بعد تجهيزه؛ حاول تقسم كلامك.");
+    const mime="audio/wav";
+    const dataUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(new Error("تعذرت قراءة التسجيل."));reader.onload=()=>resolve(String(reader.result||""));reader.readAsDataURL(nvidiaBlob);});
     const comma=dataUrl.indexOf(",");
     const response=await fetch(apiBase+"/api/transcribe",{method:"POST",credentials:"include",headers:{"Content-Type":"application/json","X-Hamasa-Request":"1"},body:JSON.stringify({audio:dataUrl.slice(comma+1),mime_type:mime}),signal:AbortSignal.timeout?AbortSignal.timeout(120000):undefined});
     const data=await response.json().catch(()=>({}));
