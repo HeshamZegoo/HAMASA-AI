@@ -93,7 +93,7 @@ class PublicGitHubReaderRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 await read_public_github_file("octocat", "hello-world", "large.txt", "main")
 
     async def test_rejects_non_utf8_file(self):
-        encoded = base64.b64encode(b"\\xff\\xfe").decode("ascii")
+        encoded = base64.b64encode(bytes([0xff, 0xfe])).decode("ascii")
         client = _FakeClient(_FakeResponse({
             "type": "file", "size": 2, "encoding": "base64", "content": encoded,
         }))
