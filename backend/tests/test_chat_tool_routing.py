@@ -152,5 +152,27 @@ class ChatToolRoutingTests(unittest.IsolatedAsyncioTestCase):
         search.assert_not_awaited()
 
 
+class LegacyConversationContextRoutingTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        FakeProviderClient.payloads = []
+
+    async def test_chat_filters_unrelated_legacy_context_before_provider_inference(self):
+        body = main.ChatRequest(
+            messages=[main.Message(role="user", content="صلح HAMASA FastAPI backend")],
+            memory=(
+                "سياق أقدم من المحادثة الحالية:\n"
+                "المستخدم: ZEGO Disk Health OS uses Debian live-build.\n"
+                "المستخدم: HAMASA AI backend uses FastAPI and Railway."
+            ),
+        )
+        with patch.object(main, "API_KEY", "test-api-key"):
+            with patch("backend.app.main.httpx.AsyncClient", FakeProviderClient):
+                await main.chat(body)
+
+        provider_context = str(FakeProviderClient.payloads[-1]["messages"])
+        self.assertIn("HAMASA AI backend uses FastAPI and Railway", provider_context)
+        self.assertNotIn("ZEGO Disk Health OS", provider_context)
+
+
 if __name__ == "__main__":
     unittest.main()

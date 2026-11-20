@@ -136,6 +136,8 @@ python -m unittest discover -s backend/tests -v
 
 The backend test workflow is defined in `.github/workflows/backend-tests.yml`. Run the tests and review the changes before deploying to production.
 
+The suite also contains deterministic, offline assistant evaluations for search intent, tool argument handling, source URL/date grounding, untrusted-page handling, SSRF protection, memory relevance, account isolation, and memory encryption. These evaluate application orchestration and safety without calling a paid model; they do not replace a separately approved live-model quality evaluation.
+
 ## Project status
 
 HAMASA is under active development. This README describes the current application architecture and configured capabilities; it does not imply that every optional provider or feature is enabled in every deployment. Actual AI quality, image understanding, web research, and voice behavior depend on the selected provider, model, credentials, and runtime environment.
