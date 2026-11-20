@@ -63,10 +63,13 @@ def main() -> None:
     ATTACHMENTS = ROOT / "attachments.js"
     if not INDEX.is_file() or not CONFIG.is_file() or not ATTACHMENTS.is_file():
         fail("index.html, config.js, or attachments.js is missing")
-    sandbox_files = ("package.json", "server.mjs", "server.test.mjs", "README.md")
+    sandbox_files = ("package.json", "server.mjs", "server.test.mjs", "README.md", "Dockerfile")
     for name in sandbox_files:
         if not (SANDBOX_SERVICE / name).is_file():
             fail(f"isolated sandbox service file is missing: {name}")
+    sandbox_dockerfile = (SANDBOX_SERVICE / "Dockerfile").read_text(encoding="utf-8")
+    if "FROM node:22-bookworm-slim" not in sandbox_dockerfile or "USER node" not in sandbox_dockerfile:
+        fail("sandbox service must use the pinned Node 22 base image and run as non-root")
     sandbox_source = (SANDBOX_SERVICE / "server.mjs").read_text(encoding="utf-8")
     for required in ("networkIsolation: \"ISOLATED\"", "timeoutSec: EXECUTION_TIMEOUT_SECONDS", "await sandbox.destroy()", "timingSafeEqual"):
         if required not in sandbox_source:
