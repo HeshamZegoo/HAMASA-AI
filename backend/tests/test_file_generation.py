@@ -8,9 +8,24 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
 
 from backend.app.file_generation import build_file
+from backend.app.main import _requested_pdf_page_count
 
 
 class FileGenerationTests(unittest.TestCase):
+    def test_requested_pdf_page_count_supports_english_and_arabic(self):
+        cases = {
+            "Create a PDF with 3 pages": 3,
+            "Make exactly 2 pages": 2,
+            "اعمل ملف PDF من ٣ صفحات": 3,
+            "عايزه من تلت صفحات": 3,
+            "تقرير بعدد ٥ صفحات": 5,
+            "Create a one page PDF": 1,
+            "Make a PDF with 25 pages": 20,
+            "Create a PDF with pages": 0,
+        }
+        for prompt, expected in cases.items():
+            with self.subTest(prompt=prompt):
+                self.assertEqual(_requested_pdf_page_count(prompt), expected)
     def test_docx_contains_title_headings_and_body(self):
         raw = build_file("docx", "HAMASA Report", "# Summary\nImportant result", [])
         document = Document(io.BytesIO(raw))
