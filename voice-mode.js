@@ -3,9 +3,9 @@
   if (window.__HAMASA_VOICE_MODE__) return;
   window.__HAMASA_VOICE_MODE__ = true;
   const $ = (id) => document.getElementById(id);
-  const openButton = $("voiceModeOpen");
+  const openButton = $("voice-mode-open");
   if (!openButton) return;
-  const apiBase = String(window.HAMASA_CONFIG?.API_URL || "https://hamasa-api-production.up.railway.app").replace(/\\/+$/, "");
+  const apiBase = String(window.HAMASA_CONFIG?.API_URL || "https://hamasa-api-production.up.railway.app").replace(/\/+$/, "");
   let recorder = null, stream = null, chunks = [], busy = false, lastReply = "", speechButton = null;
   const dialog = document.createElement("section");
   dialog.id = "hamasaVoiceDialog";
