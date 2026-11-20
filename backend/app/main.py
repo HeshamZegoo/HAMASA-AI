@@ -546,15 +546,35 @@ async def transcribe_audio(body: TranscriptionRequest):
     )
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(90.0, connect=20.0)) as client:
-            response = await client.post(
-                endpoint,
-                headers={"Authorization": f"Bearer {api_key}", "Accept": "application/json"},
-                data={"language": "multi", "response_format": "json"},
-                files={"file": (f"hamasa-audio.{extension}", audio_bytes, mime_type or "application/octet-stream")},
+            response = None
+            for attempt in range(3):
+                response = await client.post(
+                    endpoint,
+                    headers={"Authorization": f"Bearer {api_key}", "Accept": "application/json"},
+                    data={"language": "multi", "response_format": "json"},
+                    files={"file": (f"hamasa-audio.{extension}", audio_bytes, mime_type or "application/octet-stream")},
+                )
+                # NVCF can briefly fail while its inference worker is starting or recovering.
+                # Retry only provider-side 5xx responses; never retry malformed client uploads.
+                if response.status_code < 500 or attempt == 2:
+                    break
+                logger.warning(
+                    "NVIDIA transcription temporary failure; retrying attempt=%s status=%s",
+                    attempt + 1,
+                    response.status_code,
+                )
+                await asyncio.sleep(1.0 * (attempt + 1))
+        if response is None or response.status_code >= 400:
+            provider_detail = response.text[:300] if response is not None else "No provider response"
+            logger.error(
+                "NVIDIA transcription failed after retries: status=%s body=%s",
+                response.status_code if response is not None else "none",
+                provider_detail,
             )
-        if response.status_code >= 400:
-            logger.error("NVIDIA transcription failed: status=%s body=%s", response.status_code, response.text[:300])
-            raise HTTPException(status_code=502, detail="NVIDIA transcription service could not process this audio format or request.")
+            raise HTTPException(
+                status_code=502,
+                detail="NVIDIA transcription is temporarily unavailable. Please try again in a moment.",
+            )
         data = response.json()
         transcript = data.get("text", data.get("transcript", "")) if isinstance(data, dict) else ""
         if not isinstance(transcript, str):

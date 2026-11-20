@@ -951,7 +951,7 @@ function splitSpeechSegments(text) {
   const segments = [];
   let prefix = '';
   for (const token of tokens) {
-    const language = /[\\u0600-\\u06FF\\u0750-\\u077F]/u.test(token)
+    const language = /[\u0600-\u06FF\u0750-\u077F]/u.test(token)
       ? 'ar-XA'
       : /[A-Za-z]/u.test(token) ? 'en-US' : null;
     if (!language) {

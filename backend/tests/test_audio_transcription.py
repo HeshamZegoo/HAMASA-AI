@@ -103,6 +103,29 @@ class AudioTranscriptionTests(unittest.IsolatedAsyncioTestCase):
                 await main.transcribe_audio(body)
         self.assertEqual(caught.exception.status_code, 415)
 
+    async def test_provider_5xx_is_retried_before_returning_error(self):
+        class FailingThenSuccess(FakeNvidiaClient):
+            calls = []
+            async def post(self, url, headers=None, data=None, files=None):
+                self.calls.append({"url": url})
+                if len(self.calls) < 3:
+                    response = FakeNvidiaResponse()
+                    response.status_code = 500
+                    response.text = "temporary inference connection error"
+                    return response
+                return FakeNvidiaResponse()
+
+        body = main.TranscriptionRequest(
+            audio=base64.b64encode(b"x" * 2048).decode("ascii"),
+            mime_type="audio/ogg",
+        )
+        with patch.dict(os.environ, {"AI_API_KEY": "shared-provider-test-key"}):
+            with patch("backend.app.main.httpx.AsyncClient", FailingThenSuccess):
+                with patch("backend.app.main.asyncio.sleep", new_callable=unittest.mock.AsyncMock):
+                    result = await main.transcribe_audio(body)
+        self.assertEqual(result["transcript"], "عامل إيه يا حماصة؟ Hello!")
+        self.assertEqual(len(FailingThenSuccess.calls), 3)
+
     async def test_valid_audio_requires_the_shared_provider_key(self):
         body = main.TranscriptionRequest(
             audio=base64.b64encode(b"x" * 2048).decode("ascii"),
