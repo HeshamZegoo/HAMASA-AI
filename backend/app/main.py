@@ -1401,8 +1401,10 @@ async def chat(body: ChatRequest):
                     tool_calls = assistant_message.get("tool_calls") or []
                     if not tool_calls:
                         break
+                    assistant_message = dict(assistant_message)
+                    assistant_message["tool_calls"] = tool_calls[:4]
                     context_messages.append(assistant_message)
-                    for tool_call in tool_calls[:4]:
+                    for tool_call in assistant_message["tool_calls"]:
                         call_id = str(tool_call.get("id") or "")
                         function = tool_call.get("function") or {}
                         name = str(function.get("name") or "")
@@ -1430,6 +1432,24 @@ async def chat(body: ChatRequest):
                     )
                     if response.status_code >= 400:
                         break
+
+                # If the model keeps requesting tools after the bounded loop,
+                # require a user-facing answer using only the results already obtained.
+                if response.status_code < 400:
+                    try:
+                        last_message = response.json()["choices"][0]["message"]
+                    except (ValueError, KeyError, IndexError, TypeError):
+                        last_message = {}
+                    if last_message.get("tool_calls"):
+                        final_messages = [
+                            *context_messages,
+                            {"role": "system", "content": "The tool-call budget is exhausted. Do not request more tools. Give the best accurate answer from the tool results already present, and clearly state any remaining limitation."},
+                        ]
+                        response = await client.post(
+                            f"{BASE_URL}/chat/completions",
+                            headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"},
+                            json={**payload, "messages": final_messages},
+                        )
 
         if response.status_code >= 400:
             provider_message = "AI provider rejected the request."
