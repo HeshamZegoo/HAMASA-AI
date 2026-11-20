@@ -1037,41 +1037,55 @@ async function generateRequestedFile() {
 }
 function addFileDownload(target, file) {
   const bytes = Uint8Array.from(atob(file.data), c => c.charCodeAt(0));
-  const blob = new Blob([bytes], { type: file.mime_type });
+  const blob = new Blob([bytes], { type: file.mime_type || 'application/octet-stream' });
   const objectUrl = URL.createObjectURL(blob);
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  const save = document.createElement('button');
-  save.type = 'button';
-  save.textContent = isIOS ? 'حفظ الملف في «الملفات»' : '⬇ تنزيل ' + file.filename;
-  save.style.cssText = 'display:inline-flex;margin:12px 8px 0 0;padding:10px 14px;border:0;border-radius:12px;background:linear-gradient(135deg,var(--acc),#6a1bd6);color:white;font-weight:700;cursor:pointer';
-  save.addEventListener('click', async () => {
+
+  const actions = document.createElement('div');
+  actions.setAttribute('aria-label', 'خيارات حفظ الملف');
+  actions.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:14px;width:100%';
+
+  const save = document.createElement('a');
+  save.href = objectUrl;
+  save.download = file.filename || 'hamasa-file';
+  save.rel = 'noopener';
+  save.textContent = isIOS ? '⬇ تنزيل / فتح الملف' : '⬇ تنزيل ' + (file.filename || 'الملف');
+  save.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;min-height:44px;box-sizing:border-box;padding:11px 16px;border:0;border-radius:12px;background:linear-gradient(135deg,var(--acc),#6a1bd6);color:white;font-weight:700;text-decoration:none;cursor:pointer';
+
+  const share = document.createElement('button');
+  share.type = 'button';
+  share.textContent = 'مشاركة / حفظ في «الملفات»';
+  share.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;min-height:44px;box-sizing:border-box;padding:11px 16px;border:1px solid var(--line);border-radius:12px;background:transparent;color:var(--fg);font-weight:700;cursor:pointer';
+  share.addEventListener('click', async () => {
+    const downloadable = new File([blob], file.filename || 'hamasa-file', {
+      type: file.mime_type || 'application/octet-stream'
+    });
     try {
-      const downloadable = new File([blob], file.filename, { type: file.mime_type });
       if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [downloadable] }))) {
-        await navigator.share({ files: [downloadable], title: file.filename });
+        await navigator.share({ files: [downloadable], title: file.filename || 'Hamasa file' });
         return;
       }
-      const link = document.createElement('a');
-      link.href = objectUrl;
-      link.download = file.filename;
-      link.target = '_blank';
-      link.rel = 'noopener';
-      link.click();
-      if (isIOS) window.open(objectUrl, '_blank', 'noopener');
+      // Keep the action useful in browsers without file sharing.
+      window.open(objectUrl, '_blank');
     } catch (error) {
       if (error && error.name === 'AbortError') return;
-      window.open(objectUrl, '_blank', 'noopener');
+      // The direct download/open link remains visible as a fallback.
+      window.open(objectUrl, '_blank');
     }
   });
+
   const open = document.createElement('a');
   open.href = objectUrl;
   open.target = '_blank';
   open.rel = 'noopener';
-  open.textContent = 'فتح / معاينة الملف';
-  open.style.cssText = 'display:inline-flex;margin-top:12px;padding:10px 14px;border:1px solid var(--line);border-radius:12px;color:var(--fg);text-decoration:none;font-weight:600';
-  target.append(save, open);
-  setTimeout(() => URL.revokeObjectURL(objectUrl), 10 * 60 * 1000);
+  open.textContent = 'معاينة الملف';
+  open.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;min-height:44px;box-sizing:border-box;padding:11px 16px;border:1px solid var(--line);border-radius:12px;color:var(--fg);text-decoration:none;font-weight:600';
+
+  actions.append(save, share, open);
+  target.append(actions);
+  // Retain the object URL long enough for the user to open or share the file.
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 30 * 60 * 1000);
 }
 async function respond() {
   setBusy(true); typing();
