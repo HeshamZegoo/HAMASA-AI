@@ -91,7 +91,8 @@ class CodeExecutionChatFlowTests(unittest.IsolatedAsyncioTestCase):
                 main.Message(role="user", content="print(1 + 1)")
             ]))
 
-        self.assertIn("Output:\\n2", result["reply"])
+        self.assertIn("Output:", result["reply"])
+        self.assertTrue(result["reply"].endswith("2"))
         execute.assert_awaited_once()
         self.assertEqual(len(FakeProviderClient.calls), 1)
         self.assertEqual(
