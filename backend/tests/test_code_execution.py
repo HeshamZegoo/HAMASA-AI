@@ -5,6 +5,13 @@ from unittest.mock import patch
 from backend.app import agent_tools
 
 
+class FakeHealthResponse:
+    status_code = 200
+
+    def json(self):
+        return {"status": "ok", "configured": True}
+
+
 class FakeResponse:
     status_code = 200
 
@@ -33,8 +40,13 @@ class FakeAsyncClient:
     async def __aexit__(self, exc_type, exc, tb):
         return False
 
+    async def get(self, url, headers=None):
+        self.calls.append({"method": "GET", "url": url, "headers": headers, "options": self.options})
+        return FakeHealthResponse()
+
     async def post(self, url, headers=None, json=None):
         self.calls.append({
+            "method": "POST",
             "url": url,
             "headers": headers,
             "json": json,
@@ -106,7 +118,10 @@ class IsolatedCodeExecutionTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertTrue(result["ok"])
         self.assertEqual(result["stdout"], "2\n")
-        call = FakeAsyncClient.calls[0]
+        health_call, call = FakeAsyncClient.calls
+        self.assertEqual(health_call["method"], "GET")
+        self.assertEqual(health_call["url"], "http://hamasa-code-sandbox.railway.internal:3000/health")
+        self.assertEqual(call["method"], "POST")
         self.assertEqual(call["url"], "http://hamasa-code-sandbox.railway.internal:3000/execute")
         self.assertEqual(call["json"], {"language": "python", "code": "print(1 + 1)"})
         self.assertEqual(call["headers"]["Authorization"], "Bearer shared-secret")
@@ -138,6 +153,35 @@ class IsolatedCodeExecutionTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertFalse(result["ok"])
         self.assertIn("invalid response", result["error"].lower())
+
+    async def test_runner_health_must_report_configured_before_code_is_sent(self):
+        class NotReadyResponse:
+            status_code = 200
+
+            def json(self):
+                return {"status": "ok", "configured": False}
+
+        class NotReadyClient(FakeAsyncClient):
+            async def get(self, url, headers=None):
+                self.calls.append({"method": "GET", "url": url})
+                return NotReadyResponse()
+
+            async def post(self, url, headers=None, json=None):
+                self.calls.append({"method": "POST", "url": url, "json": json})
+                raise AssertionError("code must not be sent to an unconfigured runner")
+
+        with patch.dict(os.environ, {
+            "HAMASA_EXECUTOR_ENABLED": "true",
+            "HAMASA_EXECUTOR_URL": "http://runner:3000",
+            "HAMASA_EXECUTOR_TOKEN": "shared-secret",
+        }, clear=True):
+            with patch.object(agent_tools.httpx, "AsyncClient", NotReadyClient):
+                result = await agent_tools.run_isolated_code("python", "print('no')")
+
+        self.assertFalse(result["ok"])
+        self.assertFalse(result["available"])
+        self.assertEqual(len(NotReadyClient.calls), 1)
+        self.assertEqual(NotReadyClient.calls[0]["method"], "GET")
 
     async def test_unconfigured_runner_never_attempts_execution(self):
         with patch.dict(os.environ, {}, clear=True):
