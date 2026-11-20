@@ -72,6 +72,14 @@ class RelevantMemoryRetrievalTests(unittest.TestCase):
         self.assertEqual([item["text"] for item in selected], [memories[0]["text"]])
 
 
+    def test_trailing_punctuation_does_not_break_technical_term_matching(self):
+        selected = select_relevant_memories(
+            [{"category": "project", "text": "The backend uses FastAPI."}],
+            "FastAPI",
+        )
+        self.assertEqual(len(selected), 1)
+
+
 class LegacyMemoryContextTests(unittest.TestCase):
     def test_legacy_context_keeps_only_statements_related_to_the_latest_turn(self):
         legacy = (
