@@ -321,7 +321,7 @@ def build_file(fmt: str, title: str, content: str, rows: list, page_count: int =
             "<title>" + escape(title) + "</title>\n</head>\n"
             "<body>\n" + source + "\n</body>\n</html>\n"
         ).encode("utf-8")
-    if fmt in ("css", "js", "ts", "py", "sql", "sh"):
+    if fmt in ("css", "js", "ts", "py", "sql", "sh", "java", "c", "h", "cpp", "hpp", "cs", "go", "rs", "php", "rb", "kt", "swift"):
         return _strip_source_fence(content).encode("utf-8")
     raise ValueError("Unsupported file format")
 
