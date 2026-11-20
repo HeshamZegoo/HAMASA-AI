@@ -138,14 +138,21 @@ export function createServer({ sandboxCreate = (options) => Sandbox.create(optio
         ephemeral: true,
       });
 
+      const stdoutRaw = Buffer.from(String(result.stdout || ""));
+      const stderrRaw = Buffer.from(String(result.stderr || ""));
+      const stdout = stdoutRaw.subarray(0, MAX_OUTPUT_BYTES).toString("utf8");
+      const remainingOutputBytes = Math.max(0, MAX_OUTPUT_BYTES - Buffer.byteLength(stdout));
+      const stderr = stderrRaw.subarray(0, remainingOutputBytes).toString("utf8");
+      const outputWasTrimmed = stdoutRaw.length > MAX_OUTPUT_BYTES
+        || stderrRaw.length > remainingOutputBytes;
       resultPayload = {
         ok: result.exitCode === 0 && !result.timedOut,
         language: body.language,
         exit_code: result.exitCode,
-        stdout: String(result.stdout || "").slice(0, MAX_OUTPUT_BYTES),
-        stderr: String(result.stderr || "").slice(0, MAX_OUTPUT_BYTES),
+        stdout,
+        stderr,
         timed_out: Boolean(result.timedOut),
-        truncated: Boolean(result.truncated),
+        truncated: Boolean(result.truncated) || outputWasTrimmed,
         duration_ms: Date.now() - startedAt,
       };
     } catch (error) {
