@@ -120,6 +120,35 @@ test("code runs in an isolated VM and the VM is destroyed after the run", async 
   }
 });
 
+test("timed out code is reported accurately and its VM is still destroyed", async () => {
+  process.env.RAILWAY_TOKEN = "railway-test-token";
+  process.env.HAMASA_EXECUTOR_TOKEN = "test-shared-token";
+  let destroyed = false;
+  const sandbox = {
+    files: { write: async () => {} },
+    exec: async () => ({ exitCode: -1, stdout: "", stderr: "deadline", timedOut: true, truncated: false }),
+    destroy: async () => { destroyed = true; },
+  };
+  const server = createServer({ sandboxCreate: async () => sandbox });
+  try {
+    await withServer(server, async (base) => {
+      const response = await fetch(base + "/execute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer test-shared-token" },
+        body: JSON.stringify({ language: "javascript", code: "while (true) {}" }),
+      });
+      const result = await response.json();
+      assert.equal(response.status, 200);
+      assert.equal(result.ok, false);
+      assert.equal(result.timed_out, true);
+      assert.equal(destroyed, true);
+    });
+  } finally {
+    delete process.env.RAILWAY_TOKEN;
+    delete process.env.HAMASA_EXECUTOR_TOKEN;
+  }
+});
+
 test("oversized code is rejected before a VM is created", async () => {
   process.env.RAILWAY_TOKEN = "railway-test-token";
   process.env.HAMASA_EXECUTOR_TOKEN = "test-shared-token";
