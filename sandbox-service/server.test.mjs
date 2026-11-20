@@ -77,6 +77,7 @@ test("code runs in an isolated VM and the VM is destroyed after the run", async 
   process.env.HAMASA_EXECUTOR_TOKEN = "test-shared-token";
   const events = [];
   let createOptions;
+  let createLanguage;
   const sandbox = {
     files: {
       write: async (path, code) => events.push({ type: "write", path, code }),
@@ -88,8 +89,9 @@ test("code runs in an isolated VM and the VM is destroyed after the run", async 
     destroy: async () => events.push({ type: "destroy" }),
   };
   const server = createServer({
-    sandboxCreate: async (options) => {
+    sandboxCreate: async (options, language) => {
       createOptions = options;
+      createLanguage = language;
       events.push({ type: "create" });
       return sandbox;
     },
@@ -108,6 +110,7 @@ test("code runs in an isolated VM and the VM is destroyed after the run", async 
       assert.equal(createOptions.networkIsolation, "ISOLATED");
       assert.deepEqual(createOptions.resources, { cpu: 1, memoryGB: 2 });
       assert.equal(createOptions.idleTimeoutMinutes, 1);
+      assert.equal(createLanguage, "python");
       assert.equal(events[1].path, "/tmp/hamasa_main.py");
       assert.equal(events[2].command, "python3 /tmp/hamasa_main.py");
       assert.equal(events[2].options.timeoutSec, 20);
