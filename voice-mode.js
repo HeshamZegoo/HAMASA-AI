@@ -14,10 +14,10 @@
   dialog.setAttribute("aria-labelledby", "hvTitle");
   dialog.innerHTML = `
     <div class="hv-panel">
-      <div class="hv-head"><h2 id="hvTitle">محادثة حماصة الصوتية</h2><button class="hv-close" id="hvClose" type="button" aria-label="إغلاق">×</button></div>
+      <div class="hv-topbar"><h2 id="hvTitle">محادثة حماصة الصوتية</h2><button class="hv-close" id="hvClose" type="button" aria-label="إغلاق">×</button></div>
       <div class="hv-stage" aria-hidden="true">
         <div class="hv-aura"></div><div class="hv-orbit"></div>
-        <div class="hv-robot" id="hvRobot"><div class="hv-head"><div class="hv-eyes"><i></i><i></i></div><div class="hv-mouth"></div></div></div>
+        <div class="hv-robot" id="hvRobot"><div class="hv-face"><div class="hv-eyes"><i></i><i></i></div><div class="hv-mouth"></div></div></div>
       </div>
       <div class="hv-status" id="hvStatus" role="status" aria-live="polite">اضغط على الميكروفون وابدأ كلامك</div>
       <div class="hv-transcript" id="hvTranscript">هنا هيظهر كلامك ورد حماصة.</div>
@@ -32,7 +32,7 @@
   const setStatus = (message, mode = "") => { status.textContent = message; robot.className = "hv-robot " + mode; };
   const stopTracks = () => { if (stream) stream.getTracks().forEach(track => track.stop()); stream = null; };
   const close = () => {
-    if (recorder && recorder.state === "recording") recorder.stop();
+    if (recorder && recorder.state === "recording") { recorder.onstop = null; recorder.stop(); }
     stopTracks(); dialog.classList.remove("open"); setStatus("اضغط على الميكروفون وابدأ كلامك");
   };
   const chooseMime = () => {
