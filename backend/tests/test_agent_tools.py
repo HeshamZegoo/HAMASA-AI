@@ -6,6 +6,7 @@ from backend.app.agent_tools import (
     code_execution_available,
     get_chat_tools,
     validate_code_request,
+    run_isolated_code,
 )
 
 
@@ -53,6 +54,42 @@ class CalculatorToolTests(unittest.TestCase):
             validate_code_request("python", "  ")
         with self.assertRaises(ValueError):
             validate_code_request("python", "x" * 50_001)
+
+
+class IsolatedCodeRunnerClientTests(unittest.IsolatedAsyncioTestCase):
+    async def test_forwards_code_only_to_private_executor_with_bearer_auth(self):
+        captured = {}
+
+        class FakeResponse:
+            status_code = 200
+            def json(self):
+                return {"ok": True, "language": "python", "stdout": "2\\n", "stderr": "", "exit_code": 0}
+
+        class FakeClient:
+            def __init__(self, **kwargs):
+                captured["client_options"] = kwargs
+            async def __aenter__(self):
+                return self
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+            async def post(self, url, headers=None, json=None):
+                captured.update({"url": url, "headers": headers, "json": json})
+                return FakeResponse()
+
+        with patch.dict("os.environ", {
+            "HAMASA_EXECUTOR_ENABLED": "true",
+            "HAMASA_EXECUTOR_URL": "http://hamasa-code-sandbox.railway.internal:3000/",
+            "HAMASA_EXECUTOR_TOKEN": "private-test-token",
+        }, clear=True):
+            with patch("backend.app.agent_tools.httpx.AsyncClient", FakeClient):
+                result = await run_isolated_code("python", "print(1 + 1)")
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(captured["url"], "http://hamasa-code-sandbox.railway.internal:3000/execute")
+        self.assertEqual(captured["headers"]["Authorization"], "Bearer private-test-token")
+        self.assertEqual(captured["json"], {"language": "python", "code": "print(1 + 1)"})
+        self.assertNotIn("private-test-token", str(captured["json"]))
+
 
 
 if __name__ == "__main__":
