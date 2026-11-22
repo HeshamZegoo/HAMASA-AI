@@ -2,11 +2,17 @@ import asyncio
 import base64
 import os
 import unittest
+from email.utils import formatdate
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 from fastapi import HTTPException
 
-from backend.app.main import TranscriptionRequest, transcribe_audio
+from backend.app.main import (
+    TranscriptionRequest,
+    _nvidia_transcription_retry_delay,
+    transcribe_audio,
+)
 
 
 class NvidiaTranscriptionTests(unittest.TestCase):
@@ -158,6 +164,16 @@ class NvidiaTranscriptionTests(unittest.TestCase):
         self.assertEqual(raised.exception.status_code, 502)
         self.assertEqual(fake_client.calls, 1)
         sleep.assert_not_awaited()
+
+
+class NvidiaRetryAfterParsingTests(unittest.TestCase):
+    def test_http_date_retry_after_is_parsed_and_long_waits_are_not_retried(self):
+        response = SimpleNamespace(headers={"Retry-After": formatdate(1012, usegmt=True)})
+        with patch("backend.app.main.time.time", return_value=1010):
+            self.assertEqual(_nvidia_transcription_retry_delay(response, 0), 2.0)
+
+        long_wait = SimpleNamespace(headers={"Retry-After": "6"})
+        self.assertIsNone(_nvidia_transcription_retry_delay(long_wait, 0))
 
 
 if __name__ == "__main__":
