@@ -3,6 +3,8 @@ import asyncio
 import smtplib
 import ssl
 from email.message import EmailMessage
+from email.utils import parsedate_to_datetime
+from datetime import timezone
 import base64
 import os
 import sqlite3
@@ -509,6 +511,30 @@ def _normalize_wav_for_nvidia(audio_bytes: bytes) -> bytes:
     except (wave.Error, EOFError, ValueError, OverflowError):
         return audio_bytes
 
+def _nvidia_transcription_retry_delay(response, attempt: int) -> float | None:
+    """Honor bounded Retry-After values without allowing long request stalls."""
+    headers = getattr(response, "headers", {})
+    retry_after = headers.get("Retry-After") if hasattr(headers, "get") else None
+    if retry_after:
+        try:
+            delay = float(retry_after)
+        except (TypeError, ValueError):
+            try:
+                retry_at = parsedate_to_datetime(str(retry_after))
+                if retry_at.tzinfo is None:
+                    retry_at = retry_at.replace(tzinfo=timezone.utc)
+                delay = retry_at.timestamp() - time.time()
+            except (TypeError, ValueError, OverflowError):
+                delay = None
+        if delay is not None:
+            # Do not retry earlier than the provider requested. If the wait is
+            # longer than our bounded request budget, return control to the user.
+            if delay > 5.0:
+                return None
+            return max(0.0, delay)
+    return float(attempt + 1)
+
+
 @app.post("/api/transcribe")
 async def transcribe_audio(body: TranscriptionRequest):
     # Validate the payload before checking provider configuration so malformed
@@ -556,14 +582,22 @@ async def transcribe_audio(body: TranscriptionRequest):
                 )
                 # NVCF can briefly fail while its inference worker is starting or recovering.
                 # Retry only provider-side 5xx responses; never retry malformed client uploads.
-                if response.status_code < 500 or attempt == 2:
+                retryable = response.status_code >= 500 or response.status_code == 429
+                if not retryable or attempt == 2:
+                    break
+                delay = _nvidia_transcription_retry_delay(response, attempt)
+                if delay is None:
+                    logger.warning(
+                        "NVIDIA transcription rate limit retry deferred; Retry-After exceeds 5 seconds"
+                    )
                     break
                 logger.warning(
-                    "NVIDIA transcription temporary failure; retrying attempt=%s status=%s",
+                    "NVIDIA transcription temporary failure; retrying attempt=%s status=%s delay=%.2f",
                     attempt + 1,
                     response.status_code,
+                    delay,
                 )
-                await asyncio.sleep(1.0 * (attempt + 1))
+                await asyncio.sleep(delay)
         if response is None or response.status_code >= 400:
             provider_detail = response.text[:300] if response is not None else "No provider response"
             logger.error(
