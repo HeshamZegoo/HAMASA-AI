@@ -15,8 +15,9 @@ class NvidiaTranscriptionTests(unittest.TestCase):
 
     def _fake_client(self, statuses):
         class FakeResponse:
-            def __init__(self, status_code):
+            def __init__(self, status_code, headers=None):
                 self.status_code = status_code
+                self.headers = headers or {}
                 self.text = "provider response"
 
             def json(self):
@@ -26,7 +27,10 @@ class NvidiaTranscriptionTests(unittest.TestCase):
             calls = 0
 
             def __init__(self, **kwargs):
-                self.responses = [FakeResponse(status) for status in statuses]
+                self.responses = [
+                    FakeResponse(*status) if isinstance(status, tuple) else FakeResponse(status)
+                    for status in statuses
+                ]
 
             async def __aenter__(self):
                 return self
@@ -100,7 +104,26 @@ class NvidiaTranscriptionTests(unittest.TestCase):
 
         self.assertEqual(result["transcript"], "أهلاً، hello")
         self.assertEqual(fake_client.calls, 3)
-        self.assertEqual(sleep.await_count, 2)
+        self.assertEqual(
+            [call.args[0] for call in sleep.await_args_list],
+            [1.0, 2.0],
+        )
+
+    def test_transcription_retries_rate_limit_using_retry_after_header(self):
+        audio = b"x" * 2048
+        fake_client = self._fake_client([(429, {"Retry-After": "1"}), 200])
+
+        with patch.dict(os.environ, {"AI_API_KEY": "shared-nvidia-key"}):
+            with patch("backend.app.main.httpx.AsyncClient", fake_client):
+                with patch("backend.app.main.asyncio.sleep", new_callable=AsyncMock) as sleep:
+                    result = self._run(transcribe_audio(TranscriptionRequest(
+                        audio=base64.b64encode(audio).decode("ascii"),
+                        mime_type="audio/wav",
+                    )))
+
+        self.assertEqual(result["transcript"], "أهلاً، hello")
+        self.assertEqual(fake_client.calls, 2)
+        sleep.assert_awaited_once_with(1.0)
 
     def test_transcription_returns_502_after_three_provider_5xx_attempts(self):
         audio = b"x" * 2048
@@ -119,9 +142,9 @@ class NvidiaTranscriptionTests(unittest.TestCase):
         self.assertEqual(fake_client.calls, 3)
         self.assertEqual(sleep.await_count, 2)
 
-    def test_transcription_does_not_retry_provider_4xx_responses(self):
+    def test_transcription_does_not_retry_non_rate_limit_4xx_responses(self):
         audio = b"x" * 2048
-        fake_client = self._fake_client([429])
+        fake_client = self._fake_client([400])
 
         with patch.dict(os.environ, {"AI_API_KEY": "shared-nvidia-key"}):
             with patch("backend.app.main.httpx.AsyncClient", fake_client):
