@@ -20,6 +20,8 @@ class FakeStreamResponse:
 
 
 class FakeStreamingClient:
+    last_payload = None
+
     def __init__(self, **kwargs):
         self.options = kwargs
     async def __aenter__(self):
@@ -27,6 +29,7 @@ class FakeStreamingClient:
     async def __aexit__(self, exc_type, exc, tb):
         return False
     def stream(self, method, url, headers=None, json=None):
+        type(self).last_payload = json
         return FakeStreamResponse()
 
 
@@ -46,6 +49,29 @@ class ChatStreamingTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("world", output)
         self.assertIn('"type": "done"', output)
 
+    async def test_chat_stream_filters_unrelated_legacy_memory_before_provider_request(self):
+        body = main.ChatRequest(
+            messages=[main.Message(role="user", content="Fix the HAMASA FastAPI backend")],
+            memory=(
+                "HAMASA AI backend uses FastAPI and Railway.\n"
+                "ZEGO Disk Health OS uses Debian live-build."
+            ),
+        )
+        FakeStreamingClient.last_payload = None
+        with patch.object(main, "API_KEY", "test-key"):
+            with patch("backend.app.main.httpx.AsyncClient", FakeStreamingClient):
+                response = await main.chat_stream(body)
+                async for _chunk in response.body_iterator:
+                    pass
+
+        sent_messages = FakeStreamingClient.last_payload["messages"]
+        legacy_context = [
+            item["content"] for item in sent_messages
+            if "سياق سابق من نفس المحادثة" in item.get("content", "")
+        ]
+        self.assertEqual(len(legacy_context), 1)
+        self.assertIn("HAMASA AI backend uses FastAPI and Railway", legacy_context[0])
+        self.assertNotIn("ZEGO Disk Health OS", legacy_context[0])
 
 if __name__ == "__main__":
     unittest.main()
